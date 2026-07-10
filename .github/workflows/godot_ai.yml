@@ -103,6 +103,11 @@ jobs:
         with:
           scons-version: 4.10.1
 
+      - name: Install headless Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends --yes libfontconfig1-dev
+
       - name: Restore build cache
         uses: ./.github/actions/godot-cache-restore
         with:
@@ -126,7 +131,7 @@ jobs:
             pulseaudio=no
             dbus=no
             speechd=no
-            fontconfig=no
+            fontconfig=yes
             udev=no
             module_godot_agent_enabled=yes
 
