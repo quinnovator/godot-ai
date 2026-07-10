@@ -65,11 +65,11 @@ Dictionary GodotAgentRuntimeDebugger::_fail(const String &p_code, const String &
 }
 
 Ref<EditorDebuggerSession> GodotAgentRuntimeDebugger::_session_at(int p_session_id) {
-	const Array sessions = get_sessions();
-	if (p_session_id < 0 || p_session_id >= sessions.size()) {
+	const Array debugger_sessions = get_sessions();
+	if (p_session_id < 0 || p_session_id >= debugger_sessions.size()) {
 		return Ref<EditorDebuggerSession>();
 	}
-	return sessions[p_session_id];
+	return debugger_sessions[p_session_id];
 }
 
 int GodotAgentRuntimeDebugger::_select_active_session(int p_session_id) {
@@ -78,18 +78,18 @@ int GodotAgentRuntimeDebugger::_select_active_session(int p_session_id) {
 		return session.is_valid() && session->is_active() ? p_session_id : -1;
 	}
 
-	const Array sessions = get_sessions();
+	const Array debugger_sessions = get_sessions();
 	int first_active = -1;
-	for (int i = 0; i < sessions.size(); i++) {
-		Ref<EditorDebuggerSession> session = sessions[i];
+	for (int i = 0; i < debugger_sessions.size(); i++) {
+		Ref<EditorDebuggerSession> session = debugger_sessions[i];
 		if (session.is_null() || !session->is_active()) {
 			continue;
 		}
 		if (first_active < 0) {
 			first_active = i;
 		}
-		const SessionMetadata *metadata = session_metadata.getptr(i);
-		if (metadata && !metadata->hello.is_empty()) {
+		const SessionMetadata *session_info = session_metadata.getptr(i);
+		if (session_info && !session_info->hello.is_empty()) {
 			return i;
 		}
 	}
@@ -192,17 +192,17 @@ void GodotAgentRuntimeDebugger::_fail_pending_for_session(int p_session_id, cons
 }
 
 void GodotAgentRuntimeDebugger::_session_started(int p_session_id) {
-	SessionMetadata &metadata = session_metadata[p_session_id];
-	metadata.hello.clear();
-	metadata.hello_received_at_msec = 0;
-	metadata.started_at_msec = OS::get_singleton()->get_ticks_msec();
-	metadata.stopped_at_msec = 0;
+	SessionMetadata &session_info = session_metadata[p_session_id];
+	session_info.hello.clear();
+	session_info.hello_received_at_msec = 0;
+	session_info.started_at_msec = OS::get_singleton()->get_ticks_msec();
+	session_info.stopped_at_msec = 0;
 }
 
 void GodotAgentRuntimeDebugger::_session_stopped(int p_session_id) {
 	_expire_pending_results();
-	SessionMetadata &metadata = session_metadata[p_session_id];
-	metadata.stopped_at_msec = OS::get_singleton()->get_ticks_msec();
+	SessionMetadata &session_info = session_metadata[p_session_id];
+	session_info.stopped_at_msec = OS::get_singleton()->get_ticks_msec();
 	_fail_pending_for_session(p_session_id, "runtime_stopped", "The runtime stopped before responding to the command");
 }
 
@@ -211,9 +211,9 @@ bool GodotAgentRuntimeDebugger::_capture_hello(const Array &p_data, int p_sessio
 		return true;
 	}
 
-	SessionMetadata &metadata = session_metadata[p_session_id];
-	metadata.hello = p_data[0];
-	metadata.hello_received_at_msec = OS::get_singleton()->get_ticks_msec();
+	SessionMetadata &session_info = session_metadata[p_session_id];
+	session_info.hello = p_data[0];
+	session_info.hello_received_at_msec = OS::get_singleton()->get_ticks_msec();
 	return true;
 }
 
@@ -317,15 +317,15 @@ void GodotAgentRuntimeDebugger::setup_session(int p_session_id) {
 Dictionary GodotAgentRuntimeDebugger::status() {
 	_expire_pending_results();
 
-	Dictionary data;
-	data["protocol_version"] = PROTOCOL_VERSION;
-	data["pending_timeout_ms"] = PENDING_TIMEOUT_MSEC;
-	data["max_retained_results"] = MAX_RETAINED_RESULTS;
-	data["max_retained_payload_bytes"] = MAX_RETAINED_PAYLOAD_BYTES;
-	data["retained_result_count"] = results.size();
-	data["retained_payload_bytes"] = retained_payload_bytes;
-	data["evicted_result_count"] = evicted_result_count;
-	data["next_command_id"] = next_command_id;
+	Dictionary result_data;
+	result_data["protocol_version"] = PROTOCOL_VERSION;
+	result_data["pending_timeout_ms"] = PENDING_TIMEOUT_MSEC;
+	result_data["max_retained_results"] = MAX_RETAINED_RESULTS;
+	result_data["max_retained_payload_bytes"] = MAX_RETAINED_PAYLOAD_BYTES;
+	result_data["retained_result_count"] = results.size();
+	result_data["retained_payload_bytes"] = retained_payload_bytes;
+	result_data["evicted_result_count"] = evicted_result_count;
+	result_data["next_command_id"] = next_command_id;
 
 	int pending_count = 0;
 	for (int64_t id : result_order) {
@@ -334,39 +334,39 @@ Dictionary GodotAgentRuntimeDebugger::status() {
 			pending_count++;
 		}
 	}
-	data["pending_result_count"] = pending_count;
+	result_data["pending_result_count"] = pending_count;
 
 	Array session_statuses;
 	int active_count = 0;
 	int ready_count = 0;
-	const Array sessions = get_sessions();
-	for (int i = 0; i < sessions.size(); i++) {
-		Ref<EditorDebuggerSession> session = sessions[i];
+	const Array debugger_sessions = get_sessions();
+	for (int i = 0; i < debugger_sessions.size(); i++) {
+		Ref<EditorDebuggerSession> session = debugger_sessions[i];
 		const bool active = session.is_valid() && session->is_active();
-		const SessionMetadata *metadata = session_metadata.getptr(i);
-		const bool has_hello = metadata && !metadata->hello.is_empty();
+		const SessionMetadata *session_info = session_metadata.getptr(i);
+		const bool has_hello = session_info && !session_info->hello.is_empty();
 
 		Dictionary session_status;
 		session_status["session_id"] = i;
 		session_status["active"] = active;
 		session_status["ready"] = active && has_hello;
-		if (metadata) {
-			session_status["started_at_msec"] = metadata->started_at_msec;
-			session_status["stopped_at_msec"] = metadata->stopped_at_msec;
-			session_status["hello_received_at_msec"] = metadata->hello_received_at_msec;
+		if (session_info) {
+			session_status["started_at_msec"] = session_info->started_at_msec;
+			session_status["stopped_at_msec"] = session_info->stopped_at_msec;
+			session_status["hello_received_at_msec"] = session_info->hello_received_at_msec;
 			if (has_hello) {
-				session_status["hello"] = metadata->hello;
+				session_status["hello"] = session_info->hello;
 			}
 		}
 		session_statuses.push_back(session_status);
 		active_count += active ? 1 : 0;
 		ready_count += active && has_hello ? 1 : 0;
 	}
-	data["session_count"] = sessions.size();
-	data["active_session_count"] = active_count;
-	data["ready_session_count"] = ready_count;
-	data["sessions"] = session_statuses;
-	return _ok(data);
+	result_data["session_count"] = debugger_sessions.size();
+	result_data["active_session_count"] = active_count;
+	result_data["ready_session_count"] = ready_count;
+	result_data["sessions"] = session_statuses;
+	return _ok(result_data);
 }
 
 Dictionary GodotAgentRuntimeDebugger::send_command(const String &p_method, const Dictionary &p_params, int p_session_id) {
@@ -394,8 +394,8 @@ Dictionary GodotAgentRuntimeDebugger::send_command(const String &p_method, const
 	if (session.is_null() || !session->is_active()) {
 		return _fail("runtime_not_running", "The runtime debugger session became inactive before the command was sent", selected_session_id);
 	}
-	const SessionMetadata *metadata = session_metadata.getptr(selected_session_id);
-	if (!metadata || metadata->hello.is_empty()) {
+	const SessionMetadata *session_info = session_metadata.getptr(selected_session_id);
+	if (!session_info || session_info->hello.is_empty()) {
 		return _fail("runtime_not_ready", "The active debugger session has not announced a Godot AI runtime probe", selected_session_id);
 	}
 	if (next_command_id == INT64_MAX) {
@@ -438,12 +438,12 @@ Dictionary GodotAgentRuntimeDebugger::send_command(const String &p_method, const
 	payload.push_back(command);
 	session->send_message("godot_ai:command", payload);
 
-	Dictionary data;
-	data["id"] = id;
-	data["session_id"] = selected_session_id;
-	data["status"] = "pending";
-	data["timeout_ms"] = PENDING_TIMEOUT_MSEC;
-	return _ok(data);
+	Dictionary result_data;
+	result_data["id"] = id;
+	result_data["session_id"] = selected_session_id;
+	result_data["status"] = "pending";
+	result_data["timeout_ms"] = PENDING_TIMEOUT_MSEC;
+	return _ok(result_data);
 }
 
 Dictionary GodotAgentRuntimeDebugger::get_result(int64_t p_id, bool p_consume) {

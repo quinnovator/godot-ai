@@ -955,10 +955,10 @@ Dictionary GodotAgentEditorPlugin::_set_node_property(Node *p_node, const String
 	if (!set_valid) {
 		return _fail("property_set_rejected", "The node rejected the property assignment", String(p_property));
 	}
-	Dictionary data;
-	data["property"] = p_property;
-	data["value"] = _encode_variant(p_node->get(p_property));
-	return _ok(data);
+	Dictionary result_data;
+	result_data["property"] = p_property;
+	result_data["value"] = _encode_variant(p_node->get(p_property));
+	return _ok(result_data);
 }
 
 Dictionary GodotAgentEditorPlugin::_apply_node_properties(Node *p_node, const Dictionary &p_properties) const {
@@ -1001,71 +1001,71 @@ Node *GodotAgentEditorPlugin::_find_node(const Dictionary &p_params, const Strin
 }
 
 Dictionary GodotAgentEditorPlugin::_describe_node(Node *p_node, Node *p_root, bool p_include_warnings) const {
-	Dictionary data;
-	data["path"] = p_node == p_root ? "." : String(p_root->get_path_to(p_node));
-	data["name"] = String(p_node->get_name());
-	data["type"] = p_node->get_class();
-	data["child_count"] = p_node->get_child_count(false);
+	Dictionary result_data;
+	result_data["path"] = p_node == p_root ? "." : String(p_root->get_path_to(p_node));
+	result_data["name"] = String(p_node->get_name());
+	result_data["type"] = p_node->get_class();
+	result_data["child_count"] = p_node->get_child_count(false);
 	if (!p_node->get_scene_file_path().is_empty()) {
-		data["scene_file_path"] = p_node->get_scene_file_path();
+		result_data["scene_file_path"] = p_node->get_scene_file_path();
 	}
 	if (p_node->has_meta(SNAME("extras"))) {
-		Dictionary metadata;
-		metadata["extras"] = _encode_variant(p_node->get_meta(SNAME("extras")));
-		data["metadata"] = metadata;
+		Dictionary node_metadata;
+		node_metadata["extras"] = _encode_variant(p_node->get_meta(SNAME("extras")));
+		result_data["metadata"] = node_metadata;
 	}
 	if (p_node->get_owner()) {
-		data["owner_path"] = p_node->get_owner() == p_root ? "." : String(p_root->get_path_to(p_node->get_owner()));
+		result_data["owner_path"] = p_node->get_owner() == p_root ? "." : String(p_root->get_path_to(p_node->get_owner()));
 	}
 	if (Node3D *node_3d = Object::cast_to<Node3D>(p_node)) {
-		data["visible"] = node_3d->is_visible_in_tree();
-		data["transform"] = _encode_variant(node_3d->get_transform());
-		data["global_transform"] = _encode_variant(node_3d->get_global_transform());
+		result_data["visible"] = node_3d->is_visible_in_tree();
+		result_data["transform"] = _encode_variant(node_3d->get_transform());
+		result_data["global_transform"] = _encode_variant(node_3d->get_global_transform());
 	}
 	if (Node2D *node_2d = Object::cast_to<Node2D>(p_node)) {
-		data["visible"] = node_2d->is_visible_in_tree();
-		data["transform"] = _encode_variant(node_2d->get_transform());
-		data["global_transform"] = _encode_variant(node_2d->get_global_transform());
+		result_data["visible"] = node_2d->is_visible_in_tree();
+		result_data["transform"] = _encode_variant(node_2d->get_transform());
+		result_data["global_transform"] = _encode_variant(node_2d->get_global_transform());
 	}
 	if (VisualInstance3D *visual = Object::cast_to<VisualInstance3D>(p_node)) {
-		data["local_aabb"] = _encode_variant(visual->get_aabb());
+		result_data["local_aabb"] = _encode_variant(visual->get_aabb());
 	}
 	if (Skeleton3D *skeleton = Object::cast_to<Skeleton3D>(p_node)) {
-		data["bone_count"] = skeleton->get_bone_count();
+		result_data["bone_count"] = skeleton->get_bone_count();
 	}
 	if (p_include_warnings) {
-		data["warnings"] = p_node->get_configuration_warnings();
+		result_data["warnings"] = p_node->get_configuration_warnings();
 	}
-	return data;
+	return result_data;
 }
 
 Dictionary GodotAgentEditorPlugin::_describe_tree(Node *p_node, Node *p_root, int p_depth, int p_max_depth, bool p_include_internal, bool p_include_warnings, int &r_node_count) const {
 	r_node_count++;
-	Dictionary data = _describe_node(p_node, p_root, p_include_warnings);
+	Dictionary result_data = _describe_node(p_node, p_root, p_include_warnings);
 	if (p_depth >= p_max_depth) {
-		data["truncated"] = p_node->get_child_count(p_include_internal) > 0;
-		return data;
+		result_data["truncated"] = p_node->get_child_count(p_include_internal) > 0;
+		return result_data;
 	}
 	Array children;
 	for (int i = 0; i < p_node->get_child_count(p_include_internal); i++) {
 		if (r_node_count >= MAX_TREE_NODES) {
-			data["truncated"] = true;
+			result_data["truncated"] = true;
 			break;
 		}
 		Node *child = p_node->get_child(i, p_include_internal);
 		children.push_back(_describe_tree(child, p_root, p_depth + 1, p_max_depth, p_include_internal, p_include_warnings, r_node_count));
 	}
-	data["children"] = children;
-	return data;
+	result_data["children"] = children;
+	return result_data;
 }
 
 Dictionary GodotAgentEditorPlugin::_rpc_health(Dictionary p_params) {
-	Dictionary data;
-	data["protocol_version"] = PROTOCOL_VERSION;
-	data["engine"] = Engine::get_singleton()->get_version_info();
-	data["project_path"] = ProjectSettings::get_singleton()->get_resource_path();
-	data["scene_path"] = _edited_root() ? _edited_root()->get_scene_file_path() : String();
-	data["playing"] = EditorInterface::get_singleton()->is_playing_scene();
+	Dictionary result_data;
+	result_data["protocol_version"] = PROTOCOL_VERSION;
+	result_data["engine"] = Engine::get_singleton()->get_version_info();
+	result_data["project_path"] = ProjectSettings::get_singleton()->get_resource_path();
+	result_data["scene_path"] = _edited_root() ? _edited_root()->get_scene_file_path() : String();
+	result_data["playing"] = EditorInterface::get_singleton()->is_playing_scene();
 	Array capabilities;
 	capabilities.push_back("project_settings");
 	capabilities.push_back("scene_crud");
@@ -1076,8 +1076,8 @@ Dictionary GodotAgentEditorPlugin::_rpc_health(Dictionary p_params) {
 	capabilities.push_back("rig_inspection");
 	capabilities.push_back("game_control");
 	capabilities.push_back("runtime_probe");
-	data["capabilities"] = capabilities;
-	return _ok(data);
+	result_data["capabilities"] = capabilities;
+	return _ok(result_data);
 }
 
 Dictionary GodotAgentEditorPlugin::_rpc_scene_create(Dictionary p_params) {
@@ -1125,10 +1125,10 @@ Dictionary GodotAgentEditorPlugin::_rpc_scene_open(Dictionary p_params) {
 		return _fail("scene_not_found", "Scene does not exist", path);
 	}
 	EditorInterface::get_singleton()->open_scene_from_path(path);
-	Dictionary data;
-	data["path"] = path;
-	data["accepted"] = true;
-	return _ok(data);
+	Dictionary result_data;
+	result_data["path"] = path;
+	result_data["accepted"] = true;
+	return _ok(result_data);
 }
 
 Dictionary GodotAgentEditorPlugin::_rpc_scene_get_tree(Dictionary p_params) {
@@ -1194,8 +1194,8 @@ Dictionary GodotAgentEditorPlugin::_rpc_scene_create_node(Dictionary p_params) {
 	parent->add_child(node, true);
 	node->set_owner(root);
 	EditorInterface::get_singleton()->mark_scene_as_unsaved();
-	Dictionary data = _describe_node(node, root, true);
-	return _ok(data);
+	Dictionary result_data = _describe_node(node, root, true);
+	return _ok(result_data);
 }
 
 Dictionary GodotAgentEditorPlugin::_rpc_scene_instantiate(Dictionary p_params) {
@@ -1256,9 +1256,9 @@ Dictionary GodotAgentEditorPlugin::_rpc_scene_instantiate(Dictionary p_params) {
 	parent->add_child(instance, true);
 	instance->set_owner(root);
 	EditorInterface::get_singleton()->mark_scene_as_unsaved();
-	Dictionary data = _describe_node(instance, root, true);
-	data["resource_path"] = path;
-	return _ok(data);
+	Dictionary result_data = _describe_node(instance, root, true);
+	result_data["resource_path"] = path;
+	return _ok(result_data);
 }
 
 Dictionary GodotAgentEditorPlugin::_rpc_scene_set_property(Dictionary p_params) {
@@ -1285,9 +1285,9 @@ Dictionary GodotAgentEditorPlugin::_rpc_scene_set_property(Dictionary p_params) 
 		return property_result;
 	}
 	EditorInterface::get_singleton()->mark_scene_as_unsaved();
-	Dictionary data = property_result["data"];
-	data["node_path"] = p_params.get("node_path", ".");
-	return _ok(data);
+	Dictionary result_data = property_result["data"];
+	result_data["node_path"] = p_params.get("node_path", ".");
+	return _ok(result_data);
 }
 
 Dictionary GodotAgentEditorPlugin::_rpc_scene_delete_node(Dictionary p_params) {
@@ -1309,9 +1309,9 @@ Dictionary GodotAgentEditorPlugin::_rpc_scene_delete_node(Dictionary p_params) {
 	node->get_parent()->remove_child(node);
 	memdelete(node);
 	EditorInterface::get_singleton()->mark_scene_as_unsaved();
-	Dictionary data;
-	data["deleted_path"] = path;
-	return _ok(data);
+	Dictionary result_data;
+	result_data["deleted_path"] = path;
+	return _ok(result_data);
 }
 
 Dictionary GodotAgentEditorPlugin::_rpc_scene_reparent_node(Dictionary p_params) {
@@ -1373,9 +1373,9 @@ Dictionary GodotAgentEditorPlugin::_rpc_scene_save(Dictionary p_params) {
 			return _fail("save_failed", String(error_names[error]));
 		}
 	}
-	Dictionary data;
-	data["path"] = path.is_empty() ? root->get_scene_file_path() : path;
-	return _ok(data);
+	Dictionary result_data;
+	result_data["path"] = path.is_empty() ? root->get_scene_file_path() : path;
+	return _ok(result_data);
 }
 
 Dictionary GodotAgentEditorPlugin::_rpc_scene_validate(Dictionary p_params) {
@@ -1399,11 +1399,11 @@ Dictionary GodotAgentEditorPlugin::_rpc_scene_validate(Dictionary p_params) {
 			pending.push_back(node->get_child(i, false));
 		}
 	}
-	Dictionary data;
-	data["valid"] = warnings.is_empty();
-	data["warnings"] = warnings;
-	data["warning_count"] = warnings.size();
-	return _ok(data);
+	Dictionary result_data;
+	result_data["valid"] = warnings.is_empty();
+	result_data["warnings"] = warnings;
+	result_data["warning_count"] = warnings.size();
+	return _ok(result_data);
 }
 
 Dictionary GodotAgentEditorPlugin::_rpc_node_inspect(Dictionary p_params) {
@@ -1415,7 +1415,7 @@ Dictionary GodotAgentEditorPlugin::_rpc_node_inspect(Dictionary p_params) {
 		return _fail("node_not_found", "Node was not found", p_params.get("node_path", "."));
 	}
 	Dictionary values;
-	Array metadata;
+	Array property_schema;
 	List<PropertyInfo> properties;
 	node->get_property_list(&properties);
 	const Variant requested_value = p_params.get("properties", Array());
@@ -1443,13 +1443,13 @@ Dictionary GodotAgentEditorPlugin::_rpc_node_inspect(Dictionary p_params) {
 		info["usage"] = property.usage;
 		info["hint"] = property.hint;
 		info["hint_string"] = property.hint_string;
-		metadata.push_back(info);
+		property_schema.push_back(info);
 		values[property.name] = _encode_variant(node->get(property.name));
 	}
-	Dictionary data = _describe_node(node, _edited_root(), true);
-	data["property_schema"] = metadata;
-	data["properties"] = values;
-	return _ok(data);
+	Dictionary result_data = _describe_node(node, _edited_root(), true);
+	result_data["property_schema"] = property_schema;
+	result_data["properties"] = values;
+	return _ok(result_data);
 }
 
 Dictionary GodotAgentEditorPlugin::_rpc_project_get_setting(Dictionary p_params) {
@@ -1463,10 +1463,10 @@ Dictionary GodotAgentEditorPlugin::_rpc_project_get_setting(Dictionary p_params)
 	if (!ProjectSettings::get_singleton()->has_setting(key)) {
 		return _fail("setting_not_found", "Project setting does not exist", String(key));
 	}
-	Dictionary data;
-	data["key"] = key;
-	data["value"] = _encode_variant(ProjectSettings::get_singleton()->get_setting(key));
-	return _ok(data);
+	Dictionary result_data;
+	result_data["key"] = key;
+	result_data["value"] = _encode_variant(ProjectSettings::get_singleton()->get_setting(key));
+	return _ok(result_data);
 }
 
 Dictionary GodotAgentEditorPlugin::_rpc_project_set_setting(Dictionary p_params) {
@@ -1493,10 +1493,10 @@ Dictionary GodotAgentEditorPlugin::_rpc_project_set_setting(Dictionary p_params)
 			return _fail("save_failed", String(error_names[save_error]));
 		}
 	}
-	Dictionary data;
-	data["key"] = key;
-	data["value"] = _encode_variant(ProjectSettings::get_singleton()->get_setting(key));
-	return _ok(data);
+	Dictionary result_data;
+	result_data["key"] = key;
+	result_data["value"] = _encode_variant(ProjectSettings::get_singleton()->get_setting(key));
+	return _ok(result_data);
 }
 
 Dictionary GodotAgentEditorPlugin::_rpc_assets_scan(Dictionary p_params) {
@@ -1528,11 +1528,11 @@ Dictionary GodotAgentEditorPlugin::_rpc_assets_scan(Dictionary p_params) {
 	// Script and text-resource changes are discovered by scanning, while only
 	// source formats backed by an importer may be passed to reimport_files().
 	filesystem->scan_changes();
-	Dictionary data;
-	data["scanning"] = filesystem->is_scanning();
-	data["requested_paths"] = requested_paths;
-	data["reimported_paths"] = reimported_paths;
-	return _ok(data);
+	Dictionary result_data;
+	result_data["scanning"] = filesystem->is_scanning();
+	result_data["requested_paths"] = requested_paths;
+	result_data["reimported_paths"] = reimported_paths;
+	return _ok(result_data);
 }
 
 Dictionary GodotAgentEditorPlugin::_rpc_editor_focus_node(Dictionary p_params) {
@@ -1555,10 +1555,10 @@ Dictionary GodotAgentEditorPlugin::_rpc_editor_focus_node(Dictionary p_params) {
 	selection->add_node(node_3d);
 	EditorInterface::get_singleton()->edit_node(node_3d);
 	Node3DEditor::get_singleton()->get_editor_viewport(viewport_index)->focus_selection();
-	Dictionary data;
-	data["node_path"] = p_params.get("node_path", ".");
-	data["viewport"] = viewport_index;
-	return _ok(data);
+	Dictionary result_data;
+	result_data["node_path"] = p_params.get("node_path", ".");
+	result_data["viewport"] = viewport_index;
+	return _ok(result_data);
 }
 
 Dictionary GodotAgentEditorPlugin::_rpc_editor_preview_camera(Dictionary p_params) {
@@ -1576,10 +1576,10 @@ Dictionary GodotAgentEditorPlugin::_rpc_editor_preview_camera(Dictionary p_param
 	if (node_path.is_empty()) {
 		viewport->stop_camera_preview();
 		preview_viewport_mask &= ~(1 << viewport_index);
-		Dictionary data;
-		data["cleared"] = true;
-		data["viewport"] = viewport_index;
-		return _ok(data);
+		Dictionary result_data;
+		result_data["cleared"] = true;
+		result_data["viewport"] = viewport_index;
+		return _ok(result_data);
 	}
 	Node *node = _find_node(p_params);
 	Camera3D *camera = Object::cast_to<Camera3D>(node);
@@ -1589,10 +1589,10 @@ Dictionary GodotAgentEditorPlugin::_rpc_editor_preview_camera(Dictionary p_param
 	viewport->stop_camera_preview();
 	viewport->start_camera_preview(camera);
 	preview_viewport_mask |= 1 << viewport_index;
-	Dictionary data;
-	data["node_path"] = p_params.get("node_path", ".");
-	data["viewport"] = viewport_index;
-	return _ok(data);
+	Dictionary result_data;
+	result_data["node_path"] = p_params.get("node_path", ".");
+	result_data["viewport"] = viewport_index;
+	return _ok(result_data);
 }
 
 Dictionary GodotAgentEditorPlugin::_rpc_editor_capture(Dictionary p_params) {
@@ -1628,12 +1628,12 @@ Dictionary GodotAgentEditorPlugin::_rpc_editor_capture(Dictionary p_params) {
 	if (save_error != OK) {
 		return _fail("capture_failed", String(error_names[save_error]));
 	}
-	Dictionary data;
-	data["path"] = path;
-	data["absolute_path"] = absolute_path;
-	data["width"] = image->get_width();
-	data["height"] = image->get_height();
-	return _ok(data);
+	Dictionary result_data;
+	result_data["path"] = path;
+	result_data["absolute_path"] = absolute_path;
+	result_data["width"] = image->get_width();
+	result_data["height"] = image->get_height();
+	return _ok(result_data);
 }
 
 Dictionary GodotAgentEditorPlugin::_rpc_rig_inspect(Dictionary p_params) {
@@ -1657,11 +1657,11 @@ Dictionary GodotAgentEditorPlugin::_rpc_rig_inspect(Dictionary p_params) {
 		bone["pose"] = _encode_variant(skeleton->get_bone_pose(i));
 		bones.push_back(bone);
 	}
-	Dictionary data;
-	data["node_path"] = p_params.get("node_path", ".");
-	data["bone_count"] = bones.size();
-	data["bones"] = bones;
-	return _ok(data);
+	Dictionary result_data;
+	result_data["node_path"] = p_params.get("node_path", ".");
+	result_data["bone_count"] = bones.size();
+	result_data["bones"] = bones;
+	return _ok(result_data);
 }
 
 Dictionary GodotAgentEditorPlugin::_rpc_game_play(Dictionary p_params) {
@@ -1679,10 +1679,10 @@ Dictionary GodotAgentEditorPlugin::_rpc_game_play(Dictionary p_params) {
 	} else {
 		EditorInterface::get_singleton()->play_main_scene();
 	}
-	Dictionary data;
-	data["accepted"] = true;
-	data["scene"] = scene;
-	return _ok(data);
+	Dictionary result_data;
+	result_data["accepted"] = true;
+	result_data["scene"] = scene;
+	return _ok(result_data);
 }
 
 Dictionary GodotAgentEditorPlugin::_rpc_game_stop(Dictionary p_params) {
@@ -1691,10 +1691,10 @@ Dictionary GodotAgentEditorPlugin::_rpc_game_stop(Dictionary p_params) {
 }
 
 Dictionary GodotAgentEditorPlugin::_rpc_game_status(Dictionary p_params) {
-	Dictionary data;
-	data["playing"] = EditorInterface::get_singleton()->is_playing_scene();
-	data["scene"] = EditorInterface::get_singleton()->get_playing_scene();
-	return _ok(data);
+	Dictionary result_data;
+	result_data["playing"] = EditorInterface::get_singleton()->is_playing_scene();
+	result_data["scene"] = EditorInterface::get_singleton()->get_playing_scene();
+	return _ok(result_data);
 }
 
 Dictionary GodotAgentEditorPlugin::_rpc_runtime_status(Dictionary p_params) {

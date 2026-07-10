@@ -115,7 +115,9 @@ jobs:
           platform: linuxbsd
           target: editor
           scons-flags: >-
+            -j2
             dev_build=yes
+            strict_checks=yes
             debug_symbols=no
             accesskit=no
             x11=no
