@@ -517,7 +517,9 @@ public:
 	void update_transform_gizmo_highlight();
 
 	void set_can_preview(Camera3D *p_preview);
+	void start_camera_preview(Camera3D *p_camera);
 	void switch_preview_camera(Camera3D *p_new_camera);
+	void stop_camera_preview();
 	void set_state(const Dictionary &p_state);
 	Dictionary get_state() const;
 	void reset();

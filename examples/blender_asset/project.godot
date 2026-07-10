@@ -1,0 +1,13 @@
+; Minimal target project for the Blender companion example.
+
+config_version=5
+
+[application]
+
+config/name="Godot AI Blender Asset Example"
+config/features=PackedStringArray("4.7")
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"

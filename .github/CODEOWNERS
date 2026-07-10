@@ -292,3 +292,13 @@
 *.py                                          @godotengine/buildsystem
 SConstruct                                    @godotengine/buildsystem
 SCsub                                         @godotengine/buildsystem
+
+# Godot AI downstream
+
+/.github/workflows/godot_ai.yml               @quinnovator
+/agent/                                       @quinnovator
+/docs/                                        @quinnovator
+/examples/                                    @quinnovator
+/modules/godot_agent/                         @quinnovator
+/runtime/                                     @quinnovator
+/tools/godot-ai/                              @quinnovator

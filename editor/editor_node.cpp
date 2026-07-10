@@ -2252,7 +2252,7 @@ void EditorNode::_find_node_types(Node *p_node, int &count_2d, int &count_3d) {
 	}
 }
 
-void EditorNode::_save_scene_with_preview(String p_file, int p_idx) {
+Error EditorNode::_save_scene_with_preview(String p_file, int p_idx) {
 	save_scene_progress = memnew(EditorProgress("save", TTR("Saving Scene"), 4));
 
 	if (editor_data.get_edited_scene_root() != nullptr) {
@@ -2328,13 +2328,14 @@ void EditorNode::_save_scene_with_preview(String p_file, int p_idx) {
 	}
 
 	save_scene_progress->step(TTR("Saving Scene"), 4);
-	_save_scene(p_file, p_idx);
+	const Error save_error = _save_scene(p_file, p_idx);
 
 	if (!singleton->cmdline_mode) {
 		EditorResourcePreview::get_singleton()->check_for_invalidation(p_file);
 	}
 
 	_close_save_scene_progress();
+	return save_error;
 }
 
 void EditorNode::_close_save_scene_progress() {
@@ -2463,19 +2464,19 @@ static void _reset_animation_mixers(Node *p_node, List<Pair<AnimationMixer *, Re
 	}
 }
 
-void EditorNode::_save_scene(String p_file, int idx) {
-	ERR_FAIL_COND_MSG(!saving_scene.is_empty() && saving_scene == p_file, "Scene saved while already being saved!");
+Error EditorNode::_save_scene(String p_file, int idx) {
+	ERR_FAIL_COND_V_MSG(!saving_scene.is_empty() && saving_scene == p_file, ERR_BUSY, "Scene saved while already being saved!");
 
 	Node *scene = editor_data.get_edited_scene_root(idx);
 
 	if (!scene) {
 		show_accept(TTR("This operation can't be done without a tree root."), TTR("OK"));
-		return;
+		return ERR_UNCONFIGURED;
 	}
 
 	if (!scene->get_scene_file_path().is_empty() && _validate_scene_recursive(scene->get_scene_file_path(), scene)) {
 		show_accept(TTR("This scene can't be saved because there is a cyclic instance inclusion.\nPlease resolve it and then attempt to save again."), TTR("OK"));
-		return;
+		return ERR_CYCLIC_LINK;
 	}
 
 	scene->propagate_notification(NOTIFICATION_EDITOR_PRE_SAVE);
@@ -2506,7 +2507,7 @@ void EditorNode::_save_scene(String p_file, int idx) {
 
 	if (err != OK) {
 		show_accept(TTR("Couldn't save scene. Likely dependencies (instances or inheritance) couldn't be satisfied."), TTR("OK"));
-		return;
+		return err;
 	}
 
 	int flg = 0;
@@ -2557,6 +2558,7 @@ void EditorNode::_save_scene(String p_file, int idx) {
 
 	scene->propagate_notification(NOTIFICATION_EDITOR_POST_SAVE);
 	_update_unsaved_cache();
+	return err;
 }
 
 void EditorNode::save_all_scenes() {

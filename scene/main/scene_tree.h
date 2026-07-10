@@ -347,6 +347,7 @@ public:
 
 	virtual bool physics_process(double p_time) override;
 	virtual void iteration_end() override;
+	virtual void physics_process_end() override;
 	virtual bool process(double p_time) override;
 
 	virtual void finalize() override;

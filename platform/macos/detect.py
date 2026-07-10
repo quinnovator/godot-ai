@@ -1,4 +1,5 @@
 import os
+import subprocess
 import sys
 from typing import TYPE_CHECKING
 
@@ -145,6 +146,12 @@ def configure(env: "SConsEnvironment"):
         else:
             env["CC"] = ccache_path + "clang"
             env["CXX"] = ccache_path + "clang++"
+            # Do not let shell package managers substitute GNU binutils here.
+            # Apple's linker requires Darwin archive alignment, and a Nix or
+            # Homebrew `ar` earlier on PATH can silently produce unusable .a
+            # files. Resolve the platform archive tools through xcrun.
+            env["AR"] = subprocess.check_output(["xcrun", "--find", "ar"], text=True).strip()
+            env["RANLIB"] = subprocess.check_output(["xcrun", "--find", "ranlib"], text=True).strip()
 
         detect_darwin_sdk_path("macos", env)
         env.Append(CCFLAGS=["-isysroot", "$MACOS_SDK_PATH"])

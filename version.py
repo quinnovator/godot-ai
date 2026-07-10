@@ -1,9 +1,9 @@
 short_name = "godot"
-name = "Godot Engine"
+name = "Godot AI"
 major = 4
 minor = 7
 patch = 0
 status = "stable"
-module_config = ""
-website = "https://godotengine.org"
+module_config = ".ai"
+website = "https://github.com/quinnovator/godot-ai"
 docs = "4.7"

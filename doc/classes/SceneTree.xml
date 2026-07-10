@@ -332,6 +332,11 @@
 				Emitted immediately before [method Node._physics_process] is called on every node in this tree.
 			</description>
 		</signal>
+		<signal name="physics_frame_finished">
+			<description>
+				Emitted after nodes, navigation, and the 2D and 3D physics servers finish a physics step. Unlike [signal physics_frame], callbacks run after the engine leaves physics-frame context.
+			</description>
+		</signal>
 		<signal name="process_frame">
 			<description>
 				Emitted immediately before [method Node._process] is called on every node in this tree.

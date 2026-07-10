@@ -1,0 +1,21 @@
+{
+  "asset": {
+    "generator": "Godot AI imported-scene smoke probe",
+    "version": "2.0"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "nodes": [0]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "ImportedMarker",
+      "extras": {
+        "semantic_role": "ai_import_probe",
+        "source": "gltf_extras"
+      }
+    }
+  ]
+}

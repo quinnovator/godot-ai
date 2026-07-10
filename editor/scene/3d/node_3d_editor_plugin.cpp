@@ -5003,6 +5003,22 @@ void Node3DEditorViewport::set_can_preview(Camera3D *p_preview) {
 	}
 }
 
+void Node3DEditorViewport::start_camera_preview(Camera3D *p_camera) {
+	ERR_FAIL_NULL(p_camera);
+	if (previewing_camera && previewing) {
+		if (previewing == p_camera) {
+			return;
+		}
+		switch_preview_camera(p_camera);
+		return;
+	}
+	set_can_preview(p_camera);
+	preview_camera->disconnect(SceneStringName(toggled), callable_mp(this, &Node3DEditorViewport::_toggle_camera_preview));
+	preview_camera->set_pressed(true);
+	_toggle_camera_preview(true);
+	preview_camera->connect(SceneStringName(toggled), callable_mp(this, &Node3DEditorViewport::_toggle_camera_preview));
+}
+
 void Node3DEditorViewport::switch_preview_camera(Camera3D *p_new_camera) {
 	if (!previewing_camera || !previewing || !p_new_camera || p_new_camera == previewing) {
 		return;
@@ -5022,6 +5038,12 @@ void Node3DEditorViewport::switch_preview_camera(Camera3D *p_new_camera) {
 	view_3d_controller->update_camera(0);
 
 	surface->queue_redraw();
+}
+
+void Node3DEditorViewport::stop_camera_preview() {
+	if (previewing_camera && previewing) {
+		_preview_exited_scene();
+	}
 }
 
 void Node3DEditorViewport::update_transform_gizmo_view() {

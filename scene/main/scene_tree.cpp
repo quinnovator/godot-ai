@@ -685,6 +685,13 @@ void SceneTree::iteration_end() {
 	}
 }
 
+void SceneTree::physics_process_end() {
+	// Unlike `physics_frame`, this is emitted after navigation and both physics
+	// servers have completed the fixed step, and after Engine has left physics
+	// context. Runtime test harnesses can safely resume agent coroutines here.
+	emit_signal(SNAME("physics_frame_finished"));
+}
+
 bool SceneTree::process(double p_time) {
 	// First pass of scene tree fixed timestep interpolation.
 	if (get_scene_tree_fti().is_enabled()) {
@@ -1987,6 +1994,7 @@ void SceneTree::_bind_methods() {
 
 	ADD_SIGNAL(MethodInfo("process_frame"));
 	ADD_SIGNAL(MethodInfo("physics_frame"));
+	ADD_SIGNAL(MethodInfo("physics_frame_finished"));
 
 	BIND_ENUM_CONSTANT(GROUP_CALL_DEFAULT);
 	BIND_ENUM_CONSTANT(GROUP_CALL_REVERSE);

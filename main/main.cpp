@@ -5046,6 +5046,7 @@ bool Main::iteration() {
 		physics_process_max = MAX(OS::get_singleton()->get_ticks_usec() - physics_begin, physics_process_max);
 
 		Engine::get_singleton()->_in_physics = false;
+		OS::get_singleton()->get_main_loop()->physics_process_end();
 	}
 
 	if (Input::get_singleton()->is_agile_input_event_flushing()) {

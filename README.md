@@ -1,3 +1,9 @@
+# Godot AI
+
+This repository is a thin, AI-native fork of Godot 4.7. Start with [GODOT_AI.md](GODOT_AI.md) for its autonomous editor protocol, sidecar/Blender architecture, build instructions, current capabilities, and roadmap. The upstream Godot README continues below.
+
+---
+
 # Godot Engine
 
 <p align="center">
