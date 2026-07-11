@@ -66,6 +66,7 @@
 #include "editor/docks/scene_tree_dock.h"
 #include "editor/docks/signals_dock.h"
 #include "editor/editor_data.h"
+#include "editor/editor_external_changes.h"
 #include "editor/editor_interface.h"
 #include "editor/editor_log.h"
 #include "editor/editor_main_screen.h"
@@ -1552,6 +1553,8 @@ void EditorNode::_scan_external_changes() {
 	TreeItem *r = disk_changed_list->create_item();
 	disk_changed_list->set_hide_root(true);
 	bool need_reload = false;
+	bool has_unsaved_conflict = false;
+	bool disk_data_valid = true;
 
 	disk_changed_scenes.clear();
 	disk_changed_project = false;
@@ -1574,6 +1577,13 @@ void EditorNode::_scan_external_changes() {
 			ti->set_text(0, scene_path.get_file());
 			need_reload = true;
 			disk_changed_scenes.push_back(scene_path);
+			has_unsaved_conflict = has_unsaved_conflict || is_scene_unsaved(i);
+
+			// Agent writes can be observed between a file being replaced and its
+			// final contents reaching disk. Never automatically discard the loaded
+			// scene unless the replacement can already be parsed as a PackedScene.
+			Ref<PackedScene> disk_scene = ResourceLoader::load(scene_path, "PackedScene", ResourceFormatLoader::CACHE_MODE_IGNORE);
+			disk_data_valid = disk_data_valid && disk_scene.is_valid();
 		}
 	}
 
@@ -1583,9 +1593,25 @@ void EditorNode::_scan_external_changes() {
 		ti->set_text(0, "project.godot");
 		need_reload = true;
 		disk_changed_project = true;
+		has_unsaved_conflict = has_unsaved_conflict || (project_settings_editor && project_settings_editor->has_pending_changes());
+
+		// ProjectSettings::setup() mutates the live singleton as it parses. Use
+		// ConfigFile as a non-mutating syntax preflight before automatic reload.
+		Ref<ConfigFile> disk_project;
+		disk_project.instantiate();
+		const Error project_parse_error = disk_project->load(project_settings_path);
+		disk_data_valid = disk_data_valid && project_parse_error == OK && EditorExternalChanges::is_project_settings_config_safe(disk_project);
 	}
 
-	if (need_reload) {
+	const EditorExternalChangeAction action = EditorExternalChanges::decide_action(need_reload, safe_external_change_auto_reload, has_unsaved_conflict, disk_data_valid);
+	if (action == EditorExternalChangeAction::AUTO_RELOAD) {
+		const int reloaded_count = disk_changed_scenes.size() + (disk_changed_project ? 1 : 0);
+		_reload_modified_scenes();
+		if (disk_changed_project) {
+			_reload_project_settings();
+		}
+		EditorToaster::get_singleton()->popup_str(vformat(TTRN("Safely reloaded %d externally modified file.", "Safely reloaded %d externally modified files.", reloaded_count), reloaded_count), EditorToaster::SEVERITY_INFO);
+	} else if (action == EditorExternalChangeAction::PROMPT) {
 		callable_mp((Window *)disk_changed, &Window::popup_centered_ratio).call_deferred(0.3);
 	}
 }

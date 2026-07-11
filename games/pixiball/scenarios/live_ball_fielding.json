@@ -1,0 +1,73 @@
+{
+  "name": "Pixiball bounded autonomous live-ball fielding",
+  "pause": true,
+  "restore_pause": true,
+  "steps": [
+    {
+      "intent": {
+        "name": "start_versus",
+        "params": {
+          "seed": 4242,
+          "innings": 3,
+          "difficulty": 0.5,
+          "player_team": 1,
+          "cpu_team": 2
+        }
+      }
+    },
+    { "advance": 1 },
+    {
+      "intent": {
+        "name": "autoplay",
+        "params": { "enabled": true }
+      }
+    },
+    { "advance": 1 },
+    {
+      "wait": {
+        "path": "presentation.flow",
+        "equals": "live_play",
+        "max_frames": 5000,
+        "step_frames": 20
+      }
+    },
+    { "assert": { "path": "phase", "equals": "live_play" } },
+    { "assert": { "path": "presentation.live_play.active", "equals": true } },
+    { "assert": { "path": "presentation.live_play.phase", "in": ["flight", "rolling", "possession", "throw"] } },
+    { "assert": { "path": "presentation.live_play.ball_physics.mode", "exists": true } },
+    { "assert": { "path": "presentation.live_play.controlled_fielder", "exists": true } },
+    { "assert": { "path": "legal_actions", "contains": "move_fielder" } },
+    {
+      "intent": {
+        "name": "move_fielder",
+        "params": { "x": 0.35, "y": -0.2 }
+      }
+    },
+    { "advance": 3 },
+    {
+      "wait": {
+        "path": "presentation.live_play.phase",
+        "equals": "possession",
+        "max_frames": 600,
+        "step_frames": 10
+      }
+    },
+    { "assert": { "path": "presentation.live_play.holder", "equals": "center" } },
+    { "observe": "live-ball-catch" },
+    { "capture": "res://.godot/agent/captures/pixiball-live-ball-fielding.png" },
+    {
+      "wait": {
+        "path": "presentation.flow",
+        "equals": "result",
+        "max_frames": 900,
+        "step_frames": 20
+      }
+    },
+    { "assert": { "path": "presentation.live_play.active", "equals": false } },
+    { "assert": { "path": "last_result.at_bat_over", "exists": true } },
+    { "observe": "fielding-result" },
+    { "intent": { "name": "exit_to_menu", "params": {} } },
+    { "advance": 1 },
+    { "assert": { "path": "presentation.flow", "equals": "landing" } }
+  ]
+}

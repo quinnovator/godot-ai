@@ -158,6 +158,9 @@ void Input::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("has_joy_vibration", "device"), &Input::has_joy_vibration);
 	ClassDB::bind_method(D_METHOD("start_joy_vibration", "device", "weak_magnitude", "strong_magnitude", "duration"), &Input::start_joy_vibration, DEFVAL(0));
 	ClassDB::bind_method(D_METHOD("stop_joy_vibration", "device"), &Input::stop_joy_vibration);
+	ClassDB::bind_method(D_METHOD("has_joy_adaptive_triggers", "device"), &Input::has_joy_adaptive_triggers);
+	ClassDB::bind_method(D_METHOD("set_joy_adaptive_trigger_effect", "device", "trigger", "effect", "start_position", "end_position", "strength", "frequency_hz"), &Input::set_joy_adaptive_trigger_effect, DEFVAL(0), DEFVAL(0), DEFVAL(0), DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("stop_joy_adaptive_triggers", "device"), &Input::stop_joy_adaptive_triggers);
 	ClassDB::bind_method(D_METHOD("vibrate_handheld", "duration_ms", "amplitude"), &Input::vibrate_handheld, DEFVAL(500), DEFVAL(-1.0));
 	ClassDB::bind_method(D_METHOD("set_ignore_joypad_on_unfocused_application", "enable"), &Input::set_ignore_joypad_on_unfocused_application);
 	ClassDB::bind_method(D_METHOD("is_ignoring_joypad_on_unfocused_application"), &Input::is_ignoring_joypad_on_unfocused_application);
@@ -235,6 +238,15 @@ void Input::_bind_methods() {
 	BIND_ENUM_CONSTANT(CURSOR_VSPLIT);
 	BIND_ENUM_CONSTANT(CURSOR_HSPLIT);
 	BIND_ENUM_CONSTANT(CURSOR_HELP);
+
+	BIND_ENUM_CONSTANT(JOY_ADAPTIVE_TRIGGER_LEFT);
+	BIND_ENUM_CONSTANT(JOY_ADAPTIVE_TRIGGER_RIGHT);
+	BIND_ENUM_CONSTANT(JOY_ADAPTIVE_TRIGGER_BOTH);
+
+	BIND_ENUM_CONSTANT(JOY_ADAPTIVE_TRIGGER_EFFECT_OFF);
+	BIND_ENUM_CONSTANT(JOY_ADAPTIVE_TRIGGER_EFFECT_FEEDBACK);
+	BIND_ENUM_CONSTANT(JOY_ADAPTIVE_TRIGGER_EFFECT_WEAPON);
+	BIND_ENUM_CONSTANT(JOY_ADAPTIVE_TRIGGER_EFFECT_VIBRATION);
 
 	ADD_SIGNAL(MethodInfo("joy_connection_changed", PropertyInfo(Variant::INT, "device"), PropertyInfo(Variant::BOOL, "connected")));
 }
@@ -667,6 +679,55 @@ bool Input::has_joy_vibration(int p_device) const {
 	_THREAD_SAFE_METHOD_
 	const Joypad *joypad = joy_names.getptr(p_device);
 	return joypad != nullptr && joypad->has_vibration;
+}
+
+bool Input::has_joy_adaptive_triggers(int p_device) const {
+	_THREAD_SAFE_METHOD_
+	const Joypad *joypad = joy_names.getptr(p_device);
+	return joypad != nullptr && joypad->features != nullptr && joypad->features->has_joy_adaptive_triggers();
+}
+
+bool Input::set_joy_adaptive_trigger_effect(int p_device, JoyAdaptiveTrigger p_trigger, JoyAdaptiveTriggerEffect p_effect, int p_start_position, int p_end_position, int p_strength, int p_frequency_hz) {
+	_THREAD_SAFE_METHOD_
+
+	if (_should_ignore_joypad_events()) {
+		return false;
+	}
+	if (p_trigger < JOY_ADAPTIVE_TRIGGER_LEFT || p_trigger > JOY_ADAPTIVE_TRIGGER_BOTH) {
+		return false;
+	}
+
+	switch (p_effect) {
+		case JOY_ADAPTIVE_TRIGGER_EFFECT_OFF:
+			break;
+		case JOY_ADAPTIVE_TRIGGER_EFFECT_FEEDBACK:
+			if (p_start_position < 0 || p_start_position > 9 || p_strength < 0 || p_strength > 8) {
+				return false;
+			}
+			break;
+		case JOY_ADAPTIVE_TRIGGER_EFFECT_WEAPON:
+			if (p_start_position < 2 || p_start_position > 7 || p_end_position <= p_start_position || p_end_position > 8 || p_strength < 0 || p_strength > 8) {
+				return false;
+			}
+			break;
+		case JOY_ADAPTIVE_TRIGGER_EFFECT_VIBRATION:
+			if (p_start_position < 0 || p_start_position > 9 || p_strength < 0 || p_strength > 8 || p_frequency_hz < 0 || p_frequency_hz > 255) {
+				return false;
+			}
+			break;
+		default:
+			return false;
+	}
+
+	Joypad *joypad = joy_names.getptr(p_device);
+	if (joypad == nullptr || joypad->features == nullptr || !joypad->features->has_joy_adaptive_triggers()) {
+		return false;
+	}
+	return joypad->features->set_joy_adaptive_trigger_effect(p_trigger, p_effect, p_start_position, p_end_position, p_strength, p_frequency_hz);
+}
+
+bool Input::stop_joy_adaptive_triggers(int p_device) {
+	return set_joy_adaptive_trigger_effect(p_device, JOY_ADAPTIVE_TRIGGER_BOTH, JOY_ADAPTIVE_TRIGGER_EFFECT_OFF, 0, 0, 0, 0);
 }
 
 static String _hex_str(uint8_t p_byte) {
@@ -1620,6 +1681,7 @@ void Input::release_pressed_events() {
 
 		for (int device : get_connected_joypads()) {
 			stop_joy_vibration(device);
+			stop_joy_adaptive_triggers(device);
 		}
 	} else {
 		for (KeyValue<StringName, Input::ActionState> &E : action_states) {

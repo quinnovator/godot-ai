@@ -20,6 +20,7 @@ def _arguments():
     parser.add_argument("--script", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--blend")
+    parser.add_argument("--parameters")
     parser.add_argument("--receipt", required=True)
     return parser.parse_args(sys.argv[separator + 1 :])
 
@@ -29,11 +30,18 @@ def main():
 
     args = _arguments()
     original_argv = sys.argv
+    original_parameters = os.environ.get("GODOT_AGENT_BLENDER_PARAMETERS")
     try:
         sys.argv = [args.script]
+        if args.parameters:
+            os.environ["GODOT_AGENT_BLENDER_PARAMETERS"] = args.parameters
         runpy.run_path(args.script, run_name="__main__")
     finally:
         sys.argv = original_argv
+        if original_parameters is None:
+            os.environ.pop("GODOT_AGENT_BLENDER_PARAMETERS", None)
+        else:
+            os.environ["GODOT_AGENT_BLENDER_PARAMETERS"] = original_parameters
 
     if args.blend:
         os.makedirs(os.path.dirname(args.blend), exist_ok=True)

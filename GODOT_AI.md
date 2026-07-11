@@ -13,19 +13,22 @@ The `ai-native` branch starts at upstream Godot `4.7-stable` commit `5b4e0cb0fd2
 - A compiled-in, editor-only `godot_agent` module starts automatically for an open project.
 - The bridge binds to an ephemeral loopback port and authenticates every JSON-RPC request with a per-session token.
 - Agents can inspect a semantic scene tree; create, edit, reparent, delete, validate, open, and save nodes/scenes; read and write project settings; trigger imports; inspect skeleton rest/pose data; run and stop scenes; and capture a real 3D editor viewport.
-- An opt-in runtime add-on talks back through Godot's debugger. Agents can inspect the live scene and properties, set bounded properties, send mapped input, pause and advance exact physics-frame counts, capture the running viewport, raycast, and query navigation paths.
-- The stdlib-only `agent/` client provides both a Python API and a CLI.
-- The Blender companion runs agent-authored Python in an explicitly selected headless Blender, emits GLB and optional `.blend`, and records the Blender version plus hashes for its primary script and emitted files.
+- While the local Agent bridge is active, valid external scene and `project.godot` edits reload automatically only when the editor has no conflicting unsaved state. Dirty or malformed replacements retain Godot's normal decision dialog, so agent writes do not become a data-loss shortcut.
+- An opt-in runtime add-on talks back through Godot's debugger. Agents can inspect the live scene and properties, set bounded properties, send mapped input, invoke game-declared semantic intents through one fixed driver contract, pause and advance exact physics-frame counts, capture the running viewport, raycast, and query navigation paths.
+- The stdlib-only `agent/` client provides both a Python API and a CLI, including a bounded JSON scenario runner for semantic intents, exact frame advancement, state predicates, assertions, observations, and captures.
+- The Blender companion runs agent-authored Python in an explicitly selected headless Blender, emits GLB and optional `.blend`, records the Blender version plus hashes for its primary script and emitted files, and can fan independent recipes out to bounded parallel workers.
 - `examples/agent_smoke` is the end-to-end validation project, and `examples/blender_asset` demonstrates the source recipe and asset contract.
+- `games/pixiball` is the first complete benchmark game: deterministic full-game and endless-pitch rules, the original trained pitch-model contract, Blender-authored multi-weight characters and modular equipment, live 3D fielding, typed agent play, and full-game headless acceptance. Its haptic layer uses portable rumble everywhere and this fork's bounded native DualSense/Edge adaptive-trigger API when SDL reports supported Sony hardware.
 
 The current bridge is an engineering foundation, not yet the whole platform. Transactions, stable IDs, deterministic seed/snapshot/replay control, semantic render passes, asset dependency/provenance enforcement, declarative level constraints, and a text-authorable gameplay-AI stack are tracked in [the roadmap](docs/roadmap.md). The current asset manifest does not capture transitive script imports, add-ons, environment, or every external input, and installing the GLB, optional `.blend`, and manifest is not one multi-file transaction.
 
-Blender is not installed on the current macOS validation host. Its invocation,
-staging, and manifest contract are unit-tested with a mocked executable, and the
-example recipe is syntax-checked, but a real Blender export/import loop has not
-been validated here. Godot can scan a produced GLB through its normal importer;
-automated post-import rig, material, collision, animation, and known-pose
-acceptance remains roadmap work.
+The current macOS validation host uses Blender 4.5 LTS through
+`/Applications/Blender.app/Contents/MacOS/Blender`. Pixiball's production
+character has completed the real recipe-to-`.blend`-to-GLB-to-Godot loop,
+including deterministic pose renders and automated skeleton, multi-weight,
+mesh, material, socket, bounds, animation, and fallback checks. Generalizing
+those project-specific contracts into engine-wide declarative asset acceptance
+remains roadmap work.
 
 ## Build
 
@@ -44,7 +47,8 @@ The editor binary is written under `bin/`. Other platforms use the normal upstre
 Launch the built editor on a project and wait for `.godot/agent/endpoint.json`:
 
 ```sh
-bin/godot.macos.editor.dev.arm64 --editor --path examples/agent_smoke
+open -n bin/godot_macos_editor_dev.app --args \
+  --editor --path "$PWD/examples/agent_smoke"
 cd agent
 python3 -m godot_agent --project ../examples/agent_smoke status
 python3 -m godot_agent --project ../examples/agent_smoke scene-tree
@@ -53,7 +57,15 @@ python3 -m godot_agent --project ../examples/agent_smoke runtime-status
 python3 -m godot_agent --project ../examples/agent_smoke runtime-call runtime.health
 ```
 
-The endpoint is deleted on an orderly editor exit and overwritten on the next start. It is project-local, ignored with `.godot/`, and contains the host, ephemeral port, protocol version, process ID, and token. A hard crash can leave harmless stale metadata; the client then reports that the recorded loopback server is unreachable.
+Native UI automation should address the generated app by bundle identifier
+`org.godotengine.godot.custom_build`; using the generic `Godot` display name can
+select a separately installed stock editor. The endpoint is deleted on an
+orderly editor exit and overwritten on the next start. It is project-local,
+ignored with `.godot/`, and contains the host, ephemeral port, protocol version,
+process ID, and token. If another editor process opens the same project, it uses
+a PID-suffixed endpoint instead of clobbering the live primary session. A hard
+crash can leave harmless stale metadata; the client then reports that the
+recorded loopback server is unreachable.
 
 See [the architecture](docs/architecture.md), [protocol reference](docs/agent-protocol.md), [runtime add-on](runtime/README.md), and [development roadmap](docs/roadmap.md).
 

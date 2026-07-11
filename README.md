@@ -1,6 +1,6 @@
 # Godot AI
 
-This repository is a thin, AI-native fork of Godot 4.7. Start with [GODOT_AI.md](GODOT_AI.md) for its autonomous editor protocol, sidecar/Blender architecture, build instructions, current capabilities, and roadmap. The upstream Godot README continues below.
+This repository is a thin, AI-native fork of Godot 4.7. Start with [GODOT_AI.md](GODOT_AI.md) for its autonomous editor protocol, sidecar/Blender architecture, build instructions, current capabilities, and roadmap. The first complete benchmark game is [Pixiball: Harbor League](games/pixiball/README.md), a deterministic, agent-playable baseball game with Blender-authored skinned characters, trained pitch models, live 3D fielding, and typed controller feedback. The upstream Godot README continues below.
 
 ---
 

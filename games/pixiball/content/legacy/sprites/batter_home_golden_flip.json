@@ -1,0 +1,133 @@
+{
+ "name": "batter_home_golden_flip",
+ "frameWidth": 960,
+ "frameHeight": 1020,
+ "columns": 4,
+ "frames": [
+  "STANCE_A",
+  "STANCE_B",
+  "STANCE_C",
+  "LOAD",
+  "STRIDE",
+  "TAKE",
+  "LEAN_BACK",
+  "STRIDE_DOWN",
+  "SWING_DOWN",
+  "DOWN_LAUNCH",
+  "SWING_LAUNCH",
+  "LAUNCH_CONTACT",
+  "CONTACT",
+  "CONTACT_EXTENSION",
+  "EXTENSION",
+  "EXTENSION_FOLLOW",
+  "FOLLOW_HIGH",
+  "SLUMP",
+  "ADMIRE"
+ ],
+ "artFrame": {
+  "x": -72,
+  "y": -141,
+  "w": 144,
+  "h": 153
+ },
+ "scale": 6.666666666666667,
+ "mood": "golden",
+ "density": 4,
+ "shadows": [
+  {
+   "rx": 20,
+   "ry": 5,
+   "dx": 0
+  },
+  {
+   "rx": 20,
+   "ry": 5,
+   "dx": 0
+  },
+  {
+   "rx": 20,
+   "ry": 5,
+   "dx": 0
+  },
+  {
+   "rx": 20,
+   "ry": 5,
+   "dx": 1
+  },
+  {
+   "rx": 21,
+   "ry": 5,
+   "dx": -2
+  },
+  {
+   "rx": 21,
+   "ry": 5,
+   "dx": -2
+  },
+  {
+   "rx": 21,
+   "ry": 5,
+   "dx": 3
+  },
+  {
+   "rx": 22,
+   "ry": 5,
+   "dx": -2
+  },
+  {
+   "rx": 22,
+   "ry": 5,
+   "dx": -1
+  },
+  {
+   "rx": 22,
+   "ry": 5,
+   "dx": -2
+  },
+  {
+   "rx": 23,
+   "ry": 5,
+   "dx": -2
+  },
+  {
+   "rx": 24,
+   "ry": 5,
+   "dx": -2
+  },
+  {
+   "rx": 24,
+   "ry": 5,
+   "dx": -3
+  },
+  {
+   "rx": 24,
+   "ry": 5,
+   "dx": -4
+  },
+  {
+   "rx": 24,
+   "ry": 5,
+   "dx": -4
+  },
+  {
+   "rx": 24,
+   "ry": 5,
+   "dx": -4
+  },
+  {
+   "rx": 24,
+   "ry": 5,
+   "dx": -3
+  },
+  {
+   "rx": 20,
+   "ry": 5,
+   "dx": 1
+  },
+  {
+   "rx": 20,
+   "ry": 5,
+   "dx": 0
+  }
+ ]
+}

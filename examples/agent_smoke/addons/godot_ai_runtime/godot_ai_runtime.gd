@@ -7,10 +7,14 @@ extends Node
 ## filesystem paths.
 
 const PROTOCOL_VERSION := 1
-const ADDON_VERSION := "0.1.0"
+const ADDON_VERSION := "0.2.0"
 const DEBUGGER_PREFIX := &"godot_ai"
 const MESSAGE_HELLO := "godot_ai:hello"
 const MESSAGE_RESPONSE := "godot_ai:response"
+const GAMEPLAY_DRIVER_GROUP := &"godot_ai_gameplay_driver"
+const GAMEPLAY_DESCRIBE_METHOD := &"_godot_ai_describe"
+const GAMEPLAY_STATE_METHOD := &"_godot_ai_state"
+const GAMEPLAY_APPLY_INTENT_METHOD := &"_godot_ai_apply_intent"
 
 const DEFAULT_TREE_DEPTH := 8
 const MAX_TREE_DEPTH := 32
@@ -30,6 +34,8 @@ const MAX_PATH_LENGTH := 1_024
 const MAX_CAPTURE_PATH_LENGTH := 240
 const MAX_CAPTURE_WAIT_PROCESS_FRAMES := 30
 const MAX_CAPTURE_PIXELS := 33_554_432
+const MAX_GAMEPLAY_INTENTS := 256
+const MAX_GAMEPLAY_VALUE_BYTES := 1_048_576
 const CAPTURE_DIRECTORY := "res://.godot/agent/captures"
 
 signal _physics_advance_completed
@@ -42,6 +48,9 @@ const CAPABILITIES := [
 	"node.set_property",
 	"input.action_press",
 	"input.action_release",
+	"gameplay.describe",
+	"gameplay.state",
+	"gameplay.intent",
 	"time.set_paused",
 	"time.advance_physics_frames",
 	"viewport.capture",
@@ -232,6 +241,12 @@ func _execute_command(command: Dictionary) -> Dictionary:
 			return _command_input_action_press(params)
 		"input.action_release":
 			return _command_input_action_release(params)
+		"gameplay.describe":
+			return _command_gameplay_describe(params)
+		"gameplay.state":
+			return _command_gameplay_state(params)
+		"gameplay.intent":
+			return _command_gameplay_intent(params)
 		"time.set_paused":
 			return await _command_time_set_paused(params)
 		"time.advance_physics_frames":
@@ -422,6 +437,91 @@ func _command_input_action_release(params: Dictionary) -> Dictionary:
 	var action: StringName = action_result["action"]
 	Input.action_release(action)
 	return _success({"action": str(action), "pressed": false})
+
+
+func _command_gameplay_describe(params: Dictionary) -> Dictionary:
+	var params_error := _validate_params(params, [])
+	if not params_error.is_empty():
+		return params_error
+	var driver_result := _resolve_gameplay_driver()
+	if not driver_result["ok"]:
+		return driver_result
+	var driver: Node = driver_result["driver"]
+	var driver_path := _gameplay_driver_path(driver)
+	var description_result := _read_gameplay_description(driver)
+	if not description_result["ok"]:
+		return description_result
+	return _success({
+		"driver_path": driver_path,
+		"description": _encode_value(description_result["description"]),
+	})
+
+
+func _command_gameplay_state(params: Dictionary) -> Dictionary:
+	var params_error := _validate_params(params, [])
+	if not params_error.is_empty():
+		return params_error
+	var driver_result := _resolve_gameplay_driver()
+	if not driver_result["ok"]:
+		return driver_result
+	var driver: Node = driver_result["driver"]
+	var driver_path := _gameplay_driver_path(driver)
+	var state: Variant = driver.call(GAMEPLAY_STATE_METHOD)
+	var state_error := _validate_gameplay_callback_value(state, "state")
+	if not state_error.is_empty():
+		return state_error
+	return _success({
+		"driver_path": driver_path,
+		"state": _encode_value(state),
+	})
+
+
+func _command_gameplay_intent(params: Dictionary) -> Dictionary:
+	var params_error := _validate_params(params, ["name", "params"], ["name"])
+	if not params_error.is_empty():
+		return params_error
+	if typeof(params["name"]) != TYPE_STRING and typeof(params["name"]) != TYPE_STRING_NAME:
+		return _failure("invalid_intent", "name must be a String.")
+	var intent_name := str(params["name"])
+	if not _is_method_name_valid(intent_name):
+		return _failure("invalid_intent", "The intent name is invalid.", {"name": _bounded_string(intent_name, 128)})
+	var intent_params: Variant = params.get("params", {})
+	if typeof(intent_params) != TYPE_DICTIONARY:
+		return _failure("invalid_params", "params must be a Dictionary.")
+	var intent_params_error := _validate_gameplay_value(intent_params, "intent parameters")
+	if not intent_params_error.is_empty():
+		return intent_params_error
+
+	var driver_result := _resolve_gameplay_driver()
+	if not driver_result["ok"]:
+		return driver_result
+	var driver: Node = driver_result["driver"]
+	var driver_path := _gameplay_driver_path(driver)
+	var description_result := _read_gameplay_description(driver)
+	if not description_result["ok"]:
+		return description_result
+	var declared_intents: Dictionary = description_result["declared_intents"]
+	if not declared_intents.has(intent_name):
+		return _failure(
+			"intent_not_declared",
+			"The gameplay driver did not declare this intent.",
+			{"name": intent_name},
+		)
+	if not is_instance_valid(driver) or not driver.is_inside_tree():
+		return _failure(
+			"gameplay_driver_unavailable",
+			"The gameplay driver left the runtime tree before the intent could be applied.",
+		)
+
+	var intent_result: Variant = driver.call(GAMEPLAY_APPLY_INTENT_METHOD, intent_name, intent_params)
+	var result_error := _validate_gameplay_callback_value(intent_result, "intent result")
+	if not result_error.is_empty():
+		return result_error
+	return _success({
+		"driver_path": driver_path,
+		"name": intent_name,
+		"result": _encode_value(intent_result),
+	})
 
 
 func _command_time_set_paused(params: Dictionary) -> Dictionary:
@@ -912,6 +1012,186 @@ func _is_safe_mutation_value(value: Variant, depth: int = 0) -> bool:
 			return true
 		_:
 			return true
+
+
+func _resolve_gameplay_driver() -> Dictionary:
+	var drivers: Array[Node] = []
+	for candidate in get_tree().get_nodes_in_group(GAMEPLAY_DRIVER_GROUP):
+		if candidate is Node and is_instance_valid(candidate) and candidate.is_inside_tree():
+			drivers.push_back(candidate)
+	if drivers.is_empty():
+		return _failure(
+			"gameplay_driver_not_found",
+			"No runtime node opted in to the gameplay driver contract.",
+			{"group": str(GAMEPLAY_DRIVER_GROUP)},
+		)
+	if drivers.size() > 1:
+		return _failure(
+			"gameplay_driver_ambiguous",
+			"Exactly one runtime node may opt in to the gameplay driver contract.",
+			{"group": str(GAMEPLAY_DRIVER_GROUP), "count": drivers.size()},
+		)
+
+	var driver := drivers[0]
+	var invalid_callbacks: Array[String] = []
+	var callbacks := {
+		GAMEPLAY_DESCRIBE_METHOD: 0,
+		GAMEPLAY_STATE_METHOD: 0,
+		GAMEPLAY_APPLY_INTENT_METHOD: 2,
+	}
+	for callback in callbacks:
+		if not driver.has_method(callback) or driver.get_method_argument_count(callback) != callbacks[callback]:
+			invalid_callbacks.push_back(str(callback))
+	if not invalid_callbacks.is_empty():
+		return _failure(
+			"gameplay_driver_invalid",
+			"The gameplay driver does not implement the fixed callback contract.",
+			{"callbacks": invalid_callbacks},
+		)
+	return {"ok": true, "driver": driver}
+
+
+func _read_gameplay_description(driver: Node) -> Dictionary:
+	var description: Variant = driver.call(GAMEPLAY_DESCRIBE_METHOD)
+	var description_error := _validate_gameplay_callback_value(description, "description")
+	if not description_error.is_empty():
+		return description_error
+	if not description.has("intents") or typeof(description["intents"]) != TYPE_DICTIONARY:
+		return _failure(
+			"gameplay_driver_invalid_description",
+			"The gameplay description must contain an intents Dictionary.",
+		)
+	var intents: Dictionary = description["intents"]
+	if intents.size() > MAX_GAMEPLAY_INTENTS:
+		return _failure(
+			"gameplay_driver_limit_exceeded",
+			"The gameplay driver declared too many intents.",
+			{"maximum": MAX_GAMEPLAY_INTENTS, "actual": intents.size()},
+		)
+
+	var declared_intents: Dictionary = {}
+	for raw_name in intents:
+		if typeof(raw_name) != TYPE_STRING and typeof(raw_name) != TYPE_STRING_NAME:
+			return _failure(
+				"gameplay_driver_invalid_description",
+				"Every declared intent name must be a String.",
+			)
+		var intent_name := str(raw_name)
+		if not _is_method_name_valid(intent_name):
+			return _failure(
+				"gameplay_driver_invalid_description",
+				"A declared intent name is invalid.",
+				{"name": _bounded_string(intent_name, 128)},
+			)
+		if declared_intents.has(intent_name):
+			return _failure(
+				"gameplay_driver_invalid_description",
+				"Declared intent names must be unique after normalization.",
+				{"name": intent_name},
+			)
+		if typeof(intents[raw_name]) != TYPE_DICTIONARY:
+			return _failure(
+				"gameplay_driver_invalid_description",
+				"Every declared intent descriptor must be a Dictionary.",
+				{"name": intent_name},
+			)
+		declared_intents[intent_name] = intents[raw_name]
+
+	var normalized_description: Dictionary = description.duplicate(true)
+	normalized_description["intents"] = declared_intents
+	return {
+		"ok": true,
+		"description": normalized_description,
+		"declared_intents": declared_intents,
+	}
+
+
+func _validate_gameplay_callback_value(value: Variant, label: String) -> Dictionary:
+	if typeof(value) != TYPE_DICTIONARY:
+		return _failure(
+			"gameplay_driver_invalid_response",
+			"The gameplay driver %s must be a Dictionary." % label,
+			{"received": type_string(typeof(value))},
+		)
+	return _validate_gameplay_value(value, "gameplay driver %s" % label)
+
+
+func _validate_gameplay_value(value: Variant, label: String) -> Dictionary:
+	if not _is_safe_gameplay_value(value):
+		return _failure(
+			"unsafe_gameplay_value",
+			"The %s contains an unsupported, non-finite, or oversized value." % label,
+		)
+	var value_size := _serialized_size(value)
+	if value_size > MAX_GAMEPLAY_VALUE_BYTES:
+		return _failure(
+			"gameplay_value_too_large",
+			"The serialized %s exceeds the gameplay value limit." % label,
+			{"maximum_bytes": MAX_GAMEPLAY_VALUE_BYTES, "actual_bytes": value_size},
+		)
+	return {}
+
+
+func _is_safe_gameplay_value(value: Variant) -> bool:
+	var budget := {"items": 0, "string_bytes": 0}
+	return _is_safe_gameplay_value_recursive(value, 0, budget)
+
+
+func _is_safe_gameplay_value_recursive(value: Variant, depth: int, budget: Dictionary) -> bool:
+	if depth >= MAX_VALUE_DEPTH:
+		return false
+	match typeof(value):
+		TYPE_STRING, TYPE_STRING_NAME:
+			var string_value := str(value)
+			if string_value.length() > MAX_STRING_LENGTH:
+				return false
+			budget["string_bytes"] = int(budget["string_bytes"]) + string_value.to_utf8_buffer().size()
+			return int(budget["string_bytes"]) <= MAX_GAMEPLAY_VALUE_BYTES
+		TYPE_ARRAY:
+			if not _consume_gameplay_items(budget, value.size()):
+				return false
+			for item in value:
+				if not _is_safe_gameplay_value_recursive(item, depth + 1, budget):
+					return false
+			return true
+		TYPE_DICTIONARY:
+			if not _consume_gameplay_items(budget, value.size()):
+				return false
+			for key in value:
+				if typeof(key) != TYPE_STRING and typeof(key) != TYPE_STRING_NAME:
+					return false
+				var key_string := str(key)
+				if key_string.length() > MAX_STRING_LENGTH:
+					return false
+				budget["string_bytes"] = int(budget["string_bytes"]) + key_string.to_utf8_buffer().size()
+				if int(budget["string_bytes"]) > MAX_GAMEPLAY_VALUE_BYTES:
+					return false
+				if not _is_safe_gameplay_value_recursive(value[key], depth + 1, budget):
+					return false
+			return true
+		TYPE_PACKED_STRING_ARRAY:
+			if not _consume_gameplay_items(budget, value.size()):
+				return false
+			for item in value:
+				budget["string_bytes"] = int(budget["string_bytes"]) + item.to_utf8_buffer().size()
+				if int(budget["string_bytes"]) > MAX_GAMEPLAY_VALUE_BYTES:
+					return false
+			return _is_safe_mutation_value(value, depth)
+		TYPE_PACKED_BYTE_ARRAY, TYPE_PACKED_INT32_ARRAY, TYPE_PACKED_INT64_ARRAY, TYPE_PACKED_FLOAT32_ARRAY, TYPE_PACKED_FLOAT64_ARRAY, TYPE_PACKED_VECTOR2_ARRAY, TYPE_PACKED_VECTOR3_ARRAY, TYPE_PACKED_COLOR_ARRAY, TYPE_PACKED_VECTOR4_ARRAY:
+			return _consume_gameplay_items(budget, value.size()) and _is_safe_mutation_value(value, depth)
+		_:
+			return _is_safe_mutation_value(value, depth)
+
+
+func _consume_gameplay_items(budget: Dictionary, count: int) -> bool:
+	budget["items"] = int(budget["items"]) + count
+	return int(budget["items"]) <= MAX_CONTAINER_ITEMS
+
+
+func _gameplay_driver_path(driver: Node) -> String:
+	if _is_node_in_current_scene(driver):
+		return _relative_node_path(driver)
+	return str(driver.get_path())
 
 
 func _resolve_required_node(path_value: Variant) -> Dictionary:

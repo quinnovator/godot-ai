@@ -435,6 +435,7 @@ private:
 	LocalVector<String> disk_changed_scenes;
 	bool disk_changed_project = false;
 	ConfirmationDialog *disk_changed = nullptr;
+	bool safe_external_change_auto_reload = false;
 	ConfirmationDialog *project_data_missing = nullptr;
 
 	bool scene_distraction_free = false;
@@ -1024,6 +1025,7 @@ public:
 	void try_autosave();
 	void restart_editor(bool p_goto_project_manager = false);
 	void unload_editor_addons();
+	void set_safe_external_change_auto_reload(bool p_enabled) { safe_external_change_auto_reload = p_enabled; }
 
 	void open_setting_override(const String &p_property);
 	void notify_settings_overrides_changed();

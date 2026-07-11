@@ -1,0 +1,250 @@
+{
+  "batch_schema_version": 1,
+  "dry_run": false,
+  "jobs": [
+    {
+      "asset_manifest": {
+        "blender_version": "4.5.11 LTS",
+        "invocation_schema_version": 1,
+        "parameters": {
+          "asset_type": "player",
+          "candidate_id": "player-power-pitcher",
+          "palette": {
+            "accent": "#F2BB45",
+            "primary": "#103E66",
+            "secondary": "#DF4D46",
+            "skin": "#A85E3A"
+          },
+          "proportions": {
+            "height": 1.08,
+            "shoulder_width": 1.16,
+            "stockiness": 1.12
+          },
+          "role": "pitcher",
+          "stance": "pitcher_power",
+          "style": "high_resolution_pixel_volume"
+        },
+        "paths": {
+          "blend": "res://artifacts/blender_candidates/pixiball_parallel_example/player-power-pitcher.blend",
+          "log": "res://artifacts/blender_candidates/pixiball_parallel_example/player-power-pitcher.glb.agent.log",
+          "manifest": "res://artifacts/blender_candidates/pixiball_parallel_example/player-power-pitcher.glb.agent.json",
+          "output": "res://artifacts/blender_candidates/pixiball_parallel_example/player-power-pitcher.glb",
+          "script": "res://tools/blender/build_candidate.py"
+        },
+        "sha256": {
+          "blend": "087b20926b1351fe0325515780774d306b78426f11c75fe8a5448e723b3d268b",
+          "log": "bac153c10c17b00dca78db89b1f194f36845e3717fa56fd21726186769cb25e0",
+          "output": "832a1e3fa905fdb81e91fec402f7bae393ac2835612f48a59f6ce93004ea681f",
+          "script": "558e06b7f550896e316022286f5f240800b832e8c3d8ac0a48765c2791e7a74d"
+        }
+      },
+      "id": "player-power-pitcher",
+      "parameters": {
+        "asset_type": "player",
+        "candidate_id": "player-power-pitcher",
+        "palette": {
+          "accent": "#F2BB45",
+          "primary": "#103E66",
+          "secondary": "#DF4D46",
+          "skin": "#A85E3A"
+        },
+        "proportions": {
+          "height": 1.08,
+          "shoulder_width": 1.16,
+          "stockiness": 1.12
+        },
+        "role": "pitcher",
+        "stance": "pitcher_power",
+        "style": "high_resolution_pixel_volume"
+      },
+      "paths": {
+        "blend": "res://artifacts/blender_candidates/pixiball_parallel_example/player-power-pitcher.blend",
+        "log": "res://artifacts/blender_candidates/pixiball_parallel_example/player-power-pitcher.glb.agent.log",
+        "manifest": "res://artifacts/blender_candidates/pixiball_parallel_example/player-power-pitcher.glb.agent.json",
+        "output": "res://artifacts/blender_candidates/pixiball_parallel_example/player-power-pitcher.glb",
+        "script": "res://tools/blender/build_candidate.py"
+      },
+      "status": "succeeded",
+      "timeout_seconds": 300.0
+    },
+    {
+      "asset_manifest": {
+        "blender_version": "4.5.11 LTS",
+        "invocation_schema_version": 1,
+        "parameters": {
+          "asset_type": "player",
+          "candidate_id": "player-agile-catcher",
+          "palette": {
+            "accent": "#F2C857",
+            "primary": "#741F36",
+            "secondary": "#163B61",
+            "skin": "#D08B5D"
+          },
+          "proportions": {
+            "height": 0.94,
+            "shoulder_width": 1.02,
+            "stockiness": 1.05
+          },
+          "role": "catcher",
+          "stance": "catcher_low",
+          "style": "high_resolution_pixel_volume"
+        },
+        "paths": {
+          "blend": "res://artifacts/blender_candidates/pixiball_parallel_example/player-agile-catcher.blend",
+          "log": "res://artifacts/blender_candidates/pixiball_parallel_example/player-agile-catcher.glb.agent.log",
+          "manifest": "res://artifacts/blender_candidates/pixiball_parallel_example/player-agile-catcher.glb.agent.json",
+          "output": "res://artifacts/blender_candidates/pixiball_parallel_example/player-agile-catcher.glb",
+          "script": "res://tools/blender/build_candidate.py"
+        },
+        "sha256": {
+          "blend": "7e4a7f3a5c05f5cc0fb3a1e756b2eff528868ac3136209be3b3c8953f0e0c463",
+          "log": "2550c7dbf46abb4f506803214a02f87b628ab29fba8291578e9440e83b3a8dbe",
+          "output": "c34bad1b96e80272cdafe53c0eb66f2dbfc427d23a142a1c3d0ab12fbb9b13ab",
+          "script": "558e06b7f550896e316022286f5f240800b832e8c3d8ac0a48765c2791e7a74d"
+        }
+      },
+      "id": "player-agile-catcher",
+      "parameters": {
+        "asset_type": "player",
+        "candidate_id": "player-agile-catcher",
+        "palette": {
+          "accent": "#F2C857",
+          "primary": "#741F36",
+          "secondary": "#163B61",
+          "skin": "#D08B5D"
+        },
+        "proportions": {
+          "height": 0.94,
+          "shoulder_width": 1.02,
+          "stockiness": 1.05
+        },
+        "role": "catcher",
+        "stance": "catcher_low",
+        "style": "high_resolution_pixel_volume"
+      },
+      "paths": {
+        "blend": "res://artifacts/blender_candidates/pixiball_parallel_example/player-agile-catcher.blend",
+        "log": "res://artifacts/blender_candidates/pixiball_parallel_example/player-agile-catcher.glb.agent.log",
+        "manifest": "res://artifacts/blender_candidates/pixiball_parallel_example/player-agile-catcher.glb.agent.json",
+        "output": "res://artifacts/blender_candidates/pixiball_parallel_example/player-agile-catcher.glb",
+        "script": "res://tools/blender/build_candidate.py"
+      },
+      "status": "succeeded",
+      "timeout_seconds": 300.0
+    },
+    {
+      "asset_manifest": {
+        "blender_version": "4.5.11 LTS",
+        "invocation_schema_version": 1,
+        "parameters": {
+          "asset_type": "equipment",
+          "candidate_id": "equipment-catcher-mitt",
+          "equipment_kind": "mitt",
+          "palette": {
+            "accent": "#D49A4A",
+            "dark": "#261811",
+            "leather": "#71321E"
+          },
+          "style": "high_resolution_pixel_volume"
+        },
+        "paths": {
+          "blend": "res://artifacts/blender_candidates/pixiball_parallel_example/equipment-catcher-mitt.blend",
+          "log": "res://artifacts/blender_candidates/pixiball_parallel_example/equipment-catcher-mitt.glb.agent.log",
+          "manifest": "res://artifacts/blender_candidates/pixiball_parallel_example/equipment-catcher-mitt.glb.agent.json",
+          "output": "res://artifacts/blender_candidates/pixiball_parallel_example/equipment-catcher-mitt.glb",
+          "script": "res://tools/blender/build_candidate.py"
+        },
+        "sha256": {
+          "blend": "c01c62d3a41fdb65a815f7f8ab609ffd4543deed1d6b8827e93088fb7914e822",
+          "log": "5e40609c7b6dab096a38924056d78ec5ea2181b25326c24c45acf6e8eb7bf110",
+          "output": "505b7a6fd5721e291a0dbc5b7afa0b9e4f51c51231aee58687e55f39de36b78b",
+          "script": "558e06b7f550896e316022286f5f240800b832e8c3d8ac0a48765c2791e7a74d"
+        }
+      },
+      "id": "equipment-catcher-mitt",
+      "parameters": {
+        "asset_type": "equipment",
+        "candidate_id": "equipment-catcher-mitt",
+        "equipment_kind": "mitt",
+        "palette": {
+          "accent": "#D49A4A",
+          "dark": "#261811",
+          "leather": "#71321E"
+        },
+        "style": "high_resolution_pixel_volume"
+      },
+      "paths": {
+        "blend": "res://artifacts/blender_candidates/pixiball_parallel_example/equipment-catcher-mitt.blend",
+        "log": "res://artifacts/blender_candidates/pixiball_parallel_example/equipment-catcher-mitt.glb.agent.log",
+        "manifest": "res://artifacts/blender_candidates/pixiball_parallel_example/equipment-catcher-mitt.glb.agent.json",
+        "output": "res://artifacts/blender_candidates/pixiball_parallel_example/equipment-catcher-mitt.glb",
+        "script": "res://tools/blender/build_candidate.py"
+      },
+      "status": "succeeded",
+      "timeout_seconds": 300.0
+    },
+    {
+      "asset_manifest": {
+        "blender_version": "4.5.11 LTS",
+        "invocation_schema_version": 1,
+        "parameters": {
+          "asset_type": "equipment",
+          "candidate_id": "equipment-slugger-bat",
+          "equipment_kind": "bat",
+          "palette": {
+            "accent": "#F0B947",
+            "dark": "#202733",
+            "wood": "#C98A3B"
+          },
+          "style": "high_resolution_pixel_volume"
+        },
+        "paths": {
+          "blend": "res://artifacts/blender_candidates/pixiball_parallel_example/equipment-slugger-bat.blend",
+          "log": "res://artifacts/blender_candidates/pixiball_parallel_example/equipment-slugger-bat.glb.agent.log",
+          "manifest": "res://artifacts/blender_candidates/pixiball_parallel_example/equipment-slugger-bat.glb.agent.json",
+          "output": "res://artifacts/blender_candidates/pixiball_parallel_example/equipment-slugger-bat.glb",
+          "script": "res://tools/blender/build_candidate.py"
+        },
+        "sha256": {
+          "blend": "5e28188aafae60dfa7529d47e0e4b52e90e6c8b6af5b78853715b9468ebbbd86",
+          "log": "8348c8b3c638f9c87495553ec3641304689974b2c29ae36d0876fc3189e5bb39",
+          "output": "66d435fa1e1a9144a285092ed1821dda7a294002a190300dcfb2917f00ce0a65",
+          "script": "558e06b7f550896e316022286f5f240800b832e8c3d8ac0a48765c2791e7a74d"
+        }
+      },
+      "id": "equipment-slugger-bat",
+      "parameters": {
+        "asset_type": "equipment",
+        "candidate_id": "equipment-slugger-bat",
+        "equipment_kind": "bat",
+        "palette": {
+          "accent": "#F0B947",
+          "dark": "#202733",
+          "wood": "#C98A3B"
+        },
+        "style": "high_resolution_pixel_volume"
+      },
+      "paths": {
+        "blend": "res://artifacts/blender_candidates/pixiball_parallel_example/equipment-slugger-bat.blend",
+        "log": "res://artifacts/blender_candidates/pixiball_parallel_example/equipment-slugger-bat.glb.agent.log",
+        "manifest": "res://artifacts/blender_candidates/pixiball_parallel_example/equipment-slugger-bat.glb.agent.json",
+        "output": "res://artifacts/blender_candidates/pixiball_parallel_example/equipment-slugger-bat.glb",
+        "script": "res://tools/blender/build_candidate.py"
+      },
+      "status": "succeeded",
+      "timeout_seconds": 300.0
+    }
+  ],
+  "manifest": "res://tools/blender/player_equipment_candidates.batch.json",
+  "max_workers": 4,
+  "name": "Pixiball parallel player and equipment candidates",
+  "ok": true,
+  "result": "res://artifacts/blender_candidates/pixiball_parallel_example/batch-result.json",
+  "status": "succeeded",
+  "summary": {
+    "failed": 0,
+    "planned": 0,
+    "succeeded": 4,
+    "total": 4
+  }
+}

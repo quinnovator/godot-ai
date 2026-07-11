@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Optional, Sequence, TextIO
 
 from .blender import build_blender_asset
+from .blender_batch import build_blender_batch
 from .client import (
     DEFAULT_RUNTIME_POLL_INTERVAL,
     DEFAULT_RUNTIME_TIMEOUT,
@@ -19,6 +20,7 @@ from .client import (
     GodotAgentError,
     ProtocolError,
 )
+from .scenario import load_scenario, run_scenario
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -151,10 +153,40 @@ def build_parser() -> argparse.ArgumentParser:
     save = commands.add_parser("save", help="save the current edited scene")
     save.add_argument("path", nargs="?", help="optional destination scene path")
 
-    play = commands.add_parser("play", help="run the project or a specific scene")
+    play = commands.add_parser("play", help="run the project main scene or a specific scene")
     play.add_argument("scene", nargs="?", help="optional scene path to run")
+    play.add_argument(
+        "--current",
+        action="store_true",
+        help="run the currently edited scene instead of the project main scene",
+    )
 
     commands.add_parser("stop", help="stop the running game")
+
+    scenario_run = commands.add_parser(
+        "scenario-run",
+        help="run a deterministic semantic gameplay scenario from JSON",
+    )
+    scenario_run.add_argument("file", help="path to the scenario JSON file")
+    scenario_run.add_argument(
+        "--session-id",
+        "--session",
+        type=_non_negative_int,
+        help="target a specific active debugger session",
+    )
+    scenario_run.add_argument(
+        "--poll-interval",
+        type=_positive_float,
+        default=DEFAULT_RUNTIME_POLL_INTERVAL,
+        metavar="SECONDS",
+    )
+    scenario_run.add_argument(
+        "--wait-timeout",
+        dest="runtime_timeout",
+        type=_positive_float,
+        default=DEFAULT_RUNTIME_TIMEOUT,
+        metavar="SECONDS",
+    )
 
     blender_build = commands.add_parser(
         "blender-build",
@@ -178,6 +210,30 @@ def build_parser() -> argparse.ArgumentParser:
         "--blender",
         help="Blender executable or Blender.app path",
     )
+
+    blender_batch = commands.add_parser(
+        "blender-batch",
+        help="validate or run independent Blender jobs from a JSON manifest",
+    )
+    blender_batch.add_argument(
+        "manifest",
+        metavar="MANIFEST",
+        help="project-relative or res:// path to a Blender batch JSON manifest",
+    )
+    blender_batch.add_argument(
+        "--blender",
+        help="Blender executable or Blender.app path",
+    )
+    blender_batch.add_argument(
+        "--max-workers",
+        type=_positive_int,
+        help="override manifest concurrency (1-32)",
+    )
+    blender_batch.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="validate and print the resolved plan without locating Blender or writing files",
+    )
     return parser
 
 
@@ -191,6 +247,7 @@ def main(
     out = stdout if stdout is not None else sys.stdout
     err = stderr if stderr is not None else sys.stderr
 
+    result_failed = False
     try:
         if args.command == "blender-build":
             result = build_blender_asset(
@@ -200,10 +257,19 @@ def main(
                 blend=args.blend,
                 blender=args.blender,
             )
+        elif args.command == "blender-batch":
+            result = build_blender_batch(
+                project=args.project,
+                manifest=args.manifest,
+                blender=args.blender,
+                max_workers=args.max_workers,
+                dry_run=args.dry_run,
+            )
+            result_failed = not bool(result.get("ok", False))
         else:
             client = GodotAgentClient.for_project(args.project, timeout=args.timeout)
             result = _dispatch(client, args)
-        if args.command not in ("blender-build", "runtime-call", "runtime-status"):
+        if args.command not in ("blender-build", "blender-batch", "runtime-call", "runtime-status"):
             _raise_domain_failure(result, args)
     except (GodotAgentError, ValueError) as exc:
         print("godot-agent: error: {0}".format(exc), file=err)
@@ -214,7 +280,7 @@ def main(
     else:
         json.dump(result, out, ensure_ascii=False, indent=2, sort_keys=True, allow_nan=False)
     out.write("\n")
-    return 0
+    return 1 if result_failed else 0
 
 
 def _raise_domain_failure(result: Any, args: argparse.Namespace) -> None:
@@ -284,9 +350,17 @@ def _dispatch(client: GodotAgentClient, args: argparse.Namespace) -> Any:
     if args.command == "save":
         return client.save(args.path)
     if args.command == "play":
-        return client.play(args.scene)
+        return client.play(args.scene, current=args.current)
     if args.command == "stop":
         return client.stop()
+    if args.command == "scenario-run":
+        return run_scenario(
+            client,
+            load_scenario(args.file),
+            session_id=args.session_id,
+            timeout=args.runtime_timeout,
+            poll_interval=args.poll_interval,
+        )
     raise ValueError("unsupported command: {0}".format(args.command))
 
 
@@ -335,6 +409,16 @@ def _non_negative_int(raw: str) -> int:
         raise argparse.ArgumentTypeError("must be an integer") from exc
     if value < 0:
         raise argparse.ArgumentTypeError("must be non-negative")
+    return value
+
+
+def _positive_int(raw: str) -> int:
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be an integer") from exc
+    if value <= 0:
+        raise argparse.ArgumentTypeError("must be greater than zero")
     return value
 
 

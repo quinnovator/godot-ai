@@ -1,0 +1,42 @@
+{
+  "name": "Pixiball first autonomous pitch",
+  "pause": true,
+  "restore_pause": true,
+  "steps": [
+    {
+      "intent": {
+        "name": "start_match",
+        "params": {
+          "seed": 4242,
+          "innings": 1,
+          "difficulty": 0.6
+        }
+      }
+    },
+    { "advance": 1 },
+    {
+      "intent": {
+        "name": "autoplay",
+        "params": { "enabled": true }
+      }
+    },
+    { "advance": 1 },
+    {
+      "wait": {
+        "path": "presentation.flow",
+        "equals": "result",
+        "max_frames": 300,
+        "step_frames": 10
+      }
+    },
+    {
+      "assert": {
+        "path": "pitch_serial",
+        "equals": 1
+      }
+    },
+    { "advance": 20 },
+    { "observe": "first-result" },
+    { "capture": "res://.godot/agent/captures/pixiball-first-result.png" }
+  ]
+}

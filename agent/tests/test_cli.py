@@ -11,6 +11,28 @@ from test_client import FakeRpcServer, write_endpoint
 
 
 class CliTests(unittest.TestCase):
+    def test_play_defaults_to_main_and_current_is_explicit(self):
+        def response(request, _index):
+            return {
+                "jsonrpc": "2.0",
+                "id": request["id"],
+                "result": {"ok": True, "data": request["params"]},
+            }
+
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary)
+            with FakeRpcServer(response, expected_requests=2) as server:
+                write_endpoint(project, server, token="cli-token")
+                for command in (["play"], ["play", "--current"]):
+                    exit_code = main(
+                        ["--project", str(project), "--compact"] + command,
+                        stdout=io.StringIO(),
+                        stderr=io.StringIO(),
+                    )
+                    self.assertEqual(exit_code, 0)
+        self.assertEqual(server.requests[0]["params"], {"token": "cli-token"})
+        self.assertEqual(server.requests[1]["params"], {"current": True, "token": "cli-token"})
+
     def test_all_ergonomic_commands_and_raw_call(self):
         def response(request, _index):
             return {

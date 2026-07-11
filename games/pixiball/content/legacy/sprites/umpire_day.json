@@ -1,0 +1,27 @@
+{
+ "name": "umpire_day",
+ "frameWidth": 480,
+ "frameHeight": 660,
+ "columns": 5,
+ "frames": [
+  "CROUCH",
+  "LEAN",
+  "PUNCH",
+  "RINGUP_WIND",
+  "RINGUP_PUNCH"
+ ],
+ "artFrame": {
+  "x": -36,
+  "y": -87,
+  "w": 72,
+  "h": 99
+ },
+ "scale": 6.666666666666667,
+ "mood": "day",
+ "density": 4,
+ "shadows": {
+  "rx": 18,
+  "ry": 5,
+  "dx": 0
+ }
+}

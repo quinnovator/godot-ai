@@ -32,6 +32,8 @@
 
 #ifdef SDL_ENABLED
 
+#include "dualsense_effect_sdl.h"
+
 #include "core/input/default_controller_mappings.h"
 #include "core/variant/dictionary.h"
 
@@ -48,6 +50,24 @@
 	if (SDL_IsGamepad(sdl_event.jdevice.which)) { \
 		continue; \
 	}
+
+namespace {
+
+constexpr uint16_t SONY_VENDOR_ID = 0x054c;
+constexpr uint16_t DUALSENSE_PRODUCT_ID = 0x0ce6;
+constexpr uint16_t DUALSENSE_EDGE_PRODUCT_ID = 0x0df2;
+constexpr uint8_t MAX_ADAPTIVE_TRIGGER_FAILURES = 3;
+
+bool is_official_dualsense(SDL_Gamepad *p_gamepad, SDL_Joystick *p_joystick) {
+	if (p_gamepad == nullptr || p_joystick == nullptr || SDL_GetGamepadType(p_gamepad) != SDL_GAMEPAD_TYPE_PS5) {
+		return false;
+	}
+	const uint16_t vendor_id = SDL_GetJoystickVendor(p_joystick);
+	const uint16_t product_id = SDL_GetJoystickProduct(p_joystick);
+	return vendor_id == SONY_VENDOR_ID && (product_id == DUALSENSE_PRODUCT_ID || product_id == DUALSENSE_EDGE_PRODUCT_ID);
+}
+
+} // namespace
 
 JoypadSDL::~JoypadSDL() {
 	// Process any remaining input events
@@ -166,6 +186,9 @@ void JoypadSDL::process_events() {
 				joypads[joy_id].supports_force_feedback = SDL_GetBooleanProperty(propertiesID, SDL_PROP_JOYSTICK_CAP_RUMBLE_BOOLEAN, false);
 				joypads[joy_id].guid = StringName(String(guid));
 				joypads[joy_id].supports_motion_sensors = SDL_GamepadHasSensor(gamepad, SDL_SENSOR_ACCEL) || SDL_GamepadHasSensor(gamepad, SDL_SENSOR_GYRO);
+				joypads[joy_id].supports_adaptive_triggers = is_official_dualsense(gamepad, joy);
+				joypads[joy_id].adaptive_trigger_effect_active = false;
+				joypads[joy_id].adaptive_trigger_failures = 0;
 
 				sdl_instance_id_to_joypad_id.insert(sdl_event.jdevice.which, joy_id);
 
@@ -306,6 +329,15 @@ void JoypadSDL::process_events() {
 
 void JoypadSDL::close_joypad(int p_pad_idx) {
 	int sdl_instance_idx = joypads[p_pad_idx].sdl_instance_idx;
+	if (joypads[p_pad_idx].adaptive_trigger_effect_active) {
+		joypads[p_pad_idx].set_joy_adaptive_trigger_effect(
+				Input::JoyAdaptiveTrigger::JOY_ADAPTIVE_TRIGGER_BOTH,
+				Input::JoyAdaptiveTriggerEffect::JOY_ADAPTIVE_TRIGGER_EFFECT_OFF,
+				0,
+				0,
+				0,
+				0);
+	}
 
 	joypads[p_pad_idx].attached = false;
 	sdl_instance_id_to_joypad_id.erase(sdl_instance_idx);
@@ -344,6 +376,68 @@ void JoypadSDL::Joypad::set_joy_motion_sensors_enabled(bool p_enable) {
 
 bool JoypadSDL::Joypad::has_joy_vibration() const {
 	return supports_force_feedback;
+}
+
+bool JoypadSDL::Joypad::has_joy_adaptive_triggers() const {
+	return supports_adaptive_triggers && adaptive_trigger_failures < MAX_ADAPTIVE_TRIGGER_FAILURES;
+}
+
+bool JoypadSDL::Joypad::set_joy_adaptive_trigger_effect(Input::JoyAdaptiveTrigger p_trigger, Input::JoyAdaptiveTriggerEffect p_effect, int p_start_position, int p_end_position, int p_strength, int p_frequency_hz) {
+	if (!supports_adaptive_triggers || (p_effect != Input::JoyAdaptiveTriggerEffect::JOY_ADAPTIVE_TRIGGER_EFFECT_OFF && adaptive_trigger_failures >= MAX_ADAPTIVE_TRIGGER_FAILURES)) {
+		return false;
+	}
+
+	DualSenseEffectSDL::Trigger trigger;
+	switch (p_trigger) {
+		case Input::JoyAdaptiveTrigger::JOY_ADAPTIVE_TRIGGER_LEFT:
+			trigger = DualSenseEffectSDL::Trigger::LEFT;
+			break;
+		case Input::JoyAdaptiveTrigger::JOY_ADAPTIVE_TRIGGER_RIGHT:
+			trigger = DualSenseEffectSDL::Trigger::RIGHT;
+			break;
+		case Input::JoyAdaptiveTrigger::JOY_ADAPTIVE_TRIGGER_BOTH:
+			trigger = DualSenseEffectSDL::Trigger::BOTH;
+			break;
+		default:
+			return false;
+	}
+
+	DualSenseEffectSDL::Effect effect;
+	switch (p_effect) {
+		case Input::JoyAdaptiveTriggerEffect::JOY_ADAPTIVE_TRIGGER_EFFECT_OFF:
+			effect = DualSenseEffectSDL::Effect::OFF;
+			break;
+		case Input::JoyAdaptiveTriggerEffect::JOY_ADAPTIVE_TRIGGER_EFFECT_FEEDBACK:
+			effect = DualSenseEffectSDL::Effect::FEEDBACK;
+			break;
+		case Input::JoyAdaptiveTriggerEffect::JOY_ADAPTIVE_TRIGGER_EFFECT_WEAPON:
+			effect = DualSenseEffectSDL::Effect::WEAPON;
+			break;
+		case Input::JoyAdaptiveTriggerEffect::JOY_ADAPTIVE_TRIGGER_EFFECT_VIBRATION:
+			effect = DualSenseEffectSDL::Effect::VIBRATION;
+			break;
+		default:
+			return false;
+	}
+
+	DualSenseEffectSDL::Payload payload;
+	if (!DualSenseEffectSDL::build_payload(payload, trigger, effect, p_start_position, p_end_position, p_strength, p_frequency_hz)) {
+		return false;
+	}
+
+	SDL_Gamepad *gamepad = get_sdl_gamepad();
+	if (gamepad == nullptr || !SDL_SendGamepadEffect(gamepad, payload.data, DualSenseEffectSDL::PAYLOAD_SIZE)) {
+		adaptive_trigger_failures++;
+		return false;
+	}
+
+	adaptive_trigger_failures = 0;
+	if (p_trigger == Input::JoyAdaptiveTrigger::JOY_ADAPTIVE_TRIGGER_BOTH && p_effect == Input::JoyAdaptiveTriggerEffect::JOY_ADAPTIVE_TRIGGER_EFFECT_OFF) {
+		adaptive_trigger_effect_active = false;
+	} else if (p_effect != Input::JoyAdaptiveTriggerEffect::JOY_ADAPTIVE_TRIGGER_EFFECT_OFF) {
+		adaptive_trigger_effect_active = true;
+	}
+	return true;
 }
 
 SDL_Joystick *JoypadSDL::Joypad::get_sdl_joystick() const {

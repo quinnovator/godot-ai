@@ -1,0 +1,185 @@
+{
+  "asset": "pixiball_ballplayer",
+  "asset_version": 7,
+  "bounds_m": {
+    "max": [
+      0.523663,
+      1.996,
+      0.187
+    ],
+    "min": [
+      -0.623192,
+      0.004,
+      -0.330779
+    ]
+  },
+  "coordinate_contract": {
+    "forward": "-Z",
+    "ground": "Y=0",
+    "units": "meters",
+    "up": "+Y"
+  },
+  "engine": {
+    "actor_scene": "res://characters/ballplayer_actor.tscn",
+    "actor_script": "res://characters/ballplayer_actor.gd",
+    "fallback_script": "res://characters/voxel_ballplayer.gd",
+    "model_scene": "res://assets/models/ballplayer/ballplayer.glb"
+  },
+  "license": "Original Pixiball project asset",
+  "materials": [
+    "MAT_Bat",
+    "MAT_BatTape",
+    "MAT_Belt",
+    "MAT_Cleat",
+    "MAT_CleatEdge",
+    "MAT_EyeWhite",
+    "MAT_Hair",
+    "MAT_HairHighlight",
+    "MAT_Iris",
+    "MAT_Leather",
+    "MAT_LeatherLight",
+    "MAT_Metal",
+    "MAT_Mouth",
+    "MAT_Pants",
+    "MAT_PantsShadow",
+    "MAT_Pupil",
+    "MAT_Rubber",
+    "MAT_Skin",
+    "MAT_SkinLight",
+    "MAT_Sock",
+    "TEAM_Accent",
+    "TEAM_Primary",
+    "TEAM_Secondary"
+  ],
+  "native_actions": {
+    "catch": {
+      "end_frame": 25,
+      "markers": {
+        "glove_contact": 14
+      }
+    },
+    "celebrate": {
+      "end_frame": 49,
+      "markers": {
+        "celebration_peak": 24
+      }
+    },
+    "field_ready": {
+      "end_frame": 31,
+      "loop": true
+    },
+    "field_throw": {
+      "end_frame": 31,
+      "markers": {
+        "ball_release": 18
+      }
+    },
+    "idle": {
+      "end_frame": 61,
+      "loop": true
+    },
+    "pitch": {
+      "end_frame": 37,
+      "markers": {
+        "ball_release": 24
+      }
+    },
+    "run": {
+      "end_frame": 25,
+      "loop": true
+    },
+    "slide": {
+      "end_frame": 39,
+      "markers": {
+        "base_contact": 22
+      }
+    },
+    "swing": {
+      "end_frame": 29,
+      "markers": {
+        "bat_contact": 19
+      }
+    }
+  },
+  "rig": {
+    "armature": "BallplayerHumanoid",
+    "bone_count": 31,
+    "handedness": {
+      "authored_side": "right",
+      "runtime_contract": "BallplayerActor mirrors model X per action for throws, catches, field-ready, and batting side"
+    },
+    "sockets": [
+      "socket_head",
+      "socket_chest",
+      "socket_glove",
+      "socket_catch",
+      "socket_bat",
+      "socket_ball",
+      "socket_bat_tip",
+      "socket_foot.L",
+      "socket_foot.R"
+    ]
+  },
+  "schema_version": 2,
+  "source": {
+    "blend": "res://assets/models/ballplayer/source/ballplayer.blend",
+    "build_manifest": "res://assets/models/ballplayer/ballplayer.glb.agent.json",
+    "recipe": "res://assets/blender/build_ballplayer.py"
+  },
+  "team_color_slots": [
+    "TEAM_Primary",
+    "TEAM_Secondary",
+    "TEAM_Accent"
+  ],
+  "topology": {
+    "deformation": {
+      "method": "continuous multi-weight rings with dual-quaternion volume preservation",
+      "multi_weight_joints": [
+        "neck",
+        "shoulders",
+        "elbows",
+        "wrists",
+        "hips",
+        "knees",
+        "ankles"
+      ]
+    },
+    "logical_meshes": [
+      "Body_Skinned",
+      "Uniform_Skinned",
+      "Hair_Skinned",
+      "Face_Details_Skinned",
+      "Cap_Skinned",
+      "Cleats_Skinned",
+      "Glove_Skinned",
+      "Bat_Skinned"
+    ],
+    "mesh_count": 8,
+    "polygon_count": 16576,
+    "source_vertex_count": 15940
+  },
+  "visual_qa": {
+    "recipe": "res://assets/blender/render_ballplayer_qa.py",
+    "review_poses": [
+      "rest_front",
+      "rest_three_quarter",
+      "field_ready_set",
+      "pitch_balance",
+      "pitch_release",
+      "pitch_follow_through",
+      "field_throw_transfer",
+      "field_throw_cock",
+      "field_throw_release",
+      "field_throw_follow_through",
+      "swing_load",
+      "swing_contact",
+      "swing_finish",
+      "catch_contact",
+      "run_stride",
+      "celebrate_peak",
+      "celebrate_fist_pump",
+      "slide_entry",
+      "slide_contact"
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+{
+ "name": "mitt_golden",
+ "frameWidth": 120,
+ "frameHeight": 120,
+ "columns": 3,
+ "frames": [
+  "OPEN",
+  "CLOSED",
+  "POP"
+ ],
+ "artFrame": {
+  "x": -9,
+  "y": -9,
+  "w": 18,
+  "h": 18
+ },
+ "scale": 6.666666666666667,
+ "mood": "golden",
+ "density": 4
+}

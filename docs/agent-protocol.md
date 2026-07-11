@@ -53,7 +53,7 @@ Other examples include `Vector2`, `Color`, `Quaternion`, `Transform2D`, `Transfo
 | `editor.preview_camera` | `node_path`, optional `viewport` | drive an editor viewport through a scene camera; an empty path restores the editor camera |
 | `editor.capture` | optional `viewport`, `path` | GPU-backed editor viewport PNG |
 | `rig.inspect` | `node_path` | skeleton hierarchy, rest/global rest, and current pose |
-| `game.play` | optional `scene` | run current/main/custom scene |
+| `game.play` | optional `scene` or `current=true` | runs the project main scene by default, a custom scene by path, or the currently edited scene only when explicitly requested |
 | `game.stop` | none | stop the running game |
 | `game.status` | none | current play state and scene |
 | `runtime.status` | none | active debugger sessions and runtime-probe readiness |
@@ -62,7 +62,7 @@ Other examples include `Vector2`, `Color`, `Quaternion`, `Transform2D`, `Transfo
 
 Node paths are relative to the edited scene root. `.` identifies the root.
 
-`runtime.command` forwards only the fixed command set implemented by the opt-in add-on. Its current commands are `runtime.health`, `scene.get_tree`, `node.get_properties`, `node.set_property`, `input.action_press`, `input.action_release`, `time.set_paused`, `time.advance_physics_frames`, `viewport.capture`, `physics.raycast`, and `navigation.map_path`. See [the runtime reference](../runtime/README.md) for their schemas and safety limits. JSON integer parameters are accepted only when finite, integral, and within each command's documented range.
+`runtime.command` forwards only the fixed command set implemented by the opt-in add-on. Its current commands are `runtime.health`, `scene.get_tree`, `node.get_properties`, `node.set_property`, `input.action_press`, `input.action_release`, `gameplay.describe`, `gameplay.state`, `gameplay.intent`, `time.set_paused`, `time.advance_physics_frames`, `viewport.capture`, `physics.raycast`, and `navigation.map_path`. The gameplay commands target one explicitly grouped game-owned driver through three fixed callbacks; they never accept an arbitrary object method. See [the runtime reference](../runtime/README.md) for their schemas, driver contract, and safety limits. JSON integer parameters are accepted only when finite, integral, and within each command's documented range.
 
 ## Deliberate v1 limitations
 

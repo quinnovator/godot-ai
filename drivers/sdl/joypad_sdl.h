@@ -53,6 +53,9 @@ private:
 
 		bool supports_force_feedback = false;
 		bool supports_motion_sensors = false;
+		bool supports_adaptive_triggers = false;
+		bool adaptive_trigger_effect_active = false;
+		uint8_t adaptive_trigger_failures = 0;
 		uint64_t ff_effect_timestamp = 0;
 
 		virtual bool has_joy_light() const override;
@@ -62,6 +65,9 @@ private:
 		virtual void set_joy_motion_sensors_enabled(bool p_enable) override;
 
 		virtual bool has_joy_vibration() const override;
+
+		virtual bool has_joy_adaptive_triggers() const override;
+		virtual bool set_joy_adaptive_trigger_effect(Input::JoyAdaptiveTrigger p_trigger, Input::JoyAdaptiveTriggerEffect p_effect, int p_start_position, int p_end_position, int p_strength, int p_frequency_hz) override;
 
 		SDL_Joystick *get_sdl_joystick() const;
 		SDL_Gamepad *get_sdl_gamepad() const;

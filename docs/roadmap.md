@@ -25,9 +25,9 @@ The repository currently delivers M0 plus an intentionally narrow runtime/spatia
 ## M2: deterministic runtime laboratory
 
 - Expand the delivered opt-in editor-debugger runtime probe.
-- Add fixed seed and fixed timestep control around the delivered explicit physics-frame stepping and input intents.
-- Typed events and state predicates; snapshot/restore; trace and replay.
-- Scenario files, JSON/JUnit output, golden-state tests, performance budgets, and export-and-launch smoke tests.
+- Add fixed seed and fixed timestep control around the delivered explicit physics-frame stepping, mapped inputs, and game-declared semantic intents.
+- Expand the delivered JSON semantic scenario runner and state predicates with typed event streams; snapshot/restore; trace and replay.
+- Add JUnit output, golden-state tests, performance budgets, and export-and-launch smoke tests to the delivered scenario files and structured JSON results.
 - Gameplay-model inference as a pluggable resource rather than engine-coupled policy.
 
 ## M3: spatial and visual perception

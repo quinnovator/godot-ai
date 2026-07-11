@@ -1,0 +1,138 @@
+{
+  "blend": "/Users/jack/dev/godot-ai/games/pixiball/assets/models/ballplayer/source/ballplayer.blend",
+  "renders": [
+    {
+      "name": "rest_front",
+      "action": null,
+      "frame": 1,
+      "target_z": 1.03,
+      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/rest_front.png"
+    },
+    {
+      "name": "rest_three_quarter",
+      "action": null,
+      "frame": 1,
+      "target_z": 1.03,
+      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/rest_three_quarter.png"
+    },
+    {
+      "name": "field_ready_set",
+      "action": "field_ready",
+      "frame": 8,
+      "target_z": 1.03,
+      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/field_ready_set.png"
+    },
+    {
+      "name": "pitch_balance",
+      "action": "pitch",
+      "frame": 14,
+      "target_z": 1.03,
+      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/pitch_balance.png"
+    },
+    {
+      "name": "pitch_release",
+      "action": "pitch",
+      "frame": 24,
+      "target_z": 1.03,
+      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/pitch_release.png"
+    },
+    {
+      "name": "pitch_follow_through",
+      "action": "pitch",
+      "frame": 31,
+      "target_z": 1.03,
+      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/pitch_follow_through.png"
+    },
+    {
+      "name": "field_throw_transfer",
+      "action": "field_throw",
+      "frame": 11,
+      "target_z": 1.03,
+      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/field_throw_transfer.png"
+    },
+    {
+      "name": "field_throw_cock",
+      "action": "field_throw",
+      "frame": 16,
+      "target_z": 1.03,
+      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/field_throw_cock.png"
+    },
+    {
+      "name": "field_throw_release",
+      "action": "field_throw",
+      "frame": 18,
+      "target_z": 1.03,
+      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/field_throw_release.png"
+    },
+    {
+      "name": "field_throw_follow_through",
+      "action": "field_throw",
+      "frame": 24,
+      "target_z": 1.03,
+      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/field_throw_follow_through.png"
+    },
+    {
+      "name": "swing_load",
+      "action": "swing",
+      "frame": 1,
+      "target_z": 1.03,
+      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/swing_load.png"
+    },
+    {
+      "name": "swing_contact",
+      "action": "swing",
+      "frame": 19,
+      "target_z": 1.03,
+      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/swing_contact.png"
+    },
+    {
+      "name": "swing_finish",
+      "action": "swing",
+      "frame": 25,
+      "target_z": 1.03,
+      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/swing_finish.png"
+    },
+    {
+      "name": "catch_contact",
+      "action": "catch",
+      "frame": 14,
+      "target_z": 1.03,
+      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/catch_contact.png"
+    },
+    {
+      "name": "run_stride",
+      "action": "run",
+      "frame": 1,
+      "target_z": 1.03,
+      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/run_stride.png"
+    },
+    {
+      "name": "celebrate_peak",
+      "action": "celebrate",
+      "frame": 24,
+      "target_z": 1.12,
+      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/celebrate_peak.png"
+    },
+    {
+      "name": "celebrate_fist_pump",
+      "action": "celebrate",
+      "frame": 32,
+      "target_z": 1.03,
+      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/celebrate_fist_pump.png"
+    },
+    {
+      "name": "slide_entry",
+      "action": "slide",
+      "frame": 16,
+      "target_z": 0.66,
+      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/slide_entry.png"
+    },
+    {
+      "name": "slide_contact",
+      "action": "slide",
+      "frame": 22,
+      "target_z": 0.58,
+      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/slide_contact.png"
+    }
+  ]
+}

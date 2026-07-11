@@ -1,0 +1,10 @@
+[
+  { "id": "comets",   "city": "HARBOR CITY", "name": "COMETS",   "abbr": "COM", "color": "#41a6f6", "textOn": "#1a1c2c", "bat": 82, "pit": 79 },
+  { "id": "tigers",   "city": "REDSTONE",    "name": "TIGERS",   "abbr": "TIG", "color": "#e64539", "textOn": "#f4f0e1", "bat": 85, "pit": 76 },
+  { "id": "monarchs", "city": "MIDNIGHT",    "name": "MONARCHS", "abbr": "MON", "color": "#5d275d", "textOn": "#f4f0e1", "bat": 78, "pit": 88 },
+  { "id": "drifters", "city": "DUSTBOWL",    "name": "DRIFTERS", "abbr": "DRF", "color": "#e39764", "textOn": "#1a1c2c", "bat": 74, "pit": 81 },
+  { "id": "admirals", "city": "BAYSIDE",     "name": "ADMIRALS", "abbr": "ADM", "color": "#3b4a8c", "textOn": "#f4f0e1", "bat": 80, "pit": 84 },
+  { "id": "growlers", "city": "GROVETOWN",   "name": "GROWLERS", "abbr": "GRW", "color": "#38b764", "textOn": "#1a1c2c", "bat": 77, "pit": 77 },
+  { "id": "pennants", "city": "GOLDCREST",   "name": "PENNANTS", "abbr": "PEN", "color": "#ffcd75", "textOn": "#1a1c2c", "bat": 88, "pit": 70 },
+  { "id": "sparks",   "city": "TEALPORT",    "name": "SPARKS",   "abbr": "SPK", "color": "#73eff7", "textOn": "#1a1c2c", "bat": 79, "pit": 83 }
+]

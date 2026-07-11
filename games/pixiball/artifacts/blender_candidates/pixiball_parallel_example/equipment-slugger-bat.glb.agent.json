@@ -1,0 +1,28 @@
+{
+  "blender_version": "4.5.11 LTS",
+  "invocation_schema_version": 1,
+  "parameters": {
+    "asset_type": "equipment",
+    "candidate_id": "equipment-slugger-bat",
+    "equipment_kind": "bat",
+    "palette": {
+      "accent": "#F0B947",
+      "dark": "#202733",
+      "wood": "#C98A3B"
+    },
+    "style": "high_resolution_pixel_volume"
+  },
+  "paths": {
+    "blend": "res://artifacts/blender_candidates/pixiball_parallel_example/equipment-slugger-bat.blend",
+    "log": "res://artifacts/blender_candidates/pixiball_parallel_example/equipment-slugger-bat.glb.agent.log",
+    "manifest": "res://artifacts/blender_candidates/pixiball_parallel_example/equipment-slugger-bat.glb.agent.json",
+    "output": "res://artifacts/blender_candidates/pixiball_parallel_example/equipment-slugger-bat.glb",
+    "script": "res://tools/blender/build_candidate.py"
+  },
+  "sha256": {
+    "blend": "5e28188aafae60dfa7529d47e0e4b52e90e6c8b6af5b78853715b9468ebbbd86",
+    "log": "8348c8b3c638f9c87495553ec3641304689974b2c29ae36d0876fc3189e5bb39",
+    "output": "66d435fa1e1a9144a285092ed1821dda7a294002a190300dcfb2917f00ce0a65",
+    "script": "558e06b7f550896e316022286f5f240800b832e8c3d8ac0a48765c2791e7a74d"
+  }
+}

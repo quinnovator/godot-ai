@@ -22,6 +22,7 @@ exec uvx --from 'scons==4.10.1' scons \
   arch=arm64 \
   target=editor \
   dev_build=yes \
+  generate_bundle=yes \
   vulkan=no \
   accesskit=no \
   angle=no \

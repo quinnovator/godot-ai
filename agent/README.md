@@ -28,10 +28,15 @@ python3 -m godot_agent --project /path/to/project stop
 python3 -m godot_agent --project /path/to/project runtime-status
 python3 -m godot_agent --project /path/to/project runtime-call runtime.health
 python3 -m godot_agent --project /path/to/project runtime-call scene.get_tree --params '{"max_depth":4}'
+python3 -m godot_agent --project /path/to/project scenario-run scenarios/first-pitch.json
 python3 -m godot_agent --project /path/to/project call scene.get_tree --params '{}'
 ```
 
 `raw` is accepted as an alias for `call`.
+Parameterless `play` always launches the project's configured main scene, even
+when an asset gallery or test scene is open in the editor. Use `play --current`
+only when the edited scene is deliberately the launch target, or pass an
+explicit `res://.../*.tscn` path for a custom scene.
 
 ## Running-game commands
 
@@ -88,6 +93,34 @@ or running-game failures raise `DomainError` with `code`, `message`, `details`,
 `RuntimeTimeoutError`; malformed JSON-RPC or domain/result shapes raise
 `ProtocolError`.
 
+## Semantic scenario runner
+
+`scenario-run` executes bounded JSON steps against a game's opt-in semantic
+driver. It can send declared intents, advance 1–600 exact physics frames,
+observe state, assert or wait on dot-separated state paths, and capture the
+runtime viewport. Scenarios pause by default and restore the game's previous
+pause state on completion or failure.
+
+```json
+{
+  "name": "first result",
+  "steps": [
+    {"intent": {"name": "start_match", "params": {"seed": 7}}},
+    {"advance": 1},
+    {"wait": {"path": "presentation.flow", "equals": "result", "max_frames": 300}},
+    {"assert": {"path": "pitch_serial", "equals": 1}},
+    {"capture": "res://.godot/agent/captures/first-result.png"}
+  ]
+}
+```
+
+Each step contains exactly one operation. Waits are bounded to 100,000 total
+frames and advance in chunks of at most 600, matching the runtime probe's
+per-command limit. Supported comparisons are `equals`, `not_equals`, `in`,
+`contains`, and `exists`. The result includes every step record and final
+semantic state; a rejected intent, timeout, malformed response, or failed
+assertion exits nonzero with its one-based step number.
+
 ## Blender companion builds
 
 An authored Blender Python recipe can be run headlessly without requiring a
@@ -109,6 +142,51 @@ Output paths must use `res://`, stay inside the project, and end in `.glb` or
 2. the `BLENDER` environment variable
 3. `blender` on `PATH`
 4. `Blender.app` in the standard system or user macOS Applications directory
+
+Independent modeling jobs can be validated and fanned out from one reviewable
+JSON manifest:
+
+```sh
+python3 -m godot_agent \
+  --project /path/to/project \
+  blender-batch res://tools/player-candidates.batch.json \
+  --max-workers 4
+```
+
+```json
+{
+  "schema_version": 1,
+  "name": "player candidates",
+  "max_workers": 4,
+  "result": "res://artifacts/candidates/batch-result.json",
+  "defaults": {"timeout_seconds": 600},
+  "jobs": [
+    {
+      "id": "pitcher-a",
+      "script": "res://tools/build_player.py",
+      "output": "res://artifacts/candidates/pitcher-a.glb",
+      "blend": "res://artifacts/candidates/pitcher-a.blend",
+      "parameters": {"role": "pitcher", "variant": "power"}
+    }
+  ]
+}
+```
+
+Use `--dry-run` to parse the entire manifest, resolve all paths, reject unknown
+fields and case-insensitive output collisions, and print the source-ordered
+plan without locating Blender or writing files. A real run validates all jobs
+before launch and uses at most `max_workers` Blender processes (bounded to
+1–32). Each job gets a default `<output>.agent.log` JSON diagnostic file in
+addition to its existing `<output>.agent.json` provenance. The persisted batch
+result remains in manifest order even when completion order differs. Any
+failure makes the command exit nonzero, while successful peer artifacts remain
+installed and recorded.
+
+Recipe parameters are normalized, bounded JSON and are available to authored
+scripts through the file path in `GODOT_AGENT_BLENDER_PARAMETERS`. The
+bootstrap restores that environment value after each script. This preserves
+the existing no-parameter `blender-build` behavior while allowing a single
+recipe to generate many isolated candidates.
 
 The client does not install Blender and does not invoke a shell. It starts a
 fixed Blender command with `--background`, `--factory-startup`, and a packaged

@@ -1,0 +1,59 @@
+{
+  "name": "Pixiball selected-team versus semantic loop",
+  "pause": true,
+  "restore_pause": true,
+  "steps": [
+    {
+      "intent": {
+        "name": "start_versus",
+        "params": {
+          "seed": 78031,
+          "innings": 3,
+          "difficulty": 0.8,
+          "player_team": 3,
+          "cpu_team": 8
+        }
+      }
+    },
+    { "advance": 1 },
+    { "assert": { "path": "mode", "equals": "versus" } },
+    { "assert": { "path": "innings", "equals": 3 } },
+    { "assert": { "path": "difficulty", "equals": 0.8 } },
+    { "assert": { "path": "teams.home.id", "equals": "monarchs" } },
+    { "assert": { "path": "teams.away.id", "equals": "sparks" } },
+    { "assert": { "path": "presentation.cast.pitcher.throws", "exists": true } },
+    { "assert": { "path": "presentation.cast.pitcher.number", "exists": true } },
+    { "assert": { "path": "presentation.cast.batter.team", "equals": "SPK" } },
+    { "assert": { "path": "legal_actions", "contains": "select_pitch" } },
+    { "assert": { "path": "legal_actions", "contains": "primary" } },
+    { "assert": { "path": "presentation.haptics.enabled", "equals": true } },
+    { "assert": { "path": "presentation.haptics.capabilities", "exists": true } },
+    {
+      "intent": {
+        "name": "autoplay",
+        "params": { "enabled": true }
+      }
+    },
+    { "advance": 1 },
+    {
+      "wait": {
+        "path": "presentation.flow",
+        "equals": "result",
+        "max_frames": 1200,
+        "step_frames": 30
+      }
+    },
+    { "assert": { "path": "pitch_serial", "equals": 1 } },
+    { "assert": { "path": "simulation_legal_actions", "contains": "advance_after_result" } },
+    { "assert": { "path": "legal_actions", "contains": "exit_to_menu" } },
+    { "assert": { "path": "presentation.haptics.last_output.left", "exists": true } },
+    { "observe": "selected-team-first-result" },
+    { "advance": 12 },
+    { "capture": "res://.godot/agent/captures/pixiball-versus-semantic-loop.png" },
+    { "intent": { "name": "exit_to_menu", "params": {} } },
+    { "advance": 1 },
+    { "assert": { "path": "presentation.flow", "equals": "landing" } },
+    { "assert": { "path": "legal_actions", "contains": "start_versus" } },
+    { "observe": "returned-to-landing" }
+  ]
+}

@@ -1,0 +1,57 @@
+[
+  {
+    "archetype": "Balanced Hitter",
+    "encoded": 0,
+    "nBatters": 62,
+    "avgLaunchSpeed": 78.8,
+    "avgLaunchAngle": 15.6,
+    "chaseRate": 0.252,
+    "whiffRate": 0.227,
+    "contactRate": 0.773,
+    "swingRate": 0.453
+  },
+  {
+    "archetype": "Contact Hitter",
+    "encoded": 1,
+    "nBatters": 195,
+    "avgLaunchSpeed": 82.5,
+    "avgLaunchAngle": 17.8,
+    "chaseRate": 0.287,
+    "whiffRate": 0.202,
+    "contactRate": 0.798,
+    "swingRate": 0.475
+  },
+  {
+    "archetype": "Free Swinger",
+    "encoded": 2,
+    "nBatters": 86,
+    "avgLaunchSpeed": 81.6,
+    "avgLaunchAngle": 16.2,
+    "chaseRate": 0.358,
+    "whiffRate": 0.327,
+    "contactRate": 0.673,
+    "swingRate": 0.538
+  },
+  {
+    "archetype": "Guess Hitter",
+    "encoded": 3,
+    "nBatters": 110,
+    "avgLaunchSpeed": 83.0,
+    "avgLaunchAngle": 20.0,
+    "chaseRate": 0.247,
+    "whiffRate": 0.307,
+    "contactRate": 0.693,
+    "swingRate": 0.458
+  },
+  {
+    "archetype": "Strikeout-Prone",
+    "encoded": 4,
+    "nBatters": 68,
+    "avgLaunchSpeed": 83.4,
+    "avgLaunchAngle": 12.9,
+    "chaseRate": 0.276,
+    "whiffRate": 0.288,
+    "contactRate": 0.712,
+    "swingRate": 0.471
+  }
+]

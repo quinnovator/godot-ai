@@ -8,15 +8,20 @@ on:
       - "agent/**"
       - "core/**"
       - "doc/**"
+      - "drivers/**"
       - "editor/**"
       - "main/**"
       - "runtime/**"
       - "modules/godot_agent/**"
+      - "modules/godot_ai_model/**"
       - "platform/**"
       - "scene/**"
       - "examples/agent_smoke/**"
       - "examples/blender_asset/**"
+      - "games/pixiball/**"
       - "tools/godot-ai/**"
+      - "tests/drivers/**"
+      - "tests/editor/**"
       - "SConstruct"
       - "version.py"
   pull_request:
@@ -25,15 +30,20 @@ on:
       - "agent/**"
       - "core/**"
       - "doc/**"
+      - "drivers/**"
       - "editor/**"
       - "main/**"
       - "runtime/**"
       - "modules/godot_agent/**"
+      - "modules/godot_ai_model/**"
       - "platform/**"
       - "scene/**"
       - "examples/agent_smoke/**"
       - "examples/blender_asset/**"
+      - "games/pixiball/**"
       - "tools/godot-ai/**"
+      - "tests/drivers/**"
+      - "tests/editor/**"
       - "SConstruct"
       - "version.py"
   workflow_dispatch:
@@ -80,12 +90,12 @@ jobs:
 
       - name: Lint and type-check sidecar
         run: |
-          ruff check agent tools/godot-ai/*.py examples/blender_asset/build_beacon.py modules/godot_agent/config.py
+          ruff check agent tools/godot-ai/*.py examples/blender_asset/build_beacon.py games/pixiball/assets/blender/*.py games/pixiball/tools/blender/build_candidate.py modules/godot_agent/config.py
           mypy agent/godot_agent
 
       - name: Check source recipes and vendored runtime add-on
         run: |
-          python -m py_compile examples/blender_asset/build_beacon.py
+          python -m py_compile examples/blender_asset/build_beacon.py games/pixiball/assets/blender/*.py games/pixiball/tools/blender/build_candidate.py
           tools/godot-ai/sync-runtime-addon.sh --check
 
   engine-module:
@@ -134,6 +144,19 @@ jobs:
             fontconfig=yes
             udev=no
             module_godot_agent_enabled=yes
+            tests=yes
+
+      - name: Test AI-native engine extensions
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot="$GITHUB_WORKSPACE/bin/godot.linuxbsd.editor.dev.x86_64"
+          (
+            cd "$RUNNER_TEMP"
+            "$godot" --test --test-case='[AITreeModel]*'
+            "$godot" --test --test-case='[SDL][DualSense]*'
+            "$godot" --test --test-case='[Editor] External changes only auto-reload when safe'
+          )
 
       - name: Exercise fresh headless authoring and runtime loops
         shell: bash
@@ -178,6 +201,23 @@ jobs:
           if grep -q 'ERROR:' "$log"; then
             exit 1
           fi
+
+      - name: Test semantic gameplay driver contract
+        run: >-
+          bin/godot.linuxbsd.editor.dev.x86_64 --headless
+          --path examples/agent_smoke
+          --script res://runtime_gameplay_test.gd
+
+      - name: Test Pixiball benchmark game
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot="$GITHUB_WORKSPACE/bin/godot.linuxbsd.editor.dev.x86_64"
+          GODOT_BIN="$godot" tools/godot-ai/test-pixiball.sh
+          pack="$RUNNER_TEMP/pixiball-export-smoke.pck"
+          "$godot" --headless --path "$GITHUB_WORKSPACE/games/pixiball" \
+            --export-pack macOS "$pack"
+          test -s "$pack"
 
       - name: Save build cache
         if: always()

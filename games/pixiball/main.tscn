@@ -1,0 +1,83 @@
+[gd_scene format=3 uid="uid://1xlpyhfa6icj"]
+
+[ext_resource type="Script" uid="uid://dx54hg6cl6wb4" path="res://main.gd" id="1_main"]
+[ext_resource type="Script" uid="uid://1mjcfgu7p0gh" path="res://world/voxel_stadium.gd" id="2_stadium"]
+[ext_resource type="Script" uid="uid://dh15ff2rej6or" path="res://presentation/baseball_visual.gd" id="3_ball"]
+[ext_resource type="Script" uid="uid://s0qgjqr1srdr" path="res://presentation/broadcast_camera.gd" id="4_camera"]
+[ext_resource type="Script" uid="uid://bstd0rt2pltqv" path="res://gameplay/live_play_controller.gd" id="5_live"]
+[ext_resource type="Script" uid="uid://dp6dyj3s3omfu" path="res://presentation/audio_director.gd" id="6_audio"]
+[ext_resource type="Script" uid="uid://cgxd4q2fpmwts" path="res://presentation/haptics/haptic_director.gd" id="7_haptics"]
+[ext_resource type="Script" uid="uid://detm3tc1eg1p7" path="res://ui/pixiball_hud.gd" id="8_hud"]
+[ext_resource type="PackedScene" path="res://ui/pitch_intel/pitch_intel_panel.tscn" id="9_intel"]
+[ext_resource type="Shader" uid="uid://dlsqhwlraqj2w" path="res://presentation/shaders/pixel_composite.gdshader" id="10_pixel"]
+
+[sub_resource type="ShaderMaterial" id="PixelCompositeMaterial"]
+shader = ExtResource("10_pixel")
+shader_parameter/logical_size = Vector2(640, 360)
+shader_parameter/color_steps = 48.0
+shader_parameter/dither_strength = 0.35
+
+[node name="Pixiball" type="Node3D" unique_id=98687748]
+script = ExtResource("1_main")
+
+[node name="World" type="Node3D" parent="." unique_id=1096722542]
+
+[node name="Stadium" type="Node3D" parent="World" unique_id=880193813]
+script = ExtResource("2_stadium")
+
+[node name="Actors" type="Node3D" parent="." unique_id=1528100330]
+
+[node name="Ballplayers" type="Node3D" parent="Actors" unique_id=1020921335]
+
+[node name="Presentation" type="Node3D" parent="." unique_id=280059943]
+
+[node name="Baseball" type="Node3D" parent="Presentation" unique_id=2126288752]
+script = ExtResource("3_ball")
+
+[node name="CameraDirector" type="Node3D" parent="Presentation" unique_id=1147639371]
+script = ExtResource("4_camera")
+world_viewport_path = NodePath("../../PixelComposite/WorldView/WorldViewport")
+
+[node name="Systems" type="Node" parent="." unique_id=179917152]
+
+[node name="LivePlayController" type="Node" parent="Systems" unique_id=1284934244]
+script = ExtResource("5_live")
+
+[node name="AudioDirector" type="Node" parent="Systems" unique_id=1969085158]
+script = ExtResource("6_audio")
+
+[node name="HapticDirector" type="Node" parent="Systems" unique_id=1381824830]
+script = ExtResource("7_haptics")
+
+[node name="PixelComposite" type="CanvasLayer" parent="." unique_id=1081687443]
+layer = -1
+
+[node name="WorldView" type="SubViewportContainer" parent="PixelComposite" unique_id=588501327]
+texture_filter = 1
+material = SubResource("PixelCompositeMaterial")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch = true
+stretch_shrink = 2
+
+[node name="WorldViewport" type="SubViewport" parent="PixelComposite/WorldView" unique_id=528346798]
+handle_input_locally = false
+msaa_3d = 2
+size = Vector2i(640, 360)
+render_target_update_mode = 4
+
+[node name="PixiballHUD" type="CanvasLayer" parent="." unique_id=1515197848]
+script = ExtResource("8_hud")
+
+[node name="PitchIntelLayer" type="CanvasLayer" parent="." unique_id=381213954]
+layer = 24
+
+[node name="PitchIntelPanel" parent="PitchIntelLayer" unique_id=754981 instance=ExtResource("9_intel")]
+offset_left = 944.0
+offset_top = 124.0
+offset_right = 1260.0
+offset_bottom = 472.0

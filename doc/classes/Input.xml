@@ -281,6 +281,15 @@
 				By default, the deadzone is automatically calculated from the average of the action deadzones. However, you can override the deadzone to be whatever you want (on the range of 0 to 1).
 			</description>
 		</method>
+		<method name="has_joy_adaptive_triggers" qualifiers="const" experimental="">
+			<return type="bool" />
+			<param index="0" name="device" type="int" />
+			<description>
+				Returns [code]true[/code] if the joypad supports the typed adaptive-trigger effects exposed by [method set_joy_adaptive_trigger_effect].
+				This capability is currently limited to official Sony DualSense and DualSense Edge controllers handled by SDL's PS5 HID driver. A controller can stop reporting the capability after repeated output failures; callers should retain a standard vibration fallback.
+				[b]Note:[/b] This does not indicate support for DualSense audio-driven body haptics or controller-speaker output.
+			</description>
+		</method>
 		<method name="has_joy_light" qualifiers="const">
 			<return type="bool" />
 			<param index="0" name="device" type="int" />
@@ -788,6 +797,23 @@
 				[b]Note:[/b] For macOS, vibration is only supported in macOS 11 and later. When connected via USB, vibration is only supported for major brand controllers (except Xbox One and Xbox Series X/S controllers) due to macOS limitations.
 			</description>
 		</method>
+		<method name="set_joy_adaptive_trigger_effect" experimental="">
+			<return type="bool" />
+			<param index="0" name="device" type="int" />
+			<param index="1" name="trigger" type="int" enum="Input.JoyAdaptiveTrigger" />
+			<param index="2" name="effect" type="int" enum="Input.JoyAdaptiveTriggerEffect" />
+			<param index="3" name="start_position" type="int" default="0" />
+			<param index="4" name="end_position" type="int" default="0" />
+			<param index="5" name="strength" type="int" default="0" />
+			<param index="6" name="frequency_hz" type="int" default="0" />
+			<description>
+				Applies a validated adaptive-trigger effect and returns [code]true[/code] only when SDL accepted it for the selected controller. See [method has_joy_adaptive_triggers] and [method stop_joy_adaptive_triggers].
+				For [constant JOY_ADAPTIVE_TRIGGER_EFFECT_FEEDBACK], [param start_position] must be from [code]0[/code] to [code]9[/code] and [param strength] from [code]0[/code] to [code]8[/code].
+				For [constant JOY_ADAPTIVE_TRIGGER_EFFECT_WEAPON], [param start_position] must be from [code]2[/code] to [code]7[/code], [param end_position] must be greater than [param start_position] and at most [code]8[/code], and [param strength] must be from [code]0[/code] to [code]8[/code].
+				For [constant JOY_ADAPTIVE_TRIGGER_EFFECT_VIBRATION], [param start_position] must be from [code]0[/code] to [code]9[/code], [param strength] (the effect amplitude) from [code]0[/code] to [code]8[/code], and [param frequency_hz] from [code]0[/code] to [code]255[/code]. A zero strength, amplitude, or frequency safely disables that trigger's effect.
+				The API intentionally does not accept raw HID or SDL effect packets. SDL owns transport framing, Bluetooth CRCs, and enhanced-mode negotiation.
+			</description>
+		</method>
 		<method name="stop_joy_motion_sensors_calibration" experimental="">
 			<return type="void" />
 			<param index="0" name="device" type="int" />
@@ -802,6 +828,13 @@
 			<param index="0" name="device" type="int" />
 			<description>
 				Stops the vibration of the joypad started with [method start_joy_vibration].
+			</description>
+		</method>
+		<method name="stop_joy_adaptive_triggers" experimental="">
+			<return type="bool" />
+			<param index="0" name="device" type="int" />
+			<description>
+				Stops adaptive effects on both triggers and returns [code]true[/code] if SDL accepted the reset. Adaptive effects are also reset when the SDL joypad is closed.
 			</description>
 		</method>
 		<method name="vibrate_handheld">
@@ -837,7 +870,7 @@
 			If [code]true[/code], sends touch input events when clicking or dragging the mouse. See also [member ProjectSettings.input_devices/pointing/emulate_touch_from_mouse].
 		</member>
 		<member name="ignore_joypad_on_unfocused_application" type="bool" setter="set_ignore_joypad_on_unfocused_application" getter="is_ignoring_joypad_on_unfocused_application">
-			If [code]true[/code], joypad input (including motion sensors) and LED light changes will be ignored and joypad vibration will be stopped when the application is not focused.
+			If [code]true[/code], joypad input (including motion sensors) and LED light changes will be ignored, and joypad vibration and adaptive-trigger effects will be stopped when the application is not focused.
 		</member>
 		<member name="mouse_mode" type="int" setter="set_mouse_mode" getter="get_mouse_mode" enum="Input.MouseMode">
 			Controls the mouse mode.
@@ -858,6 +891,27 @@
 		</signal>
 	</signals>
 	<constants>
+		<constant name="JOY_ADAPTIVE_TRIGGER_LEFT" value="0" enum="JoyAdaptiveTrigger">
+			The left (L2) adaptive trigger.
+		</constant>
+		<constant name="JOY_ADAPTIVE_TRIGGER_RIGHT" value="1" enum="JoyAdaptiveTrigger">
+			The right (R2) adaptive trigger.
+		</constant>
+		<constant name="JOY_ADAPTIVE_TRIGGER_BOTH" value="2" enum="JoyAdaptiveTrigger">
+			Both adaptive triggers. The same effect is applied to L2 and R2 in one SDL effect update.
+		</constant>
+		<constant name="JOY_ADAPTIVE_TRIGGER_EFFECT_OFF" value="0" enum="JoyAdaptiveTriggerEffect">
+			Stops the selected trigger effect and restores its neutral movement.
+		</constant>
+		<constant name="JOY_ADAPTIVE_TRIGGER_EFFECT_FEEDBACK" value="1" enum="JoyAdaptiveTriggerEffect">
+			Applies resistance from a selected control position through the end of the trigger pull.
+		</constant>
+		<constant name="JOY_ADAPTIVE_TRIGGER_EFFECT_WEAPON" value="2" enum="JoyAdaptiveTriggerEffect">
+			Applies weapon-like resistance between two control positions.
+		</constant>
+		<constant name="JOY_ADAPTIVE_TRIGGER_EFFECT_VIBRATION" value="3" enum="JoyAdaptiveTriggerEffect">
+			Vibrates the trigger arm from a selected control position at a bounded amplitude and frequency.
+		</constant>
 		<constant name="MOUSE_MODE_VISIBLE" value="0" enum="MouseMode">
 			Makes the mouse cursor visible if it is hidden.
 		</constant>

@@ -1,0 +1,80 @@
+{
+  "featureColumns": [
+	"release_speed",
+	"effective_speed",
+	"release_spin_rate",
+	"spin_axis",
+	"pfx_x_sym",
+	"pfx_z",
+	"release_pos_x_sym",
+	"release_pos_z",
+	"release_extension",
+	"arm_angle",
+	"vaa",
+	"haa_sym",
+	"vaa_resid",
+	"haa_resid",
+	"late_break_x",
+	"late_break_z",
+	"late_break_total",
+	"plate_x",
+	"plate_z",
+	"zone",
+	"balls",
+	"strikes",
+	"outs_when_up",
+	"pitch_number",
+	"n_thruorder_pitcher",
+	"platoon",
+	"archetype_encoded",
+	"velo_delta",
+	"shape_dist",
+	"same_shape",
+	"location_change",
+	"tunnel_diff_in",
+	"break_diff_in",
+	"break_tunnel_ratio",
+	"late_break_diff",
+	"vaa_delta",
+    "haa_delta"
+  ],
+  "archetypeMap": {
+	"Balanced Hitter": 0,
+	"Contact Hitter": 1,
+	"Free Swinger": 2,
+	"Guess Hitter": 3,
+	"Strikeout-Prone": 4
+  },
+  "approachAngle": {
+	"vaa": {
+	  "coef": [
+		0.17449276411563178,
+		1.1734757766518766
+	  ],
+	  "intercept": -24.675052751563747
+	},
+	"haa": {
+	  "coef": [
+		-0.013957195038243624,
+		1.3747944628894988
+	  ],
+	  "intercept": 1.9473511170449336
+	}
+  },
+  "launchSampler": {
+	"launchSpeedStd": 12.792271614074707,
+	"launchAngleStd": 25.822086334228516,
+	"residualCorrelation": 0.13995383485946936
+  },
+  "runValues": {
+	"ball": 0.06,
+	"calledStrike": -0.04,
+	"swingingStrike": -0.27,
+	"foul": 0.0,
+	"inPlayOut": -0.1,
+	"single": 0.47,
+	"double": 0.76,
+	"triple": 1.06,
+	"homeRun": 1.39
+  }
+}

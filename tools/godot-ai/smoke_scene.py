@@ -99,6 +99,7 @@ def run(project: Path, require_capture: bool) -> dict[str, Any]:
                 "paths": [
                     "res://agent_mover.gd",
                     "res://cycle_probe.tscn",
+                    "res://gameplay_driver.gd",
                     "res://imported_marker.gltf",
                     "res://nav_mesh.tres",
                     "res://probe_shape.tres",
@@ -251,6 +252,13 @@ def run(project: Path, require_capture: bool) -> dict[str, Any]:
     ensure_node(
         client,
         existing,
+        "Node",
+        "GameplayDriver",
+        {"script": {"@type": "Resource", "path": "res://gameplay_driver.gd"}},
+    )
+    ensure_node(
+        client,
+        existing,
         "CSGBox3D",
         "Body",
         {
@@ -339,6 +347,7 @@ def run(project: Path, require_capture: bool) -> dict[str, Any]:
         "Ground",
         "GeneratedOrb",
         "AgentMover/Body",
+        "GameplayDriver",
         "ImportedAsset",
         "Navigation",
         "PhysicsProbe/ProbeCollision",

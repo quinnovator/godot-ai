@@ -538,8 +538,14 @@ class GodotAgentClient:
         params = {} if path is None else {"path": path}
         return self.call("scene.save", params)
 
-    def play(self, scene: Optional[str] = None) -> Any:
-        params = {} if scene is None else {"scene": scene}
+    def play(self, scene: Optional[str] = None, *, current: bool = False) -> Any:
+        if scene is not None and current:
+            raise ValueError("scene and current are mutually exclusive")
+        params: dict[str, Any] = {}
+        if scene is not None:
+            params["scene"] = scene
+        if current:
+            params["current"] = True
         return self.call("game.play", params)
 
     def stop(self) -> Any:

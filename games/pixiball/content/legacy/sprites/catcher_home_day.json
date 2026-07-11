@@ -1,0 +1,27 @@
+{
+ "name": "catcher_home_day",
+ "frameWidth": 480,
+ "frameHeight": 560,
+ "columns": 5,
+ "frames": [
+  "CROUCH",
+  "SHIFT",
+  "RISE",
+  "DROP",
+  "BRACE"
+ ],
+ "artFrame": {
+  "x": -36,
+  "y": -72,
+  "w": 72,
+  "h": 84
+ },
+ "scale": 6.666666666666667,
+ "mood": "day",
+ "density": 4,
+ "shadows": {
+  "rx": 26,
+  "ry": 6,
+  "dx": 0
+ }
+}

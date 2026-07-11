@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://characters/equipment/ballplayer_equipment.gd" id="1_equipment"]
+
+[node name="BallplayerEquipment" type="Node"]
+script = ExtResource("1_equipment")

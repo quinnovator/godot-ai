@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="AITreeModel" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		Loads and evaluates compact numeric gradient-boosted tree models.
+	</brief_description>
+	<description>
+		[AITreeModel] is a deterministic, dependency-free evaluator for the little-endian XGB1 binary format. XGB1 stores numeric decision trees as structure-of-arrays data and supports scalar regression and multi-class softmax objectives.
+		The binary layout is a 32-bit [code]XGB1[/code] magic value ([code]0x31424758[/code]), followed by 32-bit objective, tree count, class count, and feature count values. It then stores 32-bit float base scores, 32-bit tree class IDs and node counts, and flattened left-child, right-child, threshold or leaf value, feature-index, and default-direction arrays.
+		Features must be supplied as [PackedFloat32Array]. A split uses a strict [code]&lt;[/code] comparison. [code]NAN[/code] follows the node's encoded default direction. Regression returns raw base-plus-tree predictions; softmax returns normalized probabilities as [PackedFloat64Array].
+		[codeblock]
+		var model := AITreeModel.new()
+		if model.load_model("res://models/outcome.xgb.bin") == OK:
+			var probabilities := model.predict(PackedFloat32Array([1.0, 2.5, 0.0]))
+		[/codeblock]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="clear">
+			<return type="void" />
+			<description>
+				Unloads the model and clears [member last_error].
+			</description>
+		</method>
+		<method name="get_last_error" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the last load or prediction validation error, or an empty string after a successful operation.
+			</description>
+		</method>
+		<method name="get_num_classes" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of output classes, or [code]0[/code] when unloaded.
+			</description>
+		</method>
+		<method name="get_num_features" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the exact number of input features required by [method predict], or [code]0[/code] when unloaded.
+			</description>
+		</method>
+		<method name="get_num_trees" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of trees in the loaded ensemble, or [code]0[/code] when unloaded.
+			</description>
+		</method>
+		<method name="is_loaded" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] when a structurally valid model is loaded.
+			</description>
+		</method>
+		<method name="load_from_buffer">
+			<return type="int" enum="Error" />
+			<param index="0" name="data" type="PackedByteArray" />
+			<description>
+				Loads an XGB1 model from [param data]. The complete tree structure is validated before the model becomes available. On failure, the previous model is unloaded and [member last_error] describes the problem.
+			</description>
+		</method>
+		<method name="load_model">
+			<return type="int" enum="Error" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Loads an XGB1 model from [param path]. Both [code]res://[/code] and [code]user://[/code] paths are supported. On failure, the previous model is unloaded and [member last_error] describes the problem.
+			</description>
+		</method>
+		<method name="predict" qualifiers="const">
+			<return type="PackedFloat64Array" />
+			<param index="0" name="features" type="PackedFloat32Array" />
+			<description>
+				Evaluates the loaded ensemble. [param features] must contain exactly [member num_features] elements. Returns an empty array and sets [member last_error] if validation fails.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="last_error" type="String" setter="" getter="get_last_error" default="&quot;&quot;">
+			The last load or prediction validation error.
+		</member>
+		<member name="loaded" type="bool" setter="" getter="is_loaded" default="false">
+			Whether a valid model is loaded.
+		</member>
+		<member name="num_classes" type="int" setter="" getter="get_num_classes" default="0">
+			The number of model outputs.
+		</member>
+		<member name="num_features" type="int" setter="" getter="get_num_features" default="0">
+			The required feature vector length.
+		</member>
+		<member name="num_trees" type="int" setter="" getter="get_num_trees" default="0">
+			The number of trees in the ensemble.
+		</member>
+	</members>
+</class>

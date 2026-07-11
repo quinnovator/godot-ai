@@ -73,6 +73,19 @@ enum CursorShape : int {
 	CURSOR_HELP,
 	CURSOR_MAX
 };
+
+enum JoyAdaptiveTrigger : int {
+	JOY_ADAPTIVE_TRIGGER_LEFT,
+	JOY_ADAPTIVE_TRIGGER_RIGHT,
+	JOY_ADAPTIVE_TRIGGER_BOTH,
+};
+
+enum JoyAdaptiveTriggerEffect : int {
+	JOY_ADAPTIVE_TRIGGER_EFFECT_OFF,
+	JOY_ADAPTIVE_TRIGGER_EFFECT_FEEDBACK,
+	JOY_ADAPTIVE_TRIGGER_EFFECT_WEAPON,
+	JOY_ADAPTIVE_TRIGGER_EFFECT_VIBRATION,
+};
 } //namespace InputClassEnums
 
 class Input : public Object {
@@ -87,12 +100,24 @@ public:
 	// TODO: When we migrate to C++20, replace these with "using enum" and skip prefixing MouseMode and CursorShape in other files.
 	using MouseMode = InputClassEnums::MouseMode;
 	using CursorShape = InputClassEnums::CursorShape;
+	using JoyAdaptiveTrigger = InputClassEnums::JoyAdaptiveTrigger;
+	using JoyAdaptiveTriggerEffect = InputClassEnums::JoyAdaptiveTriggerEffect;
+	static constexpr JoyAdaptiveTrigger JOY_ADAPTIVE_TRIGGER_LEFT = InputClassEnums::JOY_ADAPTIVE_TRIGGER_LEFT;
+	static constexpr JoyAdaptiveTrigger JOY_ADAPTIVE_TRIGGER_RIGHT = InputClassEnums::JOY_ADAPTIVE_TRIGGER_RIGHT;
+	static constexpr JoyAdaptiveTrigger JOY_ADAPTIVE_TRIGGER_BOTH = InputClassEnums::JOY_ADAPTIVE_TRIGGER_BOTH;
+	static constexpr JoyAdaptiveTriggerEffect JOY_ADAPTIVE_TRIGGER_EFFECT_OFF = InputClassEnums::JOY_ADAPTIVE_TRIGGER_EFFECT_OFF;
+	static constexpr JoyAdaptiveTriggerEffect JOY_ADAPTIVE_TRIGGER_EFFECT_FEEDBACK = InputClassEnums::JOY_ADAPTIVE_TRIGGER_EFFECT_FEEDBACK;
+	static constexpr JoyAdaptiveTriggerEffect JOY_ADAPTIVE_TRIGGER_EFFECT_WEAPON = InputClassEnums::JOY_ADAPTIVE_TRIGGER_EFFECT_WEAPON;
+	static constexpr JoyAdaptiveTriggerEffect JOY_ADAPTIVE_TRIGGER_EFFECT_VIBRATION = InputClassEnums::JOY_ADAPTIVE_TRIGGER_EFFECT_VIBRATION;
 
 	class JoypadFeatures {
 	public:
 		virtual ~JoypadFeatures() {}
 
 		virtual bool has_joy_vibration() const { return false; }
+
+		virtual bool has_joy_adaptive_triggers() const { return false; }
+		virtual bool set_joy_adaptive_trigger_effect(JoyAdaptiveTrigger p_trigger, JoyAdaptiveTriggerEffect p_effect, int p_start_position, int p_end_position, int p_strength, int p_frequency_hz) { return false; }
 
 		virtual bool has_joy_light() const { return false; }
 		virtual void set_joy_light(const Color &p_color) {}
@@ -378,6 +403,9 @@ public:
 	uint64_t get_joy_vibration_timestamp(int p_device);
 	bool is_joy_vibrating(int p_device);
 	bool has_joy_vibration(int p_device) const;
+	bool has_joy_adaptive_triggers(int p_device) const;
+	bool set_joy_adaptive_trigger_effect(int p_device, JoyAdaptiveTrigger p_trigger, JoyAdaptiveTriggerEffect p_effect, int p_start_position = 0, int p_end_position = 0, int p_strength = 0, int p_frequency_hz = 0);
+	bool stop_joy_adaptive_triggers(int p_device);
 	void joy_connection_changed(int p_idx, bool p_connected, const String &p_name, const String &p_guid = "", const Dictionary &p_joypad_info = Dictionary());
 
 	Vector3 get_gravity() const;
@@ -491,3 +519,5 @@ public:
 
 VARIANT_ENUM_CAST(Input::MouseMode);
 VARIANT_ENUM_CAST(Input::CursorShape);
+VARIANT_ENUM_CAST(Input::JoyAdaptiveTrigger);
+VARIANT_ENUM_CAST(Input::JoyAdaptiveTriggerEffect);

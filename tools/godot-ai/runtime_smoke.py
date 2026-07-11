@@ -86,6 +86,27 @@ def run(project: Path, require_capture: bool = True) -> dict[str, Any]:
     try:
         status, health = wait_for_runtime(client)
         tree = client.runtime_call("scene.get_tree", {"max_depth": 8})
+        gameplay_description = client.runtime_call("gameplay.describe")
+        gameplay_before = client.runtime_call("gameplay.state")
+        gameplay_intent = client.runtime_call(
+            "gameplay.intent",
+            {"name": "set_mover_speed", "params": {"speed": 4.25}},
+        )
+        gameplay_after = client.runtime_call("gameplay.state")
+        gameplay_blocked = {
+            "undeclared": expect_runtime_error(
+                client,
+                "gameplay.intent",
+                {"name": "undeclared_intent", "params": {}},
+                "intent_not_declared",
+            ),
+            "oversized_params": expect_runtime_error(
+                client,
+                "gameplay.intent",
+                {"name": "set_mover_speed", "params": {"values": [0] * 1_025}},
+                "unsafe_gameplay_value",
+            ),
+        }
         requested = {"node_path": "AgentMover", "properties": ["position", "speed", "physics_ticks"]}
         physics_probe_request = {
             "node_path": "PhysicsProbe",
@@ -153,9 +174,33 @@ def run(project: Path, require_capture: bool = True) -> dict[str, Any]:
         physics_delta_x = physics_after_position[0] - physics_before_position[0]
         if health["scene_path"] != "res://main.tscn":
             raise RuntimeError("runtime opened an unexpected scene: {0}".format(health))
+        gameplay_capabilities = {"gameplay.describe", "gameplay.state", "gameplay.intent"}
+        if not gameplay_capabilities.issubset(set(health.get("capabilities", []))):
+            raise RuntimeError("runtime did not advertise gameplay driver capabilities: {0}".format(health))
+        declared_intents = gameplay_description.get("description", {}).get("intents", {})
+        before_gameplay_state = gameplay_before.get("state", {})
+        after_gameplay_state = gameplay_after.get("state", {})
+        if (
+            gameplay_description.get("driver_path") != "GameplayDriver"
+            or "set_mover_speed" not in declared_intents
+            or gameplay_intent.get("result") != {"accepted": True, "speed": 4.25}
+            or after_gameplay_state.get("applied_intent_count")
+            != before_gameplay_state.get("applied_intent_count", 0) + 1
+            or after_gameplay_state.get("last_intent") != "set_mover_speed"
+            or after_gameplay_state.get("mover_speed") != 4.25
+        ):
+            raise RuntimeError(
+                "semantic gameplay driver did not describe, apply, and observe an intent: {0}".format({
+                    "description": gameplay_description,
+                    "before": gameplay_before,
+                    "intent": gameplay_intent,
+                    "after": gameplay_after,
+                })
+            )
         observed_runtime_paths = runtime_paths(tree["root"])
         required_runtime_paths = {
             "AgentMover",
+            "GameplayDriver",
             "ImportedAsset",
             "Navigation",
             "PhysicsProbe",
@@ -196,6 +241,13 @@ def run(project: Path, require_capture: bool = True) -> dict[str, Any]:
             "advance": advanced,
             "raycast": raycast,
             "navigation": navigation,
+            "gameplay": {
+                "description": gameplay_description,
+                "before": gameplay_before,
+                "intent": gameplay_intent,
+                "after": gameplay_after,
+                "blocked": gameplay_blocked,
+            },
             "capture": capture,
             "blocked": blocked,
         }

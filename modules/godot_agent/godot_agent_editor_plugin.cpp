@@ -49,6 +49,7 @@
 #include "editor/editor_node.h"
 #include "editor/file_system/editor_file_system.h"
 #include "editor/scene/3d/node_3d_editor_plugin.h"
+#include "editor/settings/project_settings_editor.h"
 #include "scene/2d/node_2d.h"
 #include "scene/3d/camera_3d.h"
 #include "scene/3d/node_3d.h"
@@ -404,14 +405,31 @@ void GodotAgentEditorPlugin::_start() {
 	}
 
 	started = true;
+	EditorNode::get_singleton()->set_safe_external_change_auto_reload(true);
 	EditorNode::get_log()->add_message(vformat("Godot Agent bridge listening on 127.0.0.1:%d", server->get_local_port()), EditorLog::MSG_TYPE_EDITOR);
 }
 
 Error GodotAgentEditorPlugin::_write_endpoint() {
-	const String absolute_path = ProjectSettings::get_singleton()->globalize_path(endpoint_path);
+	const int64_t current_pid = OS::get_singleton()->get_process_id();
+	String absolute_path = ProjectSettings::get_singleton()->globalize_path(endpoint_path);
+	if (FileAccess::exists(absolute_path)) {
+		Ref<FileAccess> existing_file = FileAccess::open(absolute_path, FileAccess::READ);
+		if (existing_file.is_valid()) {
+			JSON existing_json;
+			if (existing_json.parse(existing_file->get_as_text()) == OK && existing_json.get_data().get_type() == Variant::DICTIONARY) {
+				const Dictionary existing_endpoint = existing_json.get_data();
+				const int64_t existing_pid = existing_endpoint.get("pid", -1);
+				if (existing_pid > 0 && existing_pid != current_pid && OS::get_singleton()->is_process_running(existing_pid)) {
+					endpoint_path = endpoint_path.get_base_dir().path_join(vformat("endpoint-%d.json", current_pid));
+					absolute_path = ProjectSettings::get_singleton()->globalize_path(endpoint_path);
+					print_verbose(vformat("Godot Agent: preserving endpoint owned by live PID %d; using %s", existing_pid, endpoint_path));
+				}
+			}
+		}
+	}
 	const String temporary_nonce = _generate_token();
 	ERR_FAIL_COND_V_MSG(temporary_nonce.is_empty(), ERR_CANT_CREATE, "Godot Agent could not obtain a secure endpoint filename");
-	const String temporary_path = absolute_path + ".tmp-" + itos(OS::get_singleton()->get_process_id()) + "-" + temporary_nonce.left(16);
+	const String temporary_path = absolute_path + ".tmp-" + itos(current_pid) + "-" + temporary_nonce.left(16);
 	const Error dir_error = DirAccess::make_dir_recursive_absolute(absolute_path.get_base_dir());
 	ERR_FAIL_COND_V_MSG(dir_error != OK, dir_error, "Godot Agent could not create its endpoint directory");
 #ifdef UNIX_ENABLED
@@ -498,6 +516,9 @@ void GodotAgentEditorPlugin::_remove_endpoint_if_owned() {
 }
 
 void GodotAgentEditorPlugin::_stop() {
+	if (EditorNode::get_singleton()) {
+		EditorNode::get_singleton()->set_safe_external_change_auto_reload(false);
+	}
 	_clear_agent_previews();
 	if (server.is_valid()) {
 		for (Peer &peer : peers) {
@@ -1490,8 +1511,16 @@ Dictionary GodotAgentEditorPlugin::_rpc_project_set_setting(Dictionary p_params)
 	if (save_value) {
 		const Error save_error = ProjectSettings::get_singleton()->save();
 		if (save_error != OK) {
+			if (EditorNode::get_singleton()->get_project_settings()) {
+				EditorNode::get_singleton()->get_project_settings()->mark_changes_pending();
+			}
 			return _fail("save_failed", String(error_names[save_error]));
 		}
+		if (EditorNode::get_singleton()->get_project_settings()) {
+			EditorNode::get_singleton()->get_project_settings()->mark_changes_saved();
+		}
+	} else if (EditorNode::get_singleton()->get_project_settings()) {
+		EditorNode::get_singleton()->get_project_settings()->mark_changes_pending();
 	}
 	Dictionary result_data;
 	result_data["key"] = key;
@@ -1668,20 +1697,31 @@ Dictionary GodotAgentEditorPlugin::_rpc_game_play(Dictionary p_params) {
 	if (p_params.has("scene") && !_is_string_value(p_params["scene"])) {
 		return _fail("invalid_params", "scene must be a string");
 	}
+	const Variant current_value = p_params.get("current", false);
+	if (current_value.get_type() != Variant::BOOL) {
+		return _fail("invalid_params", "current must be a boolean");
+	}
 	const String scene = p_params.get("scene", "");
+	const bool current = current_value;
+	if (!scene.is_empty() && current) {
+		return _fail("invalid_params", "scene and current are mutually exclusive");
+	}
 	if (!scene.is_empty()) {
 		if (!_is_safe_resource_path(scene, "tscn")) {
 			return _fail("invalid_scene_path", "scene must be a project-local res:// .tscn path", scene);
 		}
 		EditorInterface::get_singleton()->play_custom_scene(scene);
-	} else if (_edited_root()) {
+	} else if (current && _edited_root()) {
 		EditorInterface::get_singleton()->play_current_scene();
+	} else if (current) {
+		return _fail("no_edited_scene", "No current scene is open");
 	} else {
 		EditorInterface::get_singleton()->play_main_scene();
 	}
 	Dictionary result_data;
 	result_data["accepted"] = true;
 	result_data["scene"] = scene;
+	result_data["mode"] = !scene.is_empty() ? "custom" : (current ? "current" : "main");
 	return _ok(result_data);
 }
 

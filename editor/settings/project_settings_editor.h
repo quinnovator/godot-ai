@@ -153,6 +153,9 @@ public:
 	TabContainer *get_tabs() { return tab_container; }
 
 	void queue_save();
+	void mark_changes_pending() { settings_changed = true; }
+	void mark_changes_saved();
+	bool has_pending_changes() const { return settings_changed; }
 	void connect_filesystem_dock_signals(FileSystemDock *p_fs_dock);
 
 	ProjectSettingsEditor(EditorData *p_data);

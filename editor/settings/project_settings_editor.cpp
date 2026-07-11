@@ -92,11 +92,25 @@ void ProjectSettingsEditor::queue_save() {
 	timer->start();
 }
 
-void ProjectSettingsEditor::_save() {
+void ProjectSettingsEditor::mark_changes_saved() {
 	settings_changed = false;
-	if (ps) {
-		ps->save();
+	if (pending_override_notify) {
+		pending_override_notify = false;
+		EditorNode::get_singleton()->notify_settings_overrides_changed();
 	}
+}
+
+void ProjectSettingsEditor::_save() {
+	if (ps) {
+		const Error save_error = ps->save();
+		if (save_error != OK) {
+			// Preserve the dirty signal so an external project.godot change can
+			// never silently replace settings that failed to reach disk.
+			settings_changed = true;
+			return;
+		}
+	}
+	settings_changed = false;
 	if (pending_override_notify) {
 		pending_override_notify = false;
 		EditorNode::get_singleton()->notify_settings_overrides_changed();

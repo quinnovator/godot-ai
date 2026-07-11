@@ -19,6 +19,7 @@ BLENDER_INVOCATION_SCHEMA_VERSION = 1
 DEFAULT_BLENDER_TIMEOUT = 15 * 60.0
 MANIFEST_SUFFIX = ".agent.json"
 _LOG_TAIL_CHARACTERS = 4000
+_MAX_PARAMETERS_BYTES = 64 * 1024
 
 
 class BlenderBuildError(GodotAgentError):
@@ -73,6 +74,8 @@ def build_blender_asset(
     *,
     environ: Optional[Mapping[str, str]] = None,
     timeout: float = DEFAULT_BLENDER_TIMEOUT,
+    parameters: Optional[Mapping[str, Any]] = None,
+    log: Optional[str] = None,
 ) -> dict[str, Any]:
     """Run one authored Python script in Blender and export a validated GLB.
 
@@ -88,12 +91,15 @@ def build_blender_asset(
     script_path = _resolve_script(project_root, script)
     output_path = _resolve_res_path(project_root, output, ".glb", "--output")
     blend_path = None if blend is None else _resolve_res_path(project_root, blend, ".blend", "--blend")
-    executable = locate_blender(blender, environ=environ)
+    log_path = None if log is None else _resolve_res_path(project_root, log, ".log", "log")
+    normalized_parameters = _normalize_parameters(parameters)
 
     script_hash = _sha256(script_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     if blend_path is not None:
         blend_path.parent.mkdir(parents=True, exist_ok=True)
+    if log_path is not None:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
 
     staged_output_path = _new_staging_path(output_path)
     staged_output: Optional[Path] = staged_output_path
@@ -102,15 +108,22 @@ def build_blender_asset(
     if not bootstrap.is_file():
         raise BlenderBuildError("bundled Blender bootstrap is missing: {0}".format(bootstrap))
 
+    completed: Optional[subprocess.CompletedProcess[str]] = None
     try:
+        executable = locate_blender(blender, environ=environ)
         with tempfile.TemporaryDirectory(prefix="godot-agent-blender-") as temporary:
             receipt_path = Path(temporary) / "receipt.json"
+            parameters_path = None
+            if normalized_parameters is not None:
+                parameters_path = Path(temporary) / "parameters.json"
+                _write_json_atomic(parameters_path, normalized_parameters)
             command = _build_command(
                 executable=executable,
                 bootstrap=bootstrap,
                 script=script_path,
                 output=staged_output_path,
                 blend=staged_blend,
+                parameters=parameters_path,
                 receipt=receipt_path,
             )
             try:
@@ -165,6 +178,10 @@ def build_blender_asset(
         if blend_path is not None:
             paths["blend"] = _as_res_path(project_root, blend_path)
             hashes["blend"] = _sha256(blend_path)
+        if log_path is not None:
+            _write_build_log(log_path, "succeeded", completed=completed)
+            paths["log"] = _as_res_path(project_root, log_path)
+            hashes["log"] = _sha256(log_path)
 
         manifest: dict[str, Any] = {
             "blender_version": blender_version,
@@ -172,8 +189,19 @@ def build_blender_asset(
             "paths": paths,
             "sha256": hashes,
         }
+        if normalized_parameters is not None:
+            manifest["parameters"] = normalized_parameters
         _write_json_atomic(manifest_path, manifest)
         return manifest
+    except BlenderBuildError as exc:
+        if log_path is not None:
+            try:
+                _write_build_log(log_path, "failed", completed=completed, error=str(exc))
+            except OSError:
+                # The original build error is more useful than a secondary
+                # failure while attempting to preserve its diagnostic log.
+                pass
+        raise
     finally:
         if staged_output is not None:
             staged_output.unlink(missing_ok=True)
@@ -269,6 +297,7 @@ def _build_command(
     script: Path,
     output: Path,
     blend: Optional[Path],
+    parameters: Optional[Path],
     receipt: Path,
 ) -> Sequence[str]:
     command = [
@@ -291,6 +320,8 @@ def _build_command(
     ]
     if blend is not None:
         command.extend(["--blend", str(blend)])
+    if parameters is not None:
+        command.extend(["--parameters", str(parameters)])
     return command
 
 
@@ -364,6 +395,48 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _normalize_parameters(parameters: Optional[Mapping[str, Any]]) -> Optional[dict[str, Any]]:
+    if parameters is None:
+        return None
+    if not isinstance(parameters, Mapping):
+        raise BlenderBuildError("Blender recipe parameters must be a JSON object")
+    try:
+        encoded = json.dumps(
+            dict(parameters),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise BlenderBuildError("Blender recipe parameters must contain only finite JSON values") from exc
+    if len(encoded) > _MAX_PARAMETERS_BYTES:
+        raise BlenderBuildError("Blender recipe parameters exceed the 65536 byte limit")
+    value = json.loads(encoded.decode("utf-8"))
+    if not isinstance(value, dict):  # Defensive: the Mapping check should guarantee this.
+        raise BlenderBuildError("Blender recipe parameters must be a JSON object")
+    return value
+
+
+def _write_build_log(
+    path: Path,
+    status: str,
+    *,
+    completed: Optional[subprocess.CompletedProcess[str]] = None,
+    error: Optional[str] = None,
+) -> None:
+    value: dict[str, Any] = {
+        "invocation_schema_version": BLENDER_INVOCATION_SCHEMA_VERSION,
+        "returncode": None if completed is None else completed.returncode,
+        "status": status,
+        "stderr": "" if completed is None else _log_tail(completed.stderr or ""),
+        "stdout": "" if completed is None else _log_tail(completed.stdout or ""),
+    }
+    if error is not None:
+        value["error"] = error
+    _write_json_atomic(path, value)
 
 
 def _write_json_atomic(path: Path, value: Mapping[str, Any]) -> None:

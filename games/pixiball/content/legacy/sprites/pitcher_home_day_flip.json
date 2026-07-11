@@ -1,0 +1,143 @@
+{
+ "name": "pitcher_home_day_flip",
+ "frameWidth": 448,
+ "frameHeight": 912,
+ "columns": 9,
+ "frames": [
+  "SET",
+  "BREATHE",
+  "LOOK_IN",
+  "TAP_A",
+  "TAP_B",
+  "COME_SET",
+  "GATHER",
+  "GATHER_PUMP",
+  "PUMP",
+  "LIFT",
+  "SMEAR_STRIDE",
+  "STRIDE",
+  "STRIDE_COCK",
+  "COCK",
+  "SMEAR_RELEASE",
+  "RELEASE",
+  "RELEASE_EXTEND",
+  "EXTEND",
+  "EXTEND_FINISH",
+  "FINISH"
+ ],
+ "artFrame": {
+  "x": -56,
+  "y": -216,
+  "w": 112,
+  "h": 228
+ },
+ "scale": 4,
+ "mood": "day",
+ "density": 4,
+ "shadows": [
+  {
+   "rx": 30,
+   "ry": 7,
+   "dx": 0
+  },
+  {
+   "rx": 30,
+   "ry": 7,
+   "dx": 0
+  },
+  {
+   "rx": 30,
+   "ry": 7,
+   "dx": 0
+  },
+  {
+   "rx": 30,
+   "ry": 7,
+   "dx": 0
+  },
+  {
+   "rx": 30,
+   "ry": 7,
+   "dx": 0
+  },
+  {
+   "rx": 30,
+   "ry": 7,
+   "dx": 0
+  },
+  {
+   "rx": 29,
+   "ry": 7,
+   "dx": 0
+  },
+  {
+   "rx": 26,
+   "ry": 7,
+   "dx": 0
+  },
+  {
+   "rx": 24,
+   "ry": 7,
+   "dx": 0
+  },
+  {
+   "rx": 20,
+   "ry": 6,
+   "dx": 7
+  },
+  {
+   "rx": 28,
+   "ry": 7,
+   "dx": -10
+  },
+  {
+   "rx": 28,
+   "ry": 7,
+   "dx": -10
+  },
+  {
+   "rx": 31,
+   "ry": 7,
+   "dx": -12
+  },
+  {
+   "rx": 34,
+   "ry": 7,
+   "dx": -14
+  },
+  {
+   "rx": 34,
+   "ry": 7,
+   "dx": -12
+  },
+  {
+   "rx": 34,
+   "ry": 7,
+   "dx": -12
+  },
+  {
+   "rx": 33,
+   "ry": 7,
+   "dx": -11
+  },
+  {
+   "rx": 32,
+   "ry": 7,
+   "dx": -10
+  },
+  {
+   "rx": 31,
+   "ry": 7,
+   "dx": -13
+  },
+  {
+   "rx": 30,
+   "ry": 7,
+   "dx": -16
+  }
+ ],
+ "releaseHand": {
+  "x": -49,
+  "y": -133
+ }
+}

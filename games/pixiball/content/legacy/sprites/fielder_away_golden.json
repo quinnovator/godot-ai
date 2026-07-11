@@ -1,0 +1,31 @@
+{
+ "name": "fielder_away_golden",
+ "frameWidth": 72,
+ "frameHeight": 80,
+ "columns": 14,
+ "frames": [
+  "IDLE",
+  "READY",
+  "RUN_S_A",
+  "RUN_S_B",
+  "RUN_S_C",
+  "RUN_U_A",
+  "RUN_U_B",
+  "RUN_D_A",
+  "RUN_D_B",
+  "CATCH_HIGH",
+  "CATCH_LOW",
+  "THROW_WIND",
+  "THROW_REL",
+  "DIVE"
+ ],
+ "artFrame": {
+  "x": -9,
+  "y": -17,
+  "w": 18,
+  "h": 20
+ },
+ "scale": 4,
+ "mood": "golden",
+ "density": 4
+}

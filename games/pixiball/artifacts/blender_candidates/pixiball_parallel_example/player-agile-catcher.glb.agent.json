@@ -1,0 +1,35 @@
+{
+  "blender_version": "4.5.11 LTS",
+  "invocation_schema_version": 1,
+  "parameters": {
+    "asset_type": "player",
+    "candidate_id": "player-agile-catcher",
+    "palette": {
+      "accent": "#F2C857",
+      "primary": "#741F36",
+      "secondary": "#163B61",
+      "skin": "#D08B5D"
+    },
+    "proportions": {
+      "height": 0.94,
+      "shoulder_width": 1.02,
+      "stockiness": 1.05
+    },
+    "role": "catcher",
+    "stance": "catcher_low",
+    "style": "high_resolution_pixel_volume"
+  },
+  "paths": {
+    "blend": "res://artifacts/blender_candidates/pixiball_parallel_example/player-agile-catcher.blend",
+    "log": "res://artifacts/blender_candidates/pixiball_parallel_example/player-agile-catcher.glb.agent.log",
+    "manifest": "res://artifacts/blender_candidates/pixiball_parallel_example/player-agile-catcher.glb.agent.json",
+    "output": "res://artifacts/blender_candidates/pixiball_parallel_example/player-agile-catcher.glb",
+    "script": "res://tools/blender/build_candidate.py"
+  },
+  "sha256": {
+    "blend": "7e4a7f3a5c05f5cc0fb3a1e756b2eff528868ac3136209be3b3c8953f0e0c463",
+    "log": "2550c7dbf46abb4f506803214a02f87b628ab29fba8291578e9440e83b3a8dbe",
+    "output": "c34bad1b96e80272cdafe53c0eb66f2dbfc427d23a142a1c3d0ab12fbb9b13ab",
+    "script": "558e06b7f550896e316022286f5f240800b832e8c3d8ac0a48765c2791e7a74d"
+  }
+}

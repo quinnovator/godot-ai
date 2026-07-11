@@ -1,0 +1,82 @@
+{
+  "name": "Pixiball trained-model tunnel sequence",
+  "pause": true,
+  "restore_pause": true,
+  "steps": [
+    {
+      "intent": {
+        "name": "select_pitcher",
+        "params": { "index": 1 }
+      }
+    },
+    { "advance": 1 },
+    {
+      "intent": {
+        "name": "start_match",
+        "params": { "seed": 20260710, "innings": 1, "difficulty": 0.55 }
+      }
+    },
+    { "advance": 1 },
+    {
+      "intent": {
+        "name": "select_pitch",
+        "params": { "slot": 1 }
+      }
+    },
+    {
+      "intent": {
+        "name": "aim",
+        "params": { "x": -0.42, "y": 0.55 }
+      }
+    },
+    { "intent": { "name": "primary", "params": {} } },
+    { "advance": 96 },
+    {
+      "wait": {
+        "path": "last_result.pitch_serial",
+        "equals": 1,
+        "max_frames": 40,
+        "step_frames": 1
+      }
+    },
+    { "assert": { "path": "presentation.flow", "equals": "result" } },
+    { "assert": { "path": "replica_model", "equals": true } },
+    { "assert": { "path": "pitch_report.options.4.code", "exists": true } },
+    {
+      "wait": {
+        "path": "presentation.flow",
+        "equals": "ready",
+        "max_frames": 180,
+        "step_frames": 5
+      }
+    },
+    {
+      "intent": {
+        "name": "select_pitch",
+        "params": { "slot": 2 }
+      }
+    },
+    {
+      "intent": {
+        "name": "aim",
+        "params": { "x": 0.44, "y": -0.52 }
+      }
+    },
+    { "intent": { "name": "primary", "params": {} } },
+    { "advance": 96 },
+    {
+      "wait": {
+        "path": "last_result.pitch_serial",
+        "equals": 2,
+        "max_frames": 40,
+        "step_frames": 1
+      }
+    },
+    { "assert": { "path": "presentation.flow", "equals": "result" } },
+    { "assert": { "path": "pitch_report.tunnel_diff_in", "exists": true } },
+    { "assert": { "path": "pitch_report.probabilities.called_strike", "exists": true } },
+    { "advance": 20 },
+    { "observe": "trained-model-tunnel-report" },
+    { "capture": "res://.godot/agent/captures/pixiball-tunnel-report.png" }
+  ]
+}

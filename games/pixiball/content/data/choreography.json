@@ -1,0 +1,186 @@
+{
+  "comment": "Sprite frame choreography for the pitch scene. Tracks are step ladders: FrameAt(t) returns the first step whose 'until' exceeds t (last frame holds past the end). 'period' loops the clock (idle cycles). The 'clock' field documents what the C++ selector feeds the track: 'anim' = global anim time, 'phase' = at-bat phase timer (s), 'u' = normalized flight time (contact lands at u 0.72). Which track plays is sim-semantic and stays in C++ (PitchSceneDirector); every frame name and timing number lives here.",
+  "pitcher": {
+	"tracks": {
+	  "idle": {
+		"clock": "anim", "period": 4.2,
+		"steps": [
+		  {"frame": "SET", "until": 1.1},
+		  {"frame": "BREATHE", "until": 1.9},
+		  {"frame": "LOOK_IN", "until": 2.5},
+		  {"frame": "TAP_A", "until": 2.9},
+		  {"frame": "TAP_B", "until": 3.3},
+		  {"frame": "BREATHE", "until": 4.2}
+		]
+	  },
+	  "idleReady": {
+		"clock": "anim", "period": 4.2,
+		"steps": [
+		  {"frame": "SET", "until": 1.1},
+		  {"frame": "BREATHE", "until": 1.9},
+		  {"frame": "LOOK_IN", "until": 2.5},
+		  {"frame": "TAP_A", "until": 2.9},
+		  {"frame": "TAP_B", "until": 3.3},
+		  {"frame": "COME_SET", "until": 4.2}
+		]
+	  },
+	  "windup": {
+		"clock": "phase",
+		"steps": [
+		  {"frame": "GATHER", "until": 0.06},
+		  {"frame": "GATHER_PUMP", "until": 0.10},
+		  {"frame": "PUMP", "until": 0.26},
+		  {"frame": "LIFT", "until": 0.55},
+		  {"frame": "SMEAR_STRIDE", "until": 0.58},
+		  {"frame": "STRIDE", "until": 0.66},
+		  {"frame": "STRIDE_COCK", "until": 0.72},
+		  {"frame": "COCK", "until": 0.88},
+		  {"frame": "SMEAR_RELEASE", "until": 0.92},
+		  {"frame": "RELEASE", "until": 1.0}
+		]
+	  },
+	  "flight": {
+		"clock": "u",
+		"steps": [
+		  {"frame": "RELEASE_EXTEND", "until": 0.06},
+		  {"frame": "EXTEND", "until": 0.18},
+		  {"frame": "EXTEND_FINISH", "until": 0.28},
+		  {"frame": "FINISH", "until": 1.0}
+		]
+	  },
+	  "result": {
+		"clock": "phase",
+		"steps": [{"frame": "FINISH", "until": 1.0}]
+	  }
+	}
+  },
+  "batter": {
+	"tracks": {
+	  "waggle": {
+		"clock": "anim", "period": 1.3,
+		"steps": [
+		  {"frame": "STANCE_A", "until": 0.325},
+		  {"frame": "STANCE_B", "until": 0.65},
+		  {"frame": "STANCE_A", "until": 0.975},
+		  {"frame": "STANCE_C", "until": 1.3}
+		]
+	  },
+	  "windup": {
+		"clock": "phase",
+		"steps": [
+		  {"frame": "STANCE_A", "until": 0.6},
+		  {"frame": "LOAD", "until": 9.0}
+		]
+	  },
+	  "swing": {
+		"clock": "u",
+		"steps": [
+		  {"frame": "LOAD", "until": 0.35},
+		  {"frame": "STRIDE", "until": 0.47},
+		  {"frame": "STRIDE_DOWN", "until": 0.53},
+		  {"frame": "SWING_DOWN", "until": 0.585},
+		  {"frame": "DOWN_LAUNCH", "until": 0.62},
+		  {"frame": "SWING_LAUNCH", "until": 0.68},
+		  {"frame": "LAUNCH_CONTACT", "until": 0.72},
+		  {"frame": "CONTACT", "until": 0.80},
+		  {"frame": "CONTACT_EXTENSION", "until": 0.85},
+		  {"frame": "EXTENSION", "until": 1.0}
+		]
+	  },
+	  "take": {
+		"clock": "u",
+		"steps": [
+		  {"frame": "LOAD", "until": 0.35},
+		  {"frame": "STRIDE", "until": 0.6},
+		  {"frame": "TAKE", "until": 1.0}
+		]
+	  },
+	  "reactStrikeoutSwinging": {
+		"clock": "phase",
+		"steps": [
+		  {"frame": "TAKE", "until": 0.55},
+		  {"frame": "SLUMP", "until": 9.0}
+		]
+	  },
+	  "reactStrikeoutLooking": {
+		"clock": "phase",
+		"steps": [
+		  {"frame": "TAKE", "until": 0.65},
+		  {"frame": "SLUMP", "until": 9.0}
+		]
+	  },
+	  "reactHomeRun": {
+		"clock": "phase",
+		"steps": [
+		  {"frame": "EXTENSION_FOLLOW", "until": 0.08},
+		  {"frame": "FOLLOW_HIGH", "until": 0.4},
+		  {"frame": "ADMIRE", "until": 9.0}
+		]
+	  },
+	  "reactSwung": {
+		"clock": "phase",
+		"steps": [
+		  {"frame": "EXTENSION_FOLLOW", "until": 0.08},
+		  {"frame": "FOLLOW_HIGH", "until": 9.0}
+		]
+	  },
+	  "reactNeutral": {
+		"clock": "phase",
+		"steps": [{"frame": "STANCE_A", "until": 9.0}]
+	  }
+	}
+  },
+  "catcher": {
+	"params": {
+	  "reactU": 0.6,
+	  "dropBelowZ": 1.2,
+	  "riseAboveZ": 3.4,
+	  "shiftBeyondX": 1.0
+	},
+	"tracks": {
+	  "idle": {"clock": "phase", "steps": [{"frame": "CROUCH", "until": 9.0}]},
+	  "drop": {"clock": "phase", "steps": [{"frame": "DROP", "until": 9.0}]},
+	  "rise": {"clock": "phase", "steps": [{"frame": "RISE", "until": 9.0}]},
+	  "shift": {"clock": "phase", "steps": [{"frame": "SHIFT", "until": 9.0}]},
+	  "brace": {"clock": "phase", "steps": [{"frame": "BRACE", "until": 9.0}]}
+	}
+  },
+  "mitt": {
+	"params": {
+	  "driftU": 0.5,
+	  "easeRate": 9.0
+	},
+	"tracks": {
+	  "open": {"clock": "phase", "steps": [{"frame": "OPEN", "until": 9.0}]},
+	  "caught": {
+		"clock": "phase",
+		"steps": [
+		  {"frame": "POP", "until": 0.09},
+		  {"frame": "CLOSED", "until": 9.0}
+		]
+	  }
+	}
+  },
+  "umpire": {
+	"tracks": {
+	  "idle": {"clock": "phase", "steps": [{"frame": "CROUCH", "until": 9.0}]},
+	  "flight": {"clock": "phase", "steps": [{"frame": "LEAN", "until": 9.0}]},
+	  "strikeout": {
+		"clock": "phase",
+		"steps": [
+		  {"frame": "LEAN", "until": 0.18},
+		  {"frame": "RINGUP_WIND", "until": 0.33},
+		  {"frame": "RINGUP_PUNCH", "until": 9.0}
+		]
+	  },
+	  "calledStrike": {
+		"clock": "phase",
+		"steps": [
+		  {"frame": "CROUCH", "until": 0.18},
+		  {"frame": "PUNCH", "until": 0.68},
+		  {"frame": "CROUCH", "until": 9.0}
+		]
+	  }
+	}
+  }
+}
