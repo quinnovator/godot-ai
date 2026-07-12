@@ -337,12 +337,13 @@ func _configure_live_pitcher_visual(state: Dictionary, team: Dictionary) -> void
 	if not catalog_pitcher.is_empty():
 		catalog_pitcher.merge(live_pitcher, true)
 		live_pitcher = catalog_pitcher
-	var signature := "%s/%s/%s/%s/%d" % [
+	var signature := "%s/%s/%s/%s/%d/%s" % [
 		fielding_side,
 		String(team.get("abbr", "")),
 		int(live_pitcher.get("id", -1)),
 		String(live_pitcher.get("throws", "R")),
 		int(live_pitcher.get("number", 0)),
+		String(live_pitcher.get("name", "")),
 	]
 	if signature == _pitcher_visual_signature:
 		return
@@ -357,6 +358,7 @@ func _configure_live_pitcher_visual(state: Dictionary, team: Dictionary) -> void
 	player.configure({
 		"seed": maxi(1, int(live_pitcher.get("id", 1))),
 		"role": "pitcher",
+		"player_name": String(live_pitcher.get("name", "")),
 		"number": number,
 		"mark": String(team.get("abbr", "")).left(1),
 		"build": build,
@@ -394,7 +396,7 @@ func _configure_live_batter_visual(state: Dictionary, team: Dictionary) -> void:
 		build = "power"
 	elif float(hitter.get("speed", 0.0)) >= 27.5 or archetype.to_lower().contains("contact"):
 		build = "speed"
-	var signature := "%s/%s/%d/%s/%s" % [batting_side, team_token, lineup_index, stand, archetype]
+	var signature := "%s/%s/%d/%s/%s/%s/%d" % [batting_side, team_token, lineup_index, stand, archetype, name, number]
 	_current_batter_identity = {
 		"name": name,
 		"number": number,
@@ -408,6 +410,7 @@ func _configure_live_batter_visual(state: Dictionary, team: Dictionary) -> void:
 	batter.configure({
 		"seed": maxi(1, identity_seed),
 		"role": "batter",
+		"player_name": name,
 		"number": number,
 		"mark": String(team.get("abbr", "")).left(1),
 		"build": build,

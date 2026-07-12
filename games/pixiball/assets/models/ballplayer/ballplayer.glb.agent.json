@@ -8,8 +8,8 @@
     "script": "res://assets/blender/build_ballplayer.py"
   },
   "sha256": {
-    "blend": "0001951c27b73f7beb09f17859165f067487800858f79deb19f07f03b910a8b6",
-    "output": "51afd7340bb0bdb7890c2aeef6904b7481b87c7e40de1cbbda37bf36ebc6763b",
-    "script": "41c4fba457a68143d9f958fb2443476dce5ec6662669fa9275dcab457265f3ca"
+    "blend": "5d6ce1e377878cf11a01fdc9d6d30739ffed53896a3e32d88e2d69033a4aa0a6",
+    "output": "1e823b3209512a99253f1b6cbfd9cbe78075c6df734afe16de2353d9cf3d1f34",
+    "script": "5ab08ecaf4cedbcd8059fd58eb3a6f3bbfc6e0950028f5880fc460f4e34ae2b8"
   }
 }

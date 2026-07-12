@@ -14,6 +14,7 @@ func _run() -> void:
 		"seed": 7,
 		"role": "batter",
 		"number": 7,
+		"player_name": "Maya Okafor",
 		"mark": "H",
 		"bats": "left",
 		"helmet": true,
@@ -24,13 +25,15 @@ func _run() -> void:
 		"accent_color": Color("dfad3e"),
 	})
 	await process_frame
-	_expect_pieces(batter, ["BattingHelmet", "TeamMark", "JerseyNumberFront", "JerseyNumberBack"])
+	_expect_pieces(batter, ["BattingHelmet", "TeamMark", "JerseyNumberFront", "JerseyNameBack", "JerseyNumberBack"])
 	_expect(_label_text(batter, "TeamMark") == "H", "batter team mark was not installed")
 	_expect(_label_text(batter, "JerseyNumberFront") == "7", "one-digit jersey number was not preserved")
 	_expect(_label_text(batter, "JerseyNumberBack") == "7", "one-digit back number was not preserved")
+	_expect(_label_text(batter, "JerseyNameBack") == "OKAFOR", "surname was not extracted for the back nameplate")
 	_expect_identity_label(batter, "TeamMark", Vector3.FORWARD)
-	_expect_identity_label(batter, "JerseyNumberFront", Vector3.FORWARD, 0.10, 0.36)
-	_expect_identity_label(batter, "JerseyNumberBack", Vector3.BACK, 0.22, 0.62)
+	_expect_identity_label(batter, "JerseyNumberFront", Vector3.FORWARD, 0.085, 0.105)
+	_expect_identity_label(batter, "JerseyNumberBack", Vector3.BACK, 0.18, 0.21)
+	_expect_identity_label(batter, "JerseyNameBack", Vector3.BACK, 0.04, 0.06)
 	_expect(_mesh_visible(batter, "Bat_Skinned"), "batter lost imported bat visibility")
 	_expect(not _mesh_visible(batter, "Glove_Skinned"), "batter unexpectedly shows imported glove")
 	_expect(not _mesh_visible(batter, "Cap_Skinned"), "batting helmet did not replace imported cap")
@@ -41,18 +44,23 @@ func _run() -> void:
 	_expect(_piece_material_color(batter, "BattingHelmet", "Equipment_Primary").is_equal_approx(recolor), "helmet did not follow the team palette")
 	batter.set_team_mark("R")
 	_expect(_label_text(batter, "TeamMark") == "R", "live team-mark update did not reach equipment")
+	batter.set_player_name("Nia Rodriguez")
+	batter.set_jersey_number(27)
+	_expect(_label_text(batter, "JerseyNameBack") == "RODRIGUEZ", "live player-name update did not reach equipment")
+	_expect(_label_text(batter, "JerseyNumberBack") == "27", "live jersey-number update did not reach equipment")
 
 	var catcher := _actor({
 		"seed": 12,
 		"role": "catcher",
 		"number": 12,
+		"player_name": "Luis Chen",
 		"mark": "C",
 		"primary_color": Color("17604e"),
 		"secondary_color": Color("e7debc"),
 		"accent_color": Color("e46c35"),
 	})
 	await process_frame
-	_expect_pieces(catcher, ["CatcherMask", "CatcherChestProtector", "CatcherShinGuardL", "CatcherShinGuardR", "TeamMark", "JerseyNumberFront", "JerseyNumberBack"])
+	_expect_pieces(catcher, ["CatcherMask", "CatcherChestProtector", "CatcherShinGuardL", "CatcherShinGuardR", "TeamMark", "JerseyNumberFront", "JerseyNameBack", "JerseyNumberBack"])
 	_expect(_label_text(catcher, "JerseyNumberFront") == "12", "two-digit front number was not preserved")
 	_expect(_label_text(catcher, "JerseyNumberBack") == "12", "two-digit jersey number was not preserved")
 	_expect(_mesh_visible(catcher, "Glove_Skinned"), "catcher lost imported mitt visibility")
@@ -90,9 +98,9 @@ func _run() -> void:
 	_expect(not _mesh_visible(umpire, "Glove_Skinned"), "umpire unexpectedly shows imported glove")
 	_expect(not _mesh_visible(umpire, "Cap_Skinned"), "umpire mask did not replace imported cap")
 
-	var fielder := _actor({"seed": 18, "role": "fielder", "number": 18, "mark": "F"})
+	var fielder := _actor({"seed": 18, "role": "fielder", "number": 18, "mark": "F", "player_name": "Ari Vega"})
 	await process_frame
-	_expect_pieces(fielder, ["TeamMark", "JerseyNumberFront", "JerseyNumberBack"])
+	_expect_pieces(fielder, ["TeamMark", "JerseyNumberFront", "JerseyNameBack", "JerseyNumberBack"])
 	_expect(fielder.get_equipment_piece("BattingHelmet") == null, "fielder unexpectedly received a helmet")
 	_expect(fielder.get_equipment_piece("CatcherMask") == null, "fielder unexpectedly received catcher gear")
 	_expect(_mesh_visible(fielder, "Glove_Skinned"), "fielder lost imported glove visibility")
@@ -104,6 +112,7 @@ func _run() -> void:
 		"seed": 42,
 		"role": "batter",
 		"number": 42,
+		"player_name": "Sam Rivera",
 		"mark": "S",
 		"bats": "left",
 		"throws": "right",
@@ -120,9 +129,10 @@ func _run() -> void:
 	_expect_identity_handedness(switch_hitter, "left-handed swing")
 	_expect(_label_text(switch_hitter, "JerseyNumberFront") == "42", "hand switch changed the front jersey number")
 	_expect(_label_text(switch_hitter, "JerseyNumberBack") == "42", "hand switch changed the back jersey number")
+	_expect(_label_text(switch_hitter, "JerseyNameBack") == "RIVERA", "hand switch changed the back jersey name")
 
 	if _failures.is_empty():
-		print("PIXIBALL_EQUIPMENT_OK batter=helmet catcher=4 umpire=2 identity=mark+number animated=verified")
+		print("PIXIBALL_EQUIPMENT_OK batter=helmet catcher=4 umpire=2 identity=mark+name+number vector_twill=verified")
 		quit(0)
 		return
 	for failure in _failures:
@@ -145,30 +155,38 @@ func _expect_pieces(actor: BallplayerActor, expected: Array[String]) -> void:
 
 
 func _label_text(actor: BallplayerActor, piece_name: String) -> String:
-	var piece := actor.get_equipment_piece(piece_name) as MeshInstance3D
+	var piece := actor.get_equipment_piece(piece_name) as Node3D
 	if not is_instance_valid(piece):
 		return ""
 	return String(piece.get_meta("identity_text", ""))
 
 
 func _expect_identity_label(actor: BallplayerActor, piece_name: String, _outward: Vector3, minimum_height := 0.0, maximum_height := INF) -> void:
-	var piece := actor.get_equipment_piece(piece_name) as MeshInstance3D
+	var piece := actor.get_equipment_piece(piece_name) as Node3D
 	_expect(is_instance_valid(piece), "%s identity lettering is missing" % piece_name)
 	if not is_instance_valid(piece):
 		return
-	_expect(piece.mesh != null and piece.mesh.get_surface_count() == 2, "%s is not layered tackle-twill (border + fill)" % piece_name)
-	if piece.mesh != null:
-		for surface in range(piece.mesh.get_surface_count()):
-			var material := piece.mesh.surface_get_material(surface) as StandardMaterial3D
-			_expect(material != null and material.normal_texture != null, "%s twill layer %d lacks the stitched fabric response" % [piece_name, surface])
+	_expect(String(piece.get_meta("identity_style", "")) == "graduate_vector_twill", "%s did not use the vector twill system" % piece_name)
+	var meshes: Array[MeshInstance3D] = []
+	_collect_meshes(piece, meshes)
+	_expect(meshes.size() >= 2, "%s is not layered tackle-twill (border + fill)" % piece_name)
+	var has_border := false
+	var has_fill := false
+	for mesh_instance in meshes:
+		has_border = has_border or mesh_instance.name == "TwillBorder"
+		has_fill = has_fill or mesh_instance.name == "TwillFill"
+		if mesh_instance.mesh != null:
+			var material := mesh_instance.mesh.surface_get_material(0) as StandardMaterial3D
+			_expect(material != null and material.normal_texture != null, "%s twill layer lacks the stitched fabric response" % piece_name)
+	_expect(has_border and has_fill, "%s lacks a fill or contrast border layer" % piece_name)
 	_expect(piece.global_transform.basis.determinant() > 0.0, "%s basis reflects its lettering" % piece_name)
-	var height := piece.get_aabb().size.y
+	var height := float(piece.get_meta("identity_height", 0.0))
 	_expect(height >= minimum_height and height <= maximum_height, "%s height %.4fm is outside %.2f-%.2fm" % [piece_name, height, minimum_height, maximum_height])
 
 
 func _expect_identity_handedness(actor: BallplayerActor, context: String) -> void:
-	for piece_name in ["TeamMark", "JerseyNumberFront", "JerseyNumberBack"]:
-		var piece := actor.get_equipment_piece(piece_name) as MeshInstance3D
+	for piece_name in ["TeamMark", "JerseyNumberFront", "JerseyNameBack", "JerseyNumberBack"]:
+		var piece := actor.get_equipment_piece(piece_name) as Node3D
 		_expect(is_instance_valid(piece), "%s lost %s" % [context, piece_name])
 		if is_instance_valid(piece):
 			_expect(piece.global_transform.basis.determinant() > 0.0, "%s reflected %s" % [context, piece_name])

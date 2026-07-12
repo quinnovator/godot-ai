@@ -64,9 +64,17 @@ The following are new or rebuilt assets and systems for this repository:
 - `assets/textures/surface/` holds CC0 Poly Haven photogrammetry detail maps
   (cotton jersey knit, brown leather, fine-grained wood; see its
   `LICENSES.md`), sampled triplanar as runtime micro-surface detail.
+- `assets/textures/uniform/double_knit_albedo.png` is a Codex built-in
+  image-generation output authored as a neutral, seamless, tintable runtime
+  textile tile. It contains no logo, lettering, player likeness, or source-game
+  artwork.
+- `assets/fonts/graduate/Graduate-Regular.ttf` comes from the official Google
+  Fonts repository under SIL Open Font License 1.1; its license text is vendored
+  beside the font. Godot converts its vector contours into the runtime uniform
+  identity meshes.
 - `characters/ballplayer_actor.tscn` and the modular helmet, catcher, umpire,
-  team-mark, and jersey-number equipment layer. These assets do not use Unreal
-  mesh or sprite geometry.
+  team-mark, surname, and jersey-number equipment layer. These assets do not
+  use Unreal mesh or sprite geometry.
 - Semantic haptic composition, portable Godot rumble, and the fork's bounded
   native DualSense/DualSense Edge adaptive-trigger API.
 - `docs/art_direction/references/pixiball-pitcher-delivery-sheet-v2.png` is a

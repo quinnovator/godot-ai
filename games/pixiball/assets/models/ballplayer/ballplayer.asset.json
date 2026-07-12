@@ -1,9 +1,10 @@
 {
   "asset": "pixiball_ballplayer",
-  "asset_version": 12,
+  "asset_version": 13,
   "external_sources": {
     "head": "Blender Studio 'Human Base Meshes' bundle (CC0), realistic animation head + eye parts, vendored as source/cc0_head_base.blend",
-    "surface_detail_textures": "Poly Haven CC0 photogrammetry maps under assets/textures/surface/ (see LICENSES.md)"
+    "surface_detail_textures": "Poly Haven CC0 photogrammetry maps under assets/textures/surface/ plus the generated tintable double-knit albedo under assets/textures/uniform/",
+    "uniform_identity_font": "Graduate Regular from Google Fonts, SIL Open Font License 1.1, vendored under assets/fonts/graduate/"
   },
   "bounds_m": {
     "max": [
@@ -112,7 +113,8 @@
     },
     "motion": {
       "pitch_interpolation": "hemisphere-corrected quaternion tracks baked once per source frame",
-      "pitch_root_contract": "0.23 m controlled drive with <=0.05 m end offset before idle blend"
+      "pitch_root_contract": "0.23 m controlled drive with <=0.05 m end offset before idle blend",
+      "foot_contact_contract": "two-bone ankle IK plus explicit foot orientation; planted sole, relaxed lift, and authored rear-foot toe-off"
     },
     "sockets": [
       "socket_head",

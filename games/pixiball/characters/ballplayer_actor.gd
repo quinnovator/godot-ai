@@ -126,6 +126,9 @@ uniform float highlight_strength : hint_range(0.0, 1.0) = 0.0;
 uniform bool detail_maps_enabled = false;
 uniform sampler2D detail_normal_map : hint_normal, filter_linear_mipmap, repeat_enable;
 uniform sampler2D detail_rough_map : hint_default_white, filter_linear_mipmap, repeat_enable;
+uniform bool detail_albedo_enabled = false;
+uniform sampler2D detail_albedo_map : source_color, filter_linear_mipmap, repeat_enable;
+uniform float detail_albedo_strength = 0.16;
 uniform float detail_map_scale = 8.0;
 uniform float detail_map_normal_strength = 0.4;
 uniform float detail_map_rough_strength = 0.25;
@@ -227,6 +230,13 @@ void fragment() {
 			texture(detail_rough_map, uvp.xz).r * blend_w.y +
 			texture(detail_rough_map, uvp.xy).r * blend_w.z;
 		rough_delta += (rough_sample - 0.5) * detail_map_rough_strength;
+		if (detail_albedo_enabled) {
+			float cloth_sample =
+				texture(detail_albedo_map, uvp.zy).r * blend_w.x +
+				texture(detail_albedo_map, uvp.xz).r * blend_w.y +
+				texture(detail_albedo_map, uvp.xy).r * blend_w.z;
+			tonal += (cloth_sample - 0.5) * detail_albedo_strength;
+		}
 	}
 
 	ALBEDO = clamp(base_color.rgb * (1.0 + tonal), vec3(0.0), vec3(1.0));
@@ -239,6 +249,8 @@ void fragment() {
 
 const DETAIL_MAPS := {
 	"cloth": {
+		"albedo": preload("res://assets/textures/uniform/double_knit_albedo.png"),
+		"albedo_strength": 0.14,
 		"normal": preload("res://assets/textures/surface/cotton_jersey_nor_gl_1k.jpg"),
 		"rough": preload("res://assets/textures/surface/cotton_jersey_rough_1k.jpg"),
 		"scale": 9.0,
@@ -287,6 +299,7 @@ var _role := "fielder"
 var _throwing_hand := "right"
 var _batting_side := "right"
 var _team_mark := ""
+var _player_name := ""
 var _primary_color := Color("173f73")
 var _secondary_color := Color("f1ead9")
 var _accent_color := Color("e2b447")
@@ -303,7 +316,7 @@ func _ready() -> void:
 
 ## Configures appearance and handedness using the same Dictionary accepted by
 ## VoxelBallplayer. Important keys are seed, role, number, mark, height, build,
-## skin_tone, hair_color, throws, bats, primary_color, secondary_color,
+## player_name, skin_tone, hair_color, throws, bats, primary_color, secondary_color,
 ## accent_color, pants_color, glove, bat, and helmet.
 func configure(spec: Dictionary) -> void:
 	_spec = spec.duplicate(true)
@@ -311,6 +324,7 @@ func configure(spec: Dictionary) -> void:
 	_throwing_hand = _normalized_hand(String(_spec.get("throws", "right")))
 	_batting_side = _normalized_hand(String(_spec.get("bats", _throwing_hand)))
 	_team_mark = String(_spec.get("mark", "")).to_upper().left(1)
+	_player_name = String(_spec.get("player_name", _spec.get("name", ""))).strip_edges()
 	_primary_color = _as_color(_spec.get("primary_color", _primary_color), _primary_color)
 	_secondary_color = _as_color(_spec.get("secondary_color", _secondary_color), _secondary_color)
 	_accent_color = _as_color(_spec.get("accent_color", _accent_color), _accent_color)
@@ -497,10 +511,31 @@ func set_uniform_colors(primary: Color, secondary: Color, accent: Color, pants :
 ## glyph without changing the base character mesh.
 func set_team_mark(mark: String) -> void:
 	_team_mark = mark.to_upper().left(1)
+	_spec["mark"] = _team_mark
 	if _using_fallback:
 		_fallback.call("set_team_mark", _team_mark)
 	elif is_instance_valid(_equipment):
-		_equipment.set_identity(_team_mark, int(_spec.get("number", 0)))
+		_equipment.set_identity(_team_mark, int(_spec.get("number", 0)), _player_name)
+
+
+## Changes the roster identity without rebuilding the rigged GLB. These
+## setters are intentionally independent so lineup, trade, and customization
+## screens can update only the field that changed.
+func set_jersey_number(number: int) -> void:
+	_spec["number"] = posmod(number, 100)
+	if _using_fallback:
+		_fallback.call("configure", _spec)
+	elif is_instance_valid(_equipment):
+		_equipment.set_identity(_team_mark, get_jersey_number(), _player_name)
+
+
+func set_player_name(player_name: String) -> void:
+	_player_name = player_name.strip_edges()
+	_spec["player_name"] = _player_name
+	if _using_fallback:
+		_fallback.call("configure", _spec)
+	elif is_instance_valid(_equipment):
+		_equipment.set_identity(_team_mark, get_jersey_number(), _player_name)
 
 
 func get_team_mark() -> String:
@@ -509,6 +544,10 @@ func get_team_mark() -> String:
 
 func get_jersey_number() -> int:
 	return posmod(int(_spec.get("number", 0)), 100)
+
+
+func get_player_name() -> String:
+	return _player_name
 
 
 func get_throwing_hand() -> String:
@@ -525,7 +564,7 @@ func get_role() -> String:
 
 func get_equipment_profile() -> Dictionary:
 	if not is_instance_valid(_equipment):
-		return {"role": _role, "mark": _team_mark, "number": get_jersey_number(), "pieces": PackedStringArray()}
+		return {"role": _role, "mark": _team_mark, "number": get_jersey_number(), "player_name": _player_name, "pieces": PackedStringArray()}
 	return _equipment.get_profile()
 
 
@@ -544,12 +583,15 @@ func get_current_action() -> String:
 func get_generation_signature() -> String:
 	if _using_fallback:
 		return String(_fallback.call("get_generation_signature"))
-	return "rigged-v4:%s:%s:%s:%s:%s" % [
+	return "rigged-v5:%s:%s:%s:%s:%s:%s:%s:%s" % [
 		int(_spec.get("seed", 1)),
 		_role,
 		_throwing_hand,
+		_batting_side,
 		String(_spec.get("build", "balanced")),
+		_team_mark,
 		int(_spec.get("number", 0)),
+		_player_name,
 	]
 
 
@@ -642,6 +684,10 @@ func _install_material_overrides() -> void:
 					procedural.set_shader_parameter("detail_maps_enabled", true)
 					procedural.set_shader_parameter("detail_normal_map", maps.normal)
 					procedural.set_shader_parameter("detail_rough_map", maps.rough)
+					if maps.has("albedo"):
+						procedural.set_shader_parameter("detail_albedo_enabled", true)
+						procedural.set_shader_parameter("detail_albedo_map", maps.albedo)
+						procedural.set_shader_parameter("detail_albedo_strength", float(maps.get("albedo_strength", 0.16)))
 					procedural.set_shader_parameter("detail_map_scale", float(maps.scale))
 					procedural.set_shader_parameter("detail_map_normal_strength", float(maps.normal_strength))
 					procedural.set_shader_parameter("detail_map_rough_strength", float(maps.rough_strength))
@@ -717,9 +763,9 @@ func _apply_dimensions_and_handedness() -> void:
 	var sampled_height := 1.76 + float(posmod(seed * 48271, 1000)) / 1000.0 * 0.18
 	var height := clampf(float(_spec.get("height", sampled_height)), 1.55, 2.05)
 	var build := String(_spec.get("build", "balanced")).to_lower()
-	var width_scale: float = {"speed": 0.91, "balanced": 0.96, "power": 1.02}.get(build, 0.96)
+	var width_scale: float = {"speed": 0.86, "balanced": 0.90, "power": 0.96}.get(build, 0.90)
 	var mirror := -1.0 if _hand_for_action("idle") == "left" else 1.0
-	# 1.89 m is the authored nominal height of the realistic v11 asset.
+	# 1.89 m is the authored nominal height of the production asset.
 	_model_root.scale = Vector3(width_scale * mirror, height / 1.89, width_scale)
 	var head_index := _skeleton.find_bone("head") if is_instance_valid(_skeleton) else -1
 	if head_index >= 0:

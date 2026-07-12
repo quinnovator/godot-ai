@@ -1,7 +1,8 @@
 # Pixiball production ballplayer
 
-This is a deterministic, rigged character asset for Pixiball. The version 12
-delivery reaches for the highest realism available from open assets: the
+This is a deterministic, rigged character asset for Pixiball. Version 13
+rebuilds the figure around a leaner professional-athlete silhouette and stable
+foot mechanics while retaining the realistic open-asset head: the
 head is the professionally sculpted realistic animation head from Blender
 Studio's CC0 "Human Base Meshes" bundle (vendored as
 `source/cc0_head_base.blend`), registered onto the rig's eye targets,
@@ -15,10 +16,11 @@ cloth, oiled leather, lacquered maple, brushed steel). In-engine,
 `BallplayerActor` mirrors those families with a Burley/GGX shader that
 layers real CC0 photogrammetry micro-surface maps (cotton jersey knit,
 leather grain, wood figure from Poly Haven, sampled triplanar -- see
-`assets/textures/surface/LICENSES.md`) plus procedural pore/strand detail
+`assets/textures/surface/LICENSES.md`) and a generated tint-neutral double-knit
+albedo tile, plus procedural pore/strand detail
 and a warm fresnel scatter approximation on skin.
 
-The continuous multi-weight anatomy authors musculature and wardrobe
+The continuous multi-weight anatomy authors restrained musculature and wardrobe
 directly into the deforming ring surfaces: deltoid/bicep/tricep/forearm
 bellies, pectoral plates and a spinal groove under the fitted jersey, a
 classic home uniform (white body, team-piped button placket, red raglan
@@ -30,13 +32,13 @@ sculpted chains with knuckle and finger-scallop profiles: a half-open glove
 hand plus a throwing-hand fist that wraps the resting bat handle. A lobed
 baseball mitt with a recessed pocket and one open web bridge, sculpted
 cleats, and a structured six-panel cap with a curved tapered brim and small
-embroidered monogram complete the figure. The rig keeps the individually
-reviewed biomechanical beats and frame-baked quaternion clips from version
-9, and the head/neck joints were re-seated anatomically without touching any
-limb IK. No Unreal mesh or sprite geometry is used by this rebuilt character
-asset, it does not attempt a real-player likeness, and it contains no
-third-party character, scan, or texture data. The wider game does retain
-authorized data and reference textures from the user's original project; see
+embroidered monogram complete the figure. The rig keeps individually reviewed,
+frame-baked quaternion clips. Version 13 replaces position-only three-bone foot
+IK with a two-bone ankle solve and explicit shoe orientation, so balance,
+stride, plant, toe-off, and recovery no longer roll a cleat onto its side. It
+also grounds the swing stance through the same contact system. No Unreal mesh
+or sprite geometry is used, and the asset does not attempt a real-player
+likeness. For all open and generated sources, see
 [Asset provenance](../../../docs/ASSET_PROVENANCE.md).
 
 The GLB is the runtime source of truth. The `.blend` remains beside it under the
@@ -88,11 +90,9 @@ management, and equipment visibility. It writes individual PNGs plus
 The pitching QA set covers balance, hand break, stride, plant, late cock,
 release, extension, follow-through, and finish. Its telemetry rejects an early
 velocity peak, excessive or unrecovered root motion, unstable lead-foot plant,
-missing deceleration, and discontinuous gather rotations. The promoted v11
-receipt measures release at frame 28, 25.485 m/s authored hand speed, 0.230 m
-root excursion, 0.000 m end offset, and 0.010306 m planted-foot drift
-(identical to v9: the redesigns are visual only and leave the limb rig and
-authored clips untouched).
+missing deceleration, and discontinuous gather rotations. The promoted v13
+receipt measures release at frame 28, 25.053 m/s authored hand speed, 0.230 m
+root excursion, 0.000 m end offset, and 0.015173 m planted-foot drift.
 
 ## Instantiate
 
@@ -107,6 +107,7 @@ player.configure({
     "seed": 34,
     "role": "pitcher",
     "number": 34,
+    "player_name": "Maya Rodriguez",
     "build": "power",
     "throws": "right",
     "primary_color": Color("173f73"),
@@ -142,8 +143,11 @@ between offense and defense without duplicate GLBs.
 | `attach_to_socket(node, name, keep_global=false) -> bool` | Parents props/effects to the live rig socket. |
 | `set_uniform_colors(primary, secondary, accent, pants)` | Overrides local material copies without mutating the imported scene. |
 | `set_team_mark(mark: String)` | Stores the semantic mark; generated/licensed logo meshes should attach to `chest`. |
+| `set_player_name(player_name: String)` | Rebuilds the curved back surname from vector contours without rebuilding the GLB. |
+| `set_jersey_number(number: int)` | Updates front/back numbers in place and normalizes them to 0-99. |
 | `get_team_mark() -> String` | Returns the live one-character identity mark. |
 | `get_jersey_number() -> int` | Returns the normalized 0-99 jersey number. |
+| `get_player_name() -> String` | Returns the live roster name used for the surname plate. |
 | `get_equipment_profile() -> Dictionary` | Reports role, mark, number, and installed modular piece names. |
 | `get_equipment_piece(name: String) -> Node3D` | Returns a live helmet/mask/protector/identity attachment for QA or presentation. |
 | `set_highlighted(enabled: bool)` | Applies a local emissive selection treatment. |
@@ -164,18 +168,18 @@ Stable socket names are `head`, `chest`, `left_hand`, `right_hand`, `glove`,
 `right_foot`, `left_shin`, `right_shin`, and `feet`.
 
 The base asset stays role-neutral. `characters/equipment/ballplayer_equipment.tscn`
-adds batting helmets, catcher/umpire protection, team marks, and jersey numbers
-as bone-attached, per-instance pieces. This preserves the GLB contract and lets
-future agents replace one equipment family without rebuilding the athlete.
-Numbers and marks are stitched tackle-twill geometry, not rendered text:
-authored varsity block glyph outlines extruded into a raised fill layer over
-a contrasting border layer, curved around the measured torso and shaded with
-the knit fabric normal map. Their basis is corrected after every handedness
-change, preventing negative-scale mirroring; the back number spans roughly
-22 cm of character height and remains the dominant uniform read from the
-pitching camera.
+adds batting helmets, catcher/umpire protection, team marks, jersey surnames,
+and numbers as bone-attached, per-instance pieces. This preserves the GLB
+contract and lets future agents replace one equipment family without rebuilding
+the athlete. Identity is stitched tackle-twill geometry, not a billboard: the
+OFL-licensed Graduate font is converted to layered `TextMesh` contours, and
+each glyph is curved around the measured torso with a raised fill, contrasting
+border, and knit response. The team mark, surname, number, and palette all
+update at runtime. Their basis is corrected after every handedness change,
+preventing negative-scale mirroring; the back number remains the dominant
+uniform read from the pitching camera.
 
-For an in-engine look (cel shader plus glyph identity, which Blender QA
+For an in-engine look (surface shader plus vector-twill identity, which Blender QA
 renders cannot show), run the capture harness without `--headless`:
 
 ```sh

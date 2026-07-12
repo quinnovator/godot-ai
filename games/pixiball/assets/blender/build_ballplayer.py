@@ -3,8 +3,8 @@
 The recipe deliberately uses only Blender's bundled Python API.  Every visible
 piece is weighted to the shared armature, even when a piece is rigid, so the
 result remains easy to art-direct while exporting as a conventional skinned
-glTF.  Version 11 targets maximum realism the procedural pipeline can
-express: naturalistic adult-athlete proportions (a 7.5-heads figure with an
+glTF. Version 13 targets a lean professional-athlete silhouette with stable
+foot mechanics: naturalistic adult proportions (a 7.5-heads figure with an
 anatomically sized skull), a fully sculpted face with recessed eyeballs,
 lids, nose, lips, and ears, muscle bellies and cloth response authored into
 the deforming ring surfaces, physically based material response (subsurface
@@ -42,7 +42,7 @@ CC0_TARGET_INTERPUPIL = 0.060
 CC0_NECK_CUT_Z = 1.578
 CC0_NECK_BLEND_TOP = 1.664
 
-ASSET_VERSION = 12
+ASSET_VERSION = 13
 DEG = math.pi / 180.0
 RIG = None
 MATERIALS = {}
@@ -214,14 +214,14 @@ def create_rig():
         # figure reads about 7.7 heads tall against the fixed shoulder line.
         ("neck", (0.0, 0.0, 1.48), (0.0, 0.0, 1.56), "chest", True),
         ("head", (0.0, 0.0, 1.56), (0.0, 0.0, 1.84), "neck", True),
-        ("clavicle.L", (0.0, 0.0, 1.43), (0.255, 0.0, 1.43), "chest", True),
-        ("upper_arm.L", (0.255, 0.0, 1.43), (0.39, 0.0, 1.16), "clavicle.L", True),
-        ("forearm.L", (0.39, 0.0, 1.16), (0.43, -0.005, 0.91), "upper_arm.L", True),
-        ("hand.L", (0.43, -0.005, 0.91), (0.43, -0.045, 0.77), "forearm.L", True),
-        ("clavicle.R", (0.0, 0.0, 1.43), (-0.255, 0.0, 1.43), "chest", True),
-        ("upper_arm.R", (-0.255, 0.0, 1.43), (-0.39, 0.0, 1.16), "clavicle.R", True),
-        ("forearm.R", (-0.39, 0.0, 1.16), (-0.43, -0.005, 0.91), "upper_arm.R", True),
-        ("hand.R", (-0.43, -0.005, 0.91), (-0.43, -0.045, 0.77), "forearm.R", True),
+        ("clavicle.L", (0.0, 0.0, 1.43), (0.235, 0.0, 1.43), "chest", True),
+        ("upper_arm.L", (0.235, 0.0, 1.43), (0.365, 0.0, 1.16), "clavicle.L", True),
+        ("forearm.L", (0.365, 0.0, 1.16), (0.405, -0.005, 0.91), "upper_arm.L", True),
+        ("hand.L", (0.405, -0.005, 0.91), (0.405, -0.045, 0.77), "forearm.L", True),
+        ("clavicle.R", (0.0, 0.0, 1.43), (-0.235, 0.0, 1.43), "chest", True),
+        ("upper_arm.R", (-0.235, 0.0, 1.43), (-0.365, 0.0, 1.16), "clavicle.R", True),
+        ("forearm.R", (-0.365, 0.0, 1.16), (-0.405, -0.005, 0.91), "upper_arm.R", True),
+        ("hand.R", (-0.405, -0.005, 0.91), (-0.405, -0.045, 0.77), "forearm.R", True),
         ("thigh.L", (0.14, 0.0, 1.01), (0.14, 0.006, 0.59), "hips", True),
         ("shin.L", (0.14, 0.006, 0.59), (0.14, 0.0, 0.17), "thigh.L", True),
         ("foot.L", (0.14, 0.0, 0.17), (0.14, -0.22, 0.075), "shin.L", True),
@@ -232,11 +232,11 @@ def create_rig():
         ("toe.R", (-0.14, -0.22, 0.075), (-0.14, -0.34, 0.07), "foot.R", True),
         ("socket_head", (0.0, -0.11, 1.75), (0.0, -0.19, 1.75), "head", False),
         ("socket_chest", (0.0, -0.17, 1.35), (0.0, -0.25, 1.35), "chest", False),
-        ("socket_glove", (0.43, -0.07, 0.82), (0.43, -0.17, 0.82), "hand.L", False),
-        ("socket_catch", (0.43, -0.20, 0.84), (0.43, -0.29, 0.84), "hand.L", False),
-        ("socket_bat", (-0.43, -0.07, 0.81), (-0.43, -0.17, 0.81), "hand.R", False),
-        ("socket_ball", (-0.43, -0.13, 0.83), (-0.43, -0.22, 0.83), "hand.R", False),
-        ("socket_bat_tip", (-0.39, -0.10, 1.53), (-0.39, -0.19, 1.53), "hand.R", False),
+        ("socket_glove", (0.405, -0.07, 0.82), (0.405, -0.17, 0.82), "hand.L", False),
+        ("socket_catch", (0.405, -0.20, 0.84), (0.405, -0.29, 0.84), "hand.L", False),
+        ("socket_bat", (-0.405, -0.07, 0.81), (-0.405, -0.17, 0.81), "hand.R", False),
+        ("socket_ball", (-0.405, -0.13, 0.83), (-0.405, -0.22, 0.83), "hand.R", False),
+        ("socket_bat_tip", (-0.365, -0.10, 1.53), (-0.365, -0.19, 1.53), "hand.R", False),
         ("socket_foot.L", (0.14, -0.24, 0.04), (0.14, -0.32, 0.04), "foot.L", False),
         ("socket_foot.R", (-0.14, -0.24, 0.04), (-0.14, -0.32, 0.04), "foot.R", False),
     ]
@@ -788,21 +788,21 @@ def build_body():
             weighted_chain_part(
                 "Body_ArmBlend_" + side,
                 [
-                    ((0.305 * sign, 0.000, 1.352), 0.100, 0.098, {clavicle_bone: 0.30, upper_bone: 0.70}, arm_profile(deltoid)),
-                    ((0.330 * sign, 0.000, 1.308), 0.097, 0.095, {clavicle_bone: 0.12, upper_bone: 0.88}, arm_profile(deltoid)),
-                    ((0.352 * sign, -0.001, 1.272), 0.090, 0.088, {upper_bone: 1.0}, arm_profile(bicep)),
-                    ((0.370 * sign, -0.002, 1.240), 0.086, 0.084, {upper_bone: 1.0}, arm_profile(bicep)),
-                    ((0.383 * sign, -0.003, 1.212), 0.081, 0.079, {upper_bone: 1.0}, arm_profile(bicep)),
-                    ((0.394 * sign, -0.003, 1.188), 0.076, 0.074, {upper_bone: 0.80, forearm_bone: 0.20}, arm_profile(elbow)),
-                    ((0.402 * sign, -0.004, 1.164), 0.071, 0.070, {upper_bone: 0.55, forearm_bone: 0.45}, arm_profile(elbow)),
-                    ((0.407 * sign, -0.005, 1.142), 0.067, 0.066, {upper_bone: 0.30, forearm_bone: 0.70}, arm_profile(elbow)),
-                    ((0.412 * sign, -0.006, 1.112), 0.069, 0.067, {upper_bone: 0.12, forearm_bone: 0.88}, arm_profile(extensor)),
-                    ((0.418 * sign, -0.008, 1.072), 0.075, 0.073, {forearm_bone: 1.0}, arm_profile(extensor)),
-                    ((0.422 * sign, -0.010, 1.030), 0.072, 0.070, {forearm_bone: 1.0}, arm_profile(flexor)),
-                    ((0.426 * sign, -0.012, 0.988), 0.066, 0.064, {forearm_bone: 1.0}, arm_profile(flexor)),
-                    ((0.430 * sign, -0.015, 0.952), 0.060, 0.056, {forearm_bone: 0.88, hand_bone: 0.12}),
-                    ((0.432 * sign, -0.018, 0.926), 0.055, 0.049, {forearm_bone: 0.68, hand_bone: 0.32}),
-                    ((0.434 * sign, -0.024, 0.898), 0.051, 0.044, {forearm_bone: 0.35, hand_bone: 0.65}),
+                    ((0.280 * sign, 0.000, 1.352), 0.086, 0.085, {clavicle_bone: 0.30, upper_bone: 0.70}, arm_profile(deltoid)),
+                    ((0.305 * sign, 0.000, 1.308), 0.085, 0.083, {clavicle_bone: 0.12, upper_bone: 0.88}, arm_profile(deltoid)),
+                    ((0.327 * sign, -0.001, 1.272), 0.080, 0.078, {upper_bone: 1.0}, arm_profile(bicep)),
+                    ((0.345 * sign, -0.002, 1.240), 0.077, 0.075, {upper_bone: 1.0}, arm_profile(bicep)),
+                    ((0.358 * sign, -0.003, 1.212), 0.073, 0.071, {upper_bone: 1.0}, arm_profile(bicep)),
+                    ((0.369 * sign, -0.003, 1.188), 0.069, 0.067, {upper_bone: 0.80, forearm_bone: 0.20}, arm_profile(elbow)),
+                    ((0.377 * sign, -0.004, 1.164), 0.065, 0.064, {upper_bone: 0.55, forearm_bone: 0.45}, arm_profile(elbow)),
+                    ((0.382 * sign, -0.005, 1.142), 0.062, 0.061, {upper_bone: 0.30, forearm_bone: 0.70}, arm_profile(elbow)),
+                    ((0.387 * sign, -0.006, 1.112), 0.064, 0.062, {upper_bone: 0.12, forearm_bone: 0.88}, arm_profile(extensor)),
+                    ((0.393 * sign, -0.008, 1.072), 0.068, 0.066, {forearm_bone: 1.0}, arm_profile(extensor)),
+                    ((0.397 * sign, -0.010, 1.030), 0.065, 0.063, {forearm_bone: 1.0}, arm_profile(flexor)),
+                    ((0.401 * sign, -0.012, 0.988), 0.060, 0.058, {forearm_bone: 1.0}, arm_profile(flexor)),
+                    ((0.405 * sign, -0.015, 0.952), 0.055, 0.051, {forearm_bone: 0.88, hand_bone: 0.12}),
+                    ((0.407 * sign, -0.018, 0.926), 0.050, 0.045, {forearm_bone: 0.68, hand_bone: 0.32}),
+                    ((0.409 * sign, -0.024, 0.898), 0.047, 0.041, {forearm_bone: 0.35, hand_bone: 0.65}),
                 ],
                 "MAT_Skin",
                 arm_segments,
@@ -846,19 +846,19 @@ def build_body():
         weighted_chain_part(
             "Body_Hand_L",
             [
-                ((0.433, -0.020, 0.915), 0.050, 0.042, {"forearm.L": 0.55, "hand.L": 0.45}),
-                ((0.434, -0.026, 0.898), 0.054, 0.045, {"forearm.L": 0.30, "hand.L": 0.70}),
-                ((0.435, -0.032, 0.882), 0.059, 0.048, {"forearm.L": 0.12, "hand.L": 0.88}),
-                ((0.436, -0.036, 0.864), 0.064, 0.047, {"hand.L": 1.0}, thenar_profile),
-                ((0.436, -0.041, 0.844), 0.070, 0.046, {"hand.L": 1.0}, thenar_profile),
-                ((0.437, -0.048, 0.812), 0.080, 0.044, {"hand.L": 1.0}, thenar_profile),
-                ((0.437, -0.058, 0.780), 0.084, 0.048, {"hand.L": 1.0}, knuckle_profile),
-                ((0.437, -0.065, 0.764), 0.082, 0.044, {"hand.L": 1.0}, knuckle_profile),
-                ((0.436, -0.072, 0.748), 0.078, 0.040, {"hand.L": 1.0}, finger_profile),
-                ((0.435, -0.080, 0.732), 0.071, 0.036, {"hand.L": 1.0}, finger_profile),
-                ((0.434, -0.086, 0.720), 0.064, 0.032, {"hand.L": 1.0}, finger_profile),
-                ((0.433, -0.091, 0.708), 0.054, 0.028, {"hand.L": 1.0}, fingertip_profile),
-                ((0.432, -0.094, 0.700), 0.044, 0.024, {"hand.L": 1.0}),
+                ((0.408, -0.020, 0.915), 0.050, 0.042, {"forearm.L": 0.55, "hand.L": 0.45}),
+                ((0.409, -0.026, 0.898), 0.054, 0.045, {"forearm.L": 0.30, "hand.L": 0.70}),
+                ((0.410, -0.032, 0.882), 0.059, 0.048, {"forearm.L": 0.12, "hand.L": 0.88}),
+                ((0.411, -0.036, 0.864), 0.064, 0.047, {"hand.L": 1.0}, thenar_profile),
+                ((0.411, -0.041, 0.844), 0.070, 0.046, {"hand.L": 1.0}, thenar_profile),
+                ((0.412, -0.048, 0.812), 0.080, 0.044, {"hand.L": 1.0}, thenar_profile),
+                ((0.412, -0.058, 0.780), 0.084, 0.048, {"hand.L": 1.0}, knuckle_profile),
+                ((0.412, -0.065, 0.764), 0.082, 0.044, {"hand.L": 1.0}, knuckle_profile),
+                ((0.411, -0.072, 0.748), 0.078, 0.040, {"hand.L": 1.0}, finger_profile),
+                ((0.410, -0.080, 0.732), 0.071, 0.036, {"hand.L": 1.0}, finger_profile),
+                ((0.409, -0.086, 0.720), 0.064, 0.032, {"hand.L": 1.0}, finger_profile),
+                ((0.408, -0.091, 0.708), 0.054, 0.028, {"hand.L": 1.0}, fingertip_profile),
+                ((0.407, -0.094, 0.700), 0.044, 0.024, {"hand.L": 1.0}),
             ],
             "MAT_Skin",
             hand_segments,
@@ -871,11 +871,11 @@ def build_body():
         weighted_chain_part(
             "Body_Thumb_L",
             [
-                ((0.462, -0.044, 0.834), 0.033, 0.030, {"hand.L": 1.0}),
-                ((0.478, -0.060, 0.815), 0.029, 0.026, {"hand.L": 1.0}),
-                ((0.490, -0.074, 0.800), 0.026, 0.023, {"hand.L": 1.0}),
-                ((0.498, -0.085, 0.789), 0.022, 0.019, {"hand.L": 1.0}),
-                ((0.503, -0.093, 0.781), 0.017, 0.015, {"hand.L": 1.0}),
+                ((0.437, -0.044, 0.834), 0.033, 0.030, {"hand.L": 1.0}),
+                ((0.453, -0.060, 0.815), 0.029, 0.026, {"hand.L": 1.0}),
+                ((0.465, -0.074, 0.800), 0.026, 0.023, {"hand.L": 1.0}),
+                ((0.473, -0.085, 0.789), 0.022, 0.019, {"hand.L": 1.0}),
+                ((0.478, -0.093, 0.781), 0.017, 0.015, {"hand.L": 1.0}),
             ],
             "MAT_Skin",
             12,
@@ -886,17 +886,17 @@ def build_body():
         weighted_chain_part(
             "Body_Hand_R",
             [
-                ((-0.433, -0.020, 0.915), 0.050, 0.042, {"forearm.R": 0.55, "hand.R": 0.45}),
-                ((-0.434, -0.027, 0.898), 0.052, 0.043, {"forearm.R": 0.30, "hand.R": 0.70}),
-                ((-0.435, -0.034, 0.882), 0.056, 0.046, {"forearm.R": 0.12, "hand.R": 0.88}),
-                ((-0.436, -0.038, 0.866), 0.059, 0.046, {"hand.R": 1.0}, thenar_profile),
-                ((-0.436, -0.042, 0.850), 0.062, 0.046, {"hand.R": 1.0}, thenar_profile),
-                ((-0.437, -0.058, 0.815), 0.070, 0.050, {"hand.R": 1.0}, thenar_profile),
-                ((-0.436, -0.070, 0.782), 0.072, 0.053, {"hand.R": 1.0}, knuckle_profile),
-                ((-0.434, -0.070, 0.766), 0.069, 0.051, {"hand.R": 1.0}, knuckle_profile),
-                ((-0.432, -0.068, 0.752), 0.064, 0.048, {"hand.R": 1.0}, finger_profile),
-                ((-0.430, -0.060, 0.740), 0.056, 0.042, {"hand.R": 1.0}, finger_profile),
-                ((-0.428, -0.052, 0.732), 0.047, 0.035, {"hand.R": 1.0}),
+                ((-0.408, -0.020, 0.915), 0.050, 0.042, {"forearm.R": 0.55, "hand.R": 0.45}),
+                ((-0.409, -0.027, 0.898), 0.052, 0.043, {"forearm.R": 0.30, "hand.R": 0.70}),
+                ((-0.410, -0.034, 0.882), 0.056, 0.046, {"forearm.R": 0.12, "hand.R": 0.88}),
+                ((-0.411, -0.038, 0.866), 0.059, 0.046, {"hand.R": 1.0}, thenar_profile),
+                ((-0.411, -0.042, 0.850), 0.062, 0.046, {"hand.R": 1.0}, thenar_profile),
+                ((-0.412, -0.058, 0.815), 0.070, 0.050, {"hand.R": 1.0}, thenar_profile),
+                ((-0.411, -0.070, 0.782), 0.072, 0.053, {"hand.R": 1.0}, knuckle_profile),
+                ((-0.409, -0.070, 0.766), 0.069, 0.051, {"hand.R": 1.0}, knuckle_profile),
+                ((-0.407, -0.068, 0.752), 0.064, 0.048, {"hand.R": 1.0}, finger_profile),
+                ((-0.405, -0.060, 0.740), 0.056, 0.042, {"hand.R": 1.0}, finger_profile),
+                ((-0.403, -0.052, 0.732), 0.047, 0.035, {"hand.R": 1.0}),
             ],
             "MAT_Skin",
             hand_segments,
@@ -909,12 +909,12 @@ def build_body():
         weighted_chain_part(
             "Body_Thumb_R",
             [
-                ((-0.480, -0.056, 0.822), 0.027, 0.025, {"hand.R": 1.0}),
-                ((-0.474, -0.068, 0.812), 0.026, 0.024, {"hand.R": 1.0}),
-                ((-0.466, -0.084, 0.800), 0.024, 0.022, {"hand.R": 1.0}),
-                ((-0.458, -0.098, 0.788), 0.022, 0.020, {"hand.R": 1.0}),
-                ((-0.447, -0.104, 0.781), 0.019, 0.017, {"hand.R": 1.0}),
-                ((-0.436, -0.108, 0.775), 0.015, 0.013, {"hand.R": 1.0}),
+                ((-0.455, -0.056, 0.822), 0.027, 0.025, {"hand.R": 1.0}),
+                ((-0.449, -0.068, 0.812), 0.026, 0.024, {"hand.R": 1.0}),
+                ((-0.441, -0.084, 0.800), 0.024, 0.022, {"hand.R": 1.0}),
+                ((-0.433, -0.098, 0.788), 0.022, 0.020, {"hand.R": 1.0}),
+                ((-0.422, -0.104, 0.781), 0.019, 0.017, {"hand.R": 1.0}),
+                ((-0.411, -0.108, 0.775), 0.015, 0.013, {"hand.R": 1.0}),
             ],
             "MAT_Skin",
             12,
@@ -981,10 +981,10 @@ def build_uniform():
                 ((0.0, 0.005, 1.216), 0.233, 0.139, {"spine": 0.90, "chest": 0.10}, abs_profile),
                 ((0.0, 0.003, 1.258), 0.242, 0.141, {"spine": 0.74, "chest": 0.26}, abs_profile),
                 ((0.0, 0.002, 1.296), 0.252, 0.145, {"spine": 0.45, "chest": 0.55}, abs_profile),
-                ((0.0, 0.001, 1.336), 0.263, 0.148, {"spine": 0.26, "chest": 0.74}, pec_profile),
-                ((0.0, -0.001, 1.378), 0.269, 0.150, {"chest": 1.0}, pec_profile),
-                ((0.0, -0.001, 1.412), 0.272, 0.150, {"chest": 1.0}, pec_profile),
-                ((0.0, -0.003, 1.466), 0.236, 0.140, {"chest": 1.0}),
+                ((0.0, 0.001, 1.336), 0.252, 0.142, {"spine": 0.26, "chest": 0.74}, pec_profile),
+                ((0.0, -0.001, 1.378), 0.256, 0.143, {"chest": 1.0}, pec_profile),
+                ((0.0, -0.001, 1.412), 0.258, 0.143, {"chest": 1.0}, pec_profile),
+                ((0.0, -0.003, 1.466), 0.224, 0.134, {"chest": 1.0}),
                 ((0.0, -0.004, 1.502), 0.132, 0.098, {"chest": 0.85, "neck": 0.15}),
                 ((0.0, -0.004, 1.522), 0.068, 0.058, {"chest": 0.45, "neck": 0.55}),
             ],
@@ -1035,17 +1035,17 @@ def build_uniform():
             weighted_chain_part(
                 "Uniform_SleeveBlend_" + side,
                 [
-                    ((0.200 * sign, 0.000, 1.452), 0.098, 0.106, {"chest": 0.48, clavicle_bone: 0.42, upper_bone: 0.10}),
-                    ((0.230 * sign, 0.000, 1.442), 0.101, 0.108, {"chest": 0.30, clavicle_bone: 0.48, upper_bone: 0.22}),
-                    ((0.256 * sign, 0.000, 1.428), 0.104, 0.110, {"chest": 0.16, clavicle_bone: 0.50, upper_bone: 0.34}),
-                    ((0.283 * sign, -0.001, 1.402), 0.106, 0.109, {clavicle_bone: 0.40, upper_bone: 0.60}),
-                    ((0.306 * sign, -0.001, 1.372), 0.108, 0.111, {clavicle_bone: 0.28, upper_bone: 0.72}),
-                    ((0.325 * sign, -0.001, 1.344), 0.106, 0.108, {clavicle_bone: 0.12, upper_bone: 0.88}),
-                    ((0.340 * sign, -0.001, 1.315), 0.104, 0.106, {upper_bone: 1.0}),
-                    ((0.352 * sign, -0.001, 1.288), 0.102, 0.104, {upper_bone: 1.0}),
-                    ((0.362 * sign, -0.001, 1.258), 0.100, 0.102, {upper_bone: 0.95, forearm_bone: 0.05}),
-                    ((0.372 * sign, -0.002, 1.215), 0.097, 0.099, {upper_bone: 0.86, forearm_bone: 0.14}),
-                    ((0.377 * sign, -0.002, 1.192), 0.094, 0.096, {upper_bone: 0.80, forearm_bone: 0.20}),
+                    ((0.175 * sign, 0.000, 1.452), 0.088, 0.095, {"chest": 0.48, clavicle_bone: 0.42, upper_bone: 0.10}),
+                    ((0.205 * sign, 0.000, 1.442), 0.090, 0.096, {"chest": 0.30, clavicle_bone: 0.48, upper_bone: 0.22}),
+                    ((0.231 * sign, 0.000, 1.428), 0.092, 0.098, {"chest": 0.16, clavicle_bone: 0.50, upper_bone: 0.34}),
+                    ((0.258 * sign, -0.001, 1.402), 0.094, 0.097, {clavicle_bone: 0.40, upper_bone: 0.60}),
+                    ((0.281 * sign, -0.001, 1.372), 0.096, 0.099, {clavicle_bone: 0.28, upper_bone: 0.72}),
+                    ((0.300 * sign, -0.001, 1.344), 0.094, 0.096, {clavicle_bone: 0.12, upper_bone: 0.88}),
+                    ((0.315 * sign, -0.001, 1.315), 0.092, 0.094, {upper_bone: 1.0}),
+                    ((0.327 * sign, -0.001, 1.288), 0.090, 0.092, {upper_bone: 1.0}),
+                    ((0.337 * sign, -0.001, 1.258), 0.088, 0.090, {upper_bone: 0.95, forearm_bone: 0.05}),
+                    ((0.347 * sign, -0.002, 1.215), 0.086, 0.088, {upper_bone: 0.86, forearm_bone: 0.14}),
+                    ((0.352 * sign, -0.002, 1.192), 0.083, 0.085, {upper_bone: 0.80, forearm_bone: 0.20}),
                 ],
                 "TEAM_Secondary",
                 28,
@@ -1059,14 +1059,14 @@ def build_uniform():
         weighted_chain_part(
             "Uniform_PelvisBlend",
             [
-                ((0.0, 0.012, 1.112), 0.206, 0.128, {"hips": 1.0}),
-                ((0.0, 0.012, 1.040), 0.212, 0.133, {"hips": 1.0}),
-                ((0.0, 0.012, 1.000), 0.214, 0.134, {"hips": 1.0}),
-                ((0.0, 0.012, 0.962), 0.214, 0.135, {"hips": 1.0}),
-                ((0.0, 0.011, 0.928), 0.212, 0.133, {"hips": 0.94, "thigh.L": 0.03, "thigh.R": 0.03}),
-                ((0.0, 0.010, 0.895), 0.208, 0.131, {"hips": 0.86, "thigh.L": 0.07, "thigh.R": 0.07}),
-                ((0.0, 0.008, 0.845), 0.194, 0.124, {"hips": 0.60, "thigh.L": 0.20, "thigh.R": 0.20}),
-                ((0.0, 0.006, 0.800), 0.168, 0.112, {"hips": 0.40, "thigh.L": 0.30, "thigh.R": 0.30}),
+                ((0.0, 0.012, 1.112), 0.196, 0.123, {"hips": 1.0}),
+                ((0.0, 0.012, 1.040), 0.201, 0.127, {"hips": 1.0}),
+                ((0.0, 0.012, 1.000), 0.202, 0.128, {"hips": 1.0}),
+                ((0.0, 0.012, 0.962), 0.202, 0.129, {"hips": 1.0}),
+                ((0.0, 0.011, 0.928), 0.200, 0.127, {"hips": 0.94, "thigh.L": 0.03, "thigh.R": 0.03}),
+                ((0.0, 0.010, 0.895), 0.197, 0.125, {"hips": 0.86, "thigh.L": 0.07, "thigh.R": 0.07}),
+                ((0.0, 0.008, 0.845), 0.184, 0.119, {"hips": 0.60, "thigh.L": 0.20, "thigh.R": 0.20}),
+                ((0.0, 0.006, 0.800), 0.160, 0.107, {"hips": 0.40, "thigh.L": 0.30, "thigh.R": 0.30}),
             ],
             "MAT_Pants",
             28,
@@ -1113,23 +1113,23 @@ def build_uniform():
             weighted_chain_part(
                 "Uniform_LegBlend_" + side,
                 [
-                    ((0.108 * sign, 0.010, 0.960), 0.112, 0.110, {"hips": 0.80, thigh: 0.20}),
-                    ((0.126 * sign, 0.009, 0.905), 0.126, 0.124, {"hips": 0.60, thigh: 0.40}),
-                    ((0.134 * sign, 0.008, 0.858), 0.134, 0.132, {"hips": 0.42, thigh: 0.58}),
-                    ((0.140 * sign, 0.008, 0.778), 0.138, 0.134, {"hips": 0.10, thigh: 0.90}),
-                    ((0.140 * sign, 0.007, 0.735), 0.134, 0.131, {thigh: 1.0}),
-                    ((0.140 * sign, 0.006, 0.692), 0.128, 0.126, {thigh: 1.0}),
-                    ((0.140 * sign, 0.005, 0.640), 0.121, 0.119, {thigh: 0.85, shin: 0.15}),
-                    ((0.140 * sign, -0.008, 0.610), 0.117, 0.116, {thigh: 0.70, shin: 0.30}),
-                    ((0.140 * sign, -0.004, 0.585), 0.113, 0.112, {thigh: 0.52, shin: 0.48}),
-                    ((0.140 * sign, 0.004, 0.556), 0.109, 0.109, {thigh: 0.25, shin: 0.75}),
-                    ((0.140 * sign, 0.010, 0.510), 0.105, 0.108, {shin: 1.0}),
-                    ((0.140 * sign, 0.014, 0.462), 0.103, 0.108, {shin: 1.0}),
-                    ((0.140 * sign, 0.010, 0.415), 0.098, 0.103, {shin: 1.0}),
-                    ((0.140 * sign, 0.002, 0.352), 0.089, 0.093, {shin: 1.0}),
-                    ((0.140 * sign, -0.003, 0.268), 0.081, 0.085, {shin: 1.0}),
-                    ((0.140 * sign, -0.007, 0.214), 0.078, 0.082, {shin: 0.75, foot: 0.25}),
-                    ((0.140 * sign, -0.018, 0.158), 0.076, 0.080, {shin: 0.30, foot: 0.70}),
+                    ((0.108 * sign, 0.010, 0.960), 0.104, 0.102, {"hips": 0.80, thigh: 0.20}),
+                    ((0.126 * sign, 0.009, 0.905), 0.114, 0.112, {"hips": 0.60, thigh: 0.40}),
+                    ((0.134 * sign, 0.008, 0.858), 0.120, 0.118, {"hips": 0.42, thigh: 0.58}),
+                    ((0.140 * sign, 0.008, 0.778), 0.122, 0.120, {"hips": 0.10, thigh: 0.90}),
+                    ((0.140 * sign, 0.007, 0.735), 0.119, 0.117, {thigh: 1.0}),
+                    ((0.140 * sign, 0.006, 0.692), 0.115, 0.113, {thigh: 1.0}),
+                    ((0.140 * sign, 0.005, 0.640), 0.109, 0.108, {thigh: 0.85, shin: 0.15}),
+                    ((0.140 * sign, -0.008, 0.610), 0.106, 0.105, {thigh: 0.70, shin: 0.30}),
+                    ((0.140 * sign, -0.004, 0.585), 0.103, 0.102, {thigh: 0.52, shin: 0.48}),
+                    ((0.140 * sign, 0.004, 0.556), 0.099, 0.100, {thigh: 0.25, shin: 0.75}),
+                    ((0.140 * sign, 0.010, 0.510), 0.096, 0.099, {shin: 1.0}),
+                    ((0.140 * sign, 0.014, 0.462), 0.095, 0.099, {shin: 1.0}),
+                    ((0.140 * sign, 0.010, 0.415), 0.091, 0.095, {shin: 1.0}),
+                    ((0.140 * sign, 0.002, 0.352), 0.084, 0.088, {shin: 1.0}),
+                    ((0.140 * sign, -0.003, 0.268), 0.077, 0.081, {shin: 1.0}),
+                    ((0.140 * sign, -0.007, 0.214), 0.074, 0.078, {shin: 0.75, foot: 0.25}),
+                    ((0.140 * sign, -0.018, 0.158), 0.072, 0.076, {shin: 0.30, foot: 0.70}),
                 ],
                 "MAT_Pants",
                 28,
@@ -1695,18 +1695,40 @@ def solve_hand_targets(targets):
 
 
 def solve_foot_targets(targets):
-    """Bake three-bone leg IK while keeping planted toes in armature space."""
+    """Bake stable two-bone leg IK, then author the shoe orientation.
+
+    The previous solve ended its three-bone chain at the foot tail. Position
+    alone left the foot's roll unconstrained, so Blender could satisfy an
+    otherwise good stride target with the support cleat balanced on its heel
+    or outer edge.  We now solve thigh + shin to the derived ankle, then place
+    the foot in an explicit armature-space orientation.  ``target`` remains
+    the toe-base point so planted-foot telemetry and existing action data keep
+    the same semantic contract.
+    """
 
     helpers = []
     constraints = []
     affected = []
+    foot_orientations = {}
     for side in ("L", "R"):
         specification = targets.get(side)
         if specification is None:
             continue
         sign = 1.0 if side == "L" else -1.0
+        foot_name = "foot." + side
+        shin_name = "shin." + side
+        rest_foot = RIG.data.bones[foot_name]
+        rotation = Euler(
+            tuple(float(value) * DEG for value in specification.get("rotation", (0.0, 0.0, 0.0))),
+            "XYZ",
+        ).to_matrix()
+        rest_vector = rest_foot.tail_local - rest_foot.head_local
+        desired_vector = rotation @ rest_vector
+        toe_target = Vector(tuple(float(value) for value in specification["target"]))
+        ankle_target = toe_target - desired_vector
+
         target = bpy.data.objects.new("__IK_Foot_Target_" + side, None)
-        target.location = tuple(float(value) for value in specification["target"])
+        target.location = ankle_target
         bpy.context.collection.objects.link(target)
         pole = bpy.data.objects.new("__IK_Foot_Pole_" + side, None)
         default_pole = (0.48 * sign, -0.58, 0.66)
@@ -1714,30 +1736,42 @@ def solve_foot_targets(targets):
         bpy.context.collection.objects.link(pole)
         helpers.extend((target, pole))
 
-        foot = RIG.pose.bones["foot." + side]
-        constraint = foot.constraints.new("IK")
+        shin = RIG.pose.bones[shin_name]
+        constraint = shin.constraints.new("IK")
         constraint.name = "__BAKE_FOOT_TARGET__"
         constraint.target = target
         constraint.pole_target = pole
-        constraint.chain_count = 3
+        constraint.chain_count = 2
         constraint.iterations = 128
         constraint.use_tail = True
         constraint.pole_angle = float(specification.get("pole_angle", 0.0)) * DEG
-        constraints.append((foot, constraint))
-        affected.extend(("thigh." + side, "shin." + side, "foot." + side))
+        constraints.append((shin, constraint))
+        affected.extend(("thigh." + side, shin_name))
+        foot_orientations[side] = rotation
 
     bpy.context.view_layer.update()
     matrices = {name: RIG.pose.bones[name].matrix.copy() for name in affected}
-    for foot, constraint in constraints:
-        foot.constraints.remove(constraint)
+    for shin, constraint in constraints:
+        shin.constraints.remove(constraint)
     bpy.context.view_layer.update()
 
-    for segment in ("thigh", "shin", "foot"):
+    for segment in ("thigh", "shin"):
         for side in ("L", "R"):
             name = segment + "." + side
             if name in matrices:
                 RIG.pose.bones[name].matrix = matrices[name]
                 bpy.context.view_layer.update()
+
+    # Keep each sole orientation deterministic after the knee solve.  The
+    # delta is expressed in armature space so pitch means the same thing on
+    # both sides and no mirrored roll can sneak into a planted frame.
+    for side, rotation in foot_orientations.items():
+        foot_name = "foot." + side
+        rest_matrix = RIG.data.bones[foot_name].matrix_local.copy()
+        desired_matrix = (rotation @ rest_matrix.to_3x3()).to_4x4()
+        desired_matrix.translation = RIG.pose.bones["shin." + side].tail
+        RIG.pose.bones[foot_name].matrix = desired_matrix
+        bpy.context.view_layer.update()
     for helper in helpers:
         bpy.data.objects.remove(helper, do_unlink=True)
 
@@ -1875,10 +1909,17 @@ def build_actions():
             "R": {"target": right, "pole": right_pole},
         }
 
-    def feet(left, right=(-0.14, -0.22, 0.075), left_pole=(0.48, -0.58, 0.66), right_pole=(-0.48, -0.30, 0.66)):
+    def feet(
+        left,
+        right=(-0.14, -0.22, 0.075),
+        left_pole=(0.48, -0.58, 0.66),
+        right_pole=(-0.48, -0.30, 0.66),
+        left_rotation=(0.0, 0.0, 0.0),
+        right_rotation=(0.0, 0.0, 0.0),
+    ):
         return {
-            "L": {"target": left, "pole": left_pole},
-            "R": {"target": right, "pole": right_pole},
+            "L": {"target": left, "pole": left_pole, "rotation": left_rotation},
+            "R": {"target": right, "pole": right_pole, "rotation": right_rotation},
         }
 
     def build_pitch_action():
@@ -1923,7 +1964,7 @@ def build_actions():
                             (-0.04, -0.29, 1.32),
                             right_pole=(-0.72, -0.14, 1.44),
                         ),
-                        "_foot_targets": feet((0.14, -0.12, 0.30)),
+                        "_foot_targets": feet((0.14, -0.12, 0.30), left_rotation=(10.0, 0.0, 0.0)),
                     },
                 ),
                 (
@@ -1939,7 +1980,7 @@ def build_actions():
                             (-0.03, -0.29, 1.32),
                             right_pole=(-0.74, -0.12, 1.46),
                         ),
-                        "_foot_targets": feet((0.14, -0.08, 0.68)),
+                        "_foot_targets": feet((0.14, -0.08, 0.68), left_rotation=(18.0, 0.0, 0.0)),
                     },
                 ),
                 (
@@ -1955,7 +1996,7 @@ def build_actions():
                             (-0.32, -0.02, 1.30),
                             right_pole=(-0.78, -0.05, 1.48),
                         ),
-                        "_foot_targets": feet((0.14, -0.18, 0.58)),
+                        "_foot_targets": feet((0.14, -0.18, 0.58), left_rotation=(14.0, 0.0, 0.0)),
                     },
                 ),
                 (
@@ -1971,13 +2012,13 @@ def build_actions():
                             (-0.45, 0.10, 1.40),
                             right_pole=(-0.80, -0.02, 1.50),
                         ),
-                        "_foot_targets": feet((0.15, -0.45, 0.28)),
+                        "_foot_targets": feet((0.15, -0.45, 0.28), left_rotation=(-6.0, 0.0, 0.0)),
                     },
                 ),
                 (
                     24,
                     {
-                        "_root_location": (0.0, -0.018, 0.125),
+                        "_root_location": (0.0, -0.035, 0.125),
                         "hips": (5.0, 4.0, 0.0),
                         "spine": (4.0, -8.0, -1.0),
                         "chest": (3.0, -10.0, -1.0),
@@ -1987,13 +2028,13 @@ def build_actions():
                             (-0.50, 0.08, 1.54),
                             right_pole=(-0.79, -0.07, 1.54),
                         ),
-                        "_foot_targets": feet((0.16, -0.72, 0.075)),
+                        "_foot_targets": feet((0.16, -0.64, 0.075), right_rotation=(2.0, 0.0, 0.0)),
                     },
                 ),
                 (
                     25,
                     {
-                        "_root_location": (0.0, -0.024, 0.145),
+                        "_root_location": (0.0, -0.045, 0.145),
                         "hips": (5.5, 8.0, 0.0),
                         "spine": (4.5, -5.0, -1.0),
                         "chest": (4.0, -8.0, -1.0),
@@ -2003,13 +2044,13 @@ def build_actions():
                             (-0.48, 0.02, 1.63),
                             right_pole=(-0.78, -0.11, 1.57),
                         ),
-                        "_foot_targets": feet((0.16, -0.72, 0.075)),
+                        "_foot_targets": feet((0.16, -0.64, 0.075), right_rotation=(4.0, 0.0, 0.0)),
                     },
                 ),
                 (
                     26,
                     {
-                        "_root_location": (0.0, -0.030, 0.165),
+                        "_root_location": (0.0, -0.052, 0.165),
                         "hips": (6.0, 12.0, 0.0),
                         "spine": (5.0, -2.0, -1.0),
                         "chest": (5.0, -5.0, -1.0),
@@ -2019,13 +2060,13 @@ def build_actions():
                             (-0.44, -0.03, 1.72),
                             right_pole=(-0.76, -0.15, 1.60),
                         ),
-                        "_foot_targets": feet((0.16, -0.72, 0.075)),
+                        "_foot_targets": feet((0.16, -0.64, 0.075), right_rotation=(7.0, 0.0, 0.0)),
                     },
                 ),
                 (
                     27,
                     {
-                        "_root_location": (0.0, -0.036, 0.190),
+                        "_root_location": (0.0, -0.058, 0.190),
                         "hips": (6.0, 15.0, 1.0),
                         "spine": (7.0, 2.0, 0.0),
                         "chest": (8.0, 4.0, 0.0),
@@ -2035,13 +2076,13 @@ def build_actions():
                             (-0.32, -0.36, 1.68),
                             right_pole=(-0.70, -0.32, 1.59),
                         ),
-                        "_foot_targets": feet((0.16, -0.72, 0.075)),
+                        "_foot_targets": feet((0.16, -0.64, 0.075), right_rotation=(10.0, 0.0, 0.0)),
                     },
                 ),
                 (
                     28,
                     {
-                        "_root_location": (0.0, -0.042, 0.215),
+                        "_root_location": (0.0, -0.062, 0.215),
                         "hips": (7.0, 18.0, 1.0),
                         "spine": (9.0, 8.0, 1.0),
                         "chest": (12.0, 12.0, 1.0),
@@ -2051,13 +2092,13 @@ def build_actions():
                             (-0.08, -1.22, 1.56),
                             right_pole=(-0.62, -0.55, 1.55),
                         ),
-                        "_foot_targets": feet((0.16, -0.72, 0.075)),
+                        "_foot_targets": feet((0.16, -0.64, 0.075), right_rotation=(14.0, 0.0, 0.0)),
                     },
                 ),
                 (
                     29,
                     {
-                        "_root_location": (0.0, -0.045, 0.230),
+                        "_root_location": (0.0, -0.065, 0.230),
                         "hips": (8.0, 20.0, 1.0),
                         "spine": (10.0, 10.0, 1.0),
                         "chest": (14.0, 14.0, 1.0),
@@ -2067,13 +2108,13 @@ def build_actions():
                             (0.02, -1.36, 1.40),
                             right_pole=(-0.45, -0.72, 1.43),
                         ),
-                        "_foot_targets": feet((0.16, -0.72, 0.075)),
+                        "_foot_targets": feet((0.16, -0.64, 0.075), right_rotation=(20.0, 0.0, 0.0)),
                     },
                 ),
                 (
                     34,
                     {
-                        "_root_location": (0.0, -0.032, 0.205),
+                        "_root_location": (0.0, -0.052, 0.205),
                         "hips": (12.0, 24.0, 1.0),
                         "spine": (14.0, 14.0, 1.0),
                         "chest": (18.0, 14.0, 1.0),
@@ -2084,16 +2125,17 @@ def build_actions():
                             right_pole=(-0.05, -0.55, 1.15),
                         ),
                         "_foot_targets": feet(
-                            (0.16, -0.72, 0.075),
+                            (0.16, -0.64, 0.075),
                             (-0.12, -0.15, 0.50),
                             right_pole=(-0.45, -0.38, 0.72),
+                            right_rotation=(20.0, 0.0, 0.0),
                         ),
                     },
                 ),
                 (
                     39,
                     {
-                        "_root_location": (0.0, -0.012, 0.115),
+                        "_root_location": (0.0, -0.025, 0.115),
                         "hips": (8.0, 20.0, 1.0),
                         "spine": (8.0, 10.0, 1.0),
                         "chest": (8.0, 8.0, 1.0),
@@ -2107,6 +2149,7 @@ def build_actions():
                             (0.14, -0.64, 0.075),
                             (-0.12, -0.38, 0.18),
                             right_pole=(-0.45, -0.56, 0.58),
+                            right_rotation=(12.0, 0.0, 0.0),
                         ),
                     },
                 ),
@@ -2125,8 +2168,8 @@ def build_actions():
                             right_pole=(-0.66, -0.18, 1.10),
                         ),
                         "_foot_targets": feet(
-                            (0.18, -0.30, 0.075),
-                            (-0.18, -0.22, 0.075),
+                            (0.14, -0.54, 0.075),
+                            (-0.13, -0.31, 0.075),
                             left_pole=(0.50, -0.55, 0.62),
                             right_pole=(-0.50, -0.34, 0.60),
                         ),
@@ -2543,7 +2586,8 @@ def build_actions():
                     "hips": (0.0, -12.0, 0.0),
                     "chest": (0.0, -24.0, -2.0),
                     "head": (0.0, 20.0, 1.0),
-                    "_hand_targets": {"L": {"target": (-0.14, -0.20, 1.40)}, "R": {"target": (-0.22, -0.18, 1.43)}},
+                    "_hand_targets": hands((-0.21, -0.19, 1.37), (-0.29, -0.16, 1.40)),
+                    "_foot_targets": feet((0.16, -0.28, 0.075), (-0.18, -0.18, 0.075)),
                 },
             ),
             (
@@ -2555,7 +2599,8 @@ def build_actions():
                     "head": (0.0, 40.0, 3.0),
                     "thigh.L": (-12.0, 0.0, 0.0),
                     "thigh.R": (8.0, 0.0, 0.0),
-                    "_hand_targets": {"L": {"target": (-0.18, -0.15, 1.42)}, "R": {"target": (-0.26, -0.13, 1.45)}},
+                    "_hand_targets": hands((-0.23, -0.14, 1.40), (-0.32, -0.11, 1.43)),
+                    "_foot_targets": feet((0.16, -0.28, 0.075), (-0.18, -0.18, 0.075)),
                 },
             ),
             (
@@ -2567,7 +2612,8 @@ def build_actions():
                     "head": (-1.0, -10.0, -1.0),
                     "thigh.L": (10.0, 0.0, 0.0),
                     "thigh.R": (-8.0, 0.0, 0.0),
-                    "_hand_targets": {"L": {"target": (-0.08, -0.34, 1.30)}, "R": {"target": (-0.15, -0.34, 1.32)}},
+                    "_hand_targets": hands((-0.08, -0.34, 1.30), (-0.15, -0.34, 1.32)),
+                    "_foot_targets": feet((0.18, -0.36, 0.075), (-0.18, -0.18, 0.075)),
                 },
             ),
             (
@@ -2580,7 +2626,8 @@ def build_actions():
                     "head": (-4.0, -48.0, -4.0),
                     "thigh.L": (20.0, 0.0, 0.0),
                     "thigh.R": (-22.0, 0.0, 0.0),
-                    "_hand_targets": {"L": {"target": (0.10, -0.46, 1.22)}, "R": {"target": (0.03, -0.48, 1.23)}},
+                    "_hand_targets": hands((0.10, -0.46, 1.22), (0.03, -0.48, 1.23)),
+                    "_foot_targets": feet((0.20, -0.48, 0.075), (-0.18, -0.18, 0.075), right_rotation=(8.0, 0.0, 0.0)),
                 },
             ),
             (
@@ -2593,7 +2640,8 @@ def build_actions():
                     "head": (-8.0, -76.0, -6.0),
                     "thigh.L": (18.0, 0.0, 0.0),
                     "thigh.R": (-18.0, 0.0, 0.0),
-                    "_hand_targets": {"L": {"target": (0.30, -0.18, 1.43)}, "R": {"target": (0.24, -0.21, 1.46)}},
+                    "_hand_targets": hands((0.30, -0.18, 1.43), (0.24, -0.21, 1.46)),
+                    "_foot_targets": feet((0.22, -0.50, 0.075), (-0.16, -0.16, 0.075), right_rotation=(18.0, 0.0, 0.0)),
                 },
             ),
             (
@@ -2603,7 +2651,8 @@ def build_actions():
                     "spine": (5.0, 24.0, 2.0),
                     "chest": (8.0, 32.0, 3.0),
                     "head": (-4.0, -20.0, -2.0),
-                    "_hand_targets": {"L": {"target": (0.15, -0.19, 1.25)}, "R": {"target": (0.08, -0.20, 1.27)}},
+                    "_hand_targets": hands((0.15, -0.19, 1.25), (0.08, -0.20, 1.27)),
+                    "_foot_targets": feet((0.18, -0.38, 0.075), (-0.16, -0.18, 0.075), right_rotation=(6.0, 0.0, 0.0)),
                 },
             ),
         ],

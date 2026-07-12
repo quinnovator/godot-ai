@@ -4,13 +4,14 @@
 and jersey identity. The production athlete GLB remains an invariant base: 31
 bones, eight logical skinned meshes, nine native actions, and the same gameplay
 sockets. Equipment is assembled from engine-native meshes sized to the
-anatomical head, plus jersey identity built as stitched tackle-twill
-geometry: authored varsity block glyph outlines (0-9 and A-Z, no font
-rendering anywhere) extruded into a raised team-primary fill layer over a
-secondary border layer, wrapped around the measured torso ellipse a few
-millimetres proud of the cloth, and shaded with the CC0 knit fabric normal
-map -- exactly how sewn-on pro uniform lettering is constructed. Everything
-is attached to semantic bones by `BallplayerActor`.
+anatomical head, plus jersey identity built as stitched tackle-twill vector
+geometry. Runtime text is converted from the OFL-licensed Graduate collegiate
+font into real `TextMesh` contours, with a raised team-primary fill over a
+secondary border. Every glyph is independently wrapped and tangent-aligned to
+the measured torso ellipse, stands a few millimetres proud of the cloth, and
+uses the knit fabric normal map. This keeps the team mark, surname, and number
+fully programmable without reducing them to flat billboards. Everything is
+attached to semantic bones by `BallplayerActor`.
 
 Top-level pieces are first positioned in the actor's neutral coordinate space
 and reparented to `BoneAttachment3D` nodes with their world transform
@@ -23,12 +24,13 @@ all imported clips.
 | `helmet=true` (batter by default) | team-colored helmet, brim, ear flap, padding, stripe |
 | `role=catcher` | mask, plated chest protector, left/right shin guards |
 | `role=umpire` | neutral cage mask and padded protector |
-| player roles | front team mark, front number, large back number |
+| player roles | front team mark, front number, curved back surname, large back number |
 
 All colored meshes share per-actor local materials. `set_uniform_colors()`
 updates the base GLB and role gear together, restyling the lettering in the
-new palette; `set_team_mark()` updates the live front glyph. Identity pieces
-are restyled in place, so bone attachment and handedness-mirroring
+new palette; `set_team_mark()`, `set_player_name()`, and
+`set_jersey_number()` update the live identity. Identity pieces are rebuilt in
+place, so bone attachment and handedness-mirroring
 correction survive every palette or identity change. The actor's existing
 `bat` and `glove` rules remain authoritative. The imported cap is hidden only
 when a helmet or role mask replaces it.
@@ -40,8 +42,8 @@ bin/godot.macos.editor.dev.arm64 --headless --path games/pixiball \
   --script res://characters/tests/test_ballplayer_equipment.gd
 ```
 
-The contract covers one- and two-digit numbers, role piece sets, bone
-attachment, animated following, palette propagation, live marks, and unchanged
-bat/glove/cap visibility. `character_gallery.tscn` is the visual QA surface for
+The contract covers one- and two-digit numbers, surname extraction, role piece
+sets, bone attachment, animated following, palette propagation, live identity
+updates, and unchanged bat/glove/cap visibility. `character_gallery.tscn` is the visual QA surface for
 pitcher, batter, catcher, umpire, fielder, and sliding runner variants across
 the complete native action cycle.

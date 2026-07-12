@@ -1,7 +1,7 @@
 extends SceneTree
 ## Captures deterministic in-engine review renders of the production
-## ballplayer, including the cel-banded surface shader and the pixel-glyph
-## team identity that only exist at runtime (the Blender QA renders cannot
+## ballplayer, including the cel-banded surface shader and vector-twill team
+## identity that only exist at runtime (the Blender QA renders cannot
 ## show either). Run WITHOUT --headless so the viewport renders:
 ##
 ##   godot --path games/pixiball \
@@ -56,6 +56,7 @@ func _run() -> void:
 		"seed": 2,
 		"role": "pitcher",
 		"number": 27,
+		"player_name": "Maya Rodriguez",
 		"mark": "P",
 		"build": "balanced",
 		"throws": "right",
