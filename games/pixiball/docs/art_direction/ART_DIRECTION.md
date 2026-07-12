@@ -49,12 +49,11 @@ socket, gameplay geometry, and mood contracts.
 
 - Athletic, stylized proportions with readable shoulders, ribcage, pelvis,
   elbows, knees, calves, hands, and feet.
-- The head is the professionally sculpted CC0 realistic animation head from
-  Blender Studio's Human Base Meshes bundle, registered onto the rig's eye
-  targets, with its layered sclera/iris eyes, added pupils, and brow chains
-  anchored to the sculpted ridge. Its neck rim hides under the undershirt
-  mock-collar. No generic sphere head, no decal faces, and no floating
-  feature boxes that flash or separate during turns.
+- The complete anatomical base is the professionally sculpted CC0 realistic
+  male body from Blender Studio's Human Base Meshes bundle, modified and
+  weighted in the production Blender source. Preserve its modeled face,
+  sclera/iris/pupil stack, hands, feet, and natural joint landmarks. No generic
+  sphere head, decal face, or floating feature boxes.
 - Continuous deformation at every major joint with enough topology to hold
   pitching, batting, catching, sliding, and running silhouettes.
 - Pitching must preserve a stable head and gaze, pelvis-before-shoulders
@@ -64,13 +63,10 @@ socket, gameplay geometry, and mood contracts.
 - Faces remain calm during exertion: a closed mouth, restrained brow
   movement, and no expression morphing between keys. Avoid exposed teeth and
   face intersections.
-- Surfaces are physically based: subsurface-weighted skin with a warm
-  fresnel scatter approximation, polyester double-knit weave, oiled leather
-  grain, lacquered maple, and brushed steel, layered as procedural
-  micro-detail over Burley/GGX response. Proportions are naturalistic
-  (roughly 7.7 heads at a 1.89 m nominal height) with muscle bellies and
-  cloth drape authored into the deforming ring surfaces at subdivision
-  density.
+- Surfaces are physically based: authored skin, knit normal/roughness maps,
+  oiled leather, lacquered maple, and brushed steel exported from Blender.
+  Proportions are naturalistic at a 1.84 m nominal height, with a slim athletic
+  torso and cloth drape modeled into the skinned garment surfaces.
 - Authored jersey collar, team-piped button placket, raglan sleeves, belt
   and loops, striped team stirrup socks, wristbands, cleat laces/studs, cap
   seams and embroidered monogram, glove webbing, and bat grip. Cloth must
@@ -81,7 +77,7 @@ socket, gameplay geometry, and mood contracts.
   single-sided, and correct negative-scale handedness so the glyphs are
   never mirrored.
 - Keep the 31-bone armature, nine native actions, marker frames, semantic
-  sockets, eight logical mesh categories, team material slots, handedness, and
+  sockets, 35 authored mesh objects, team material slots, handedness, and
   grounded bounds intact unless a contract and its tests are deliberately
   versioned together.
 

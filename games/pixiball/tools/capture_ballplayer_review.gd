@@ -1,8 +1,8 @@
 extends SceneTree
 ## Captures deterministic in-engine review renders of the production
-## ballplayer, including the cel-banded surface shader and vector-twill team
-## identity that only exist at runtime (the Blender QA renders cannot
-## show either). Run WITHOUT --headless so the viewport renders:
+## ballplayer, including the per-team PBR palette and viewport-rendered roster
+## identity that only exist at runtime (the Blender QA renders cannot show
+## either). Run WITHOUT --headless so the viewport renders:
 ##
 ##   godot --path games/pixiball \
 ##     --script res://tools/capture_ballplayer_review.gd -- --output-dir DIR
@@ -68,8 +68,8 @@ func _run() -> void:
 		"pants_color": Color("ead8c3"),
 	})
 	stage.add_child(actor)
-	if actor.is_using_fallback():
-		_failures.append("actor selected the voxel fallback; nothing to review")
+	if actor.get_model_kind() != "rigged_glb":
+		_failures.append("authored Blender actor did not load; nothing to review")
 
 	for shot in REVIEW_SHOTS:
 		camera.position = shot["camera"] as Vector3

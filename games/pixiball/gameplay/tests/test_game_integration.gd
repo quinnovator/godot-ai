@@ -19,13 +19,13 @@ func _run() -> void:
 	_check(game._plate_pitch_world(Vector2(0.0, 1.5)).is_equal_approx(game.broadcast_camera.plate_location_world(0.0, 1.5)), "pitch endpoint and projected strike zone must share one world mapping")
 	_check(game.batter is BallplayerActor, "playable batter should use BallplayerActor")
 	_check(game.batter.get_model_kind() == "rigged_glb", "playable batter should load the rigged GLB")
-	_check(not game.batter.is_using_fallback(), "playable batter unexpectedly selected voxel fallback")
+	_check(not game.batter.is_using_fallback(), "playable batter did not load the Blender model")
 	_check(game.batter.get_socket_node("bat_grip") != null, "playable batter should expose its imported bat socket")
 	for defender_value in game.defenders.values():
 		var defender := defender_value as BallplayerActor
 		_check(defender != null, "every playable defender should use BallplayerActor")
 		if defender != null:
-			_check(not defender.is_using_fallback(), "playable defender unexpectedly selected voxel fallback")
+			_check(not defender.is_using_fallback(), "playable defender did not load the Blender model")
 	_check(game._validate_agent_intent("start_match", {"seed": 4242.0, "innings": 1.0}).is_empty(), "JSON-RPC integral floats should satisfy integer fields")
 	_check(game._validate_agent_intent("select_pitcher", {"index": 1.0}).is_empty(), "JSON-RPC integral pitcher index should be accepted")
 	_check(game._validate_agent_intent("select_pitch", {"slot": 5.0}).is_empty(), "JSON-RPC integral pitch slot should be accepted")

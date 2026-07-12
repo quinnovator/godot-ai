@@ -2,16 +2,19 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c3e0uf2pdqwas"
-path="res://.godot/imported/double_knit_albedo.png-d7392e94c4228b2ef05fd80aca6d07d4.ctex"
+uid="uid://cm22gssxr23rn"
+path="res://.godot/imported/ballplayer_cotton_jersey_nor_gl_1k.jpg-da3c2b3ebf79676d40204118a2c122f7.ctex"
 metadata={
 "vram_texture": false
+}
+generator_parameters={
+"md5": "df0793c596023e59b7ada30026f269c8"
 }
 
 [deps]
 
-source_file="res://assets/textures/uniform/double_knit_albedo.png"
-dest_files=["res://.godot/imported/double_knit_albedo.png-d7392e94c4228b2ef05fd80aca6d07d4.ctex"]
+source_file="res://assets/models/ballplayer/ballplayer_cotton_jersey_nor_gl_1k.jpg"
+dest_files=["res://.godot/imported/ballplayer_cotton_jersey_nor_gl_1k.jpg-da3c2b3ebf79676d40204118a2c122f7.ctex"]
 
 [params]
 

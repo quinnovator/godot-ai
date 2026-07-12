@@ -54,27 +54,26 @@ The following are new or rebuilt assets and systems for this repository:
   shader, broadcast cameras, synthesized audio, particles, and pitch-intel
   presentation. The UI remains a native Godot implementation but now ports the
   Unreal Slate layout, typography, palette, and interaction states directly.
-- `assets/models/ballplayer/ballplayer.glb`, its Blender 5.1.2 `.blend` source,
-  deterministic Python recipe, animations, build receipt, and QA renderer.
-  The head and layered eye meshes come from the CC0 (public domain) Blender
-  Studio "Human Base Meshes" bundle (realistic animation head), vendored as
-  `assets/models/ballplayer/source/cc0_head_base.blend` and fitted/re-weighted
-  by the recipe; the asset does not attempt a real-player likeness. All other
-  geometry is procedurally sculpted inside the recipe.
+- `assets/models/ballplayer/ballplayer.glb`, its authored Blender 5.1.2 `.blend`
+  source, animations, export metadata, and QA renderer. The complete base body,
+  face, and layered eyes derive from Blender Studio's CC0 (public-domain)
+  [Human Base Meshes bundle](https://download.blender.org/demo/bundles/bundles-3.6/).
+  They are modified, fitted, and re-weighted inside the checked-in Blender file.
+  The baseball uniform, cap, short hair, cleats, glove, bat, UV identity panels,
+  and role equipment are project-authored Blender meshes. The asset does not
+  attempt a real-player likeness.
 - `assets/textures/surface/` holds CC0 Poly Haven photogrammetry detail maps
   (cotton jersey knit, brown leather, fine-grained wood; see its
-  `LICENSES.md`), sampled triplanar as runtime micro-surface detail.
-- `assets/textures/uniform/double_knit_albedo.png` is a Codex built-in
-  image-generation output authored as a neutral, seamless, tintable runtime
-  textile tile. It contains no logo, lettering, player likeness, or source-game
-  artwork.
+  `LICENSES.md`). The Blender asset embeds the applicable cloth normal and
+  roughness maps in its exported PBR materials.
 - `assets/fonts/graduate/Graduate-Regular.ttf` comes from the official Google
   Fonts repository under SIL Open Font License 1.1; its license text is vendored
-  beside the font. Godot converts its vector contours into the runtime uniform
-  identity meshes.
-- `characters/ballplayer_actor.tscn` and the modular helmet, catcher, umpire,
-  team-mark, surname, and jersey-number equipment layer. These assets do not
-  use Unreal mesh or sprite geometry.
+  beside the font. Godot renders it into per-player viewport textures mapped to
+  the Blender-authored jersey identity surfaces.
+- `characters/ballplayer_actor.tscn` and its equipment selector. Helmet,
+  catcher, and umpire geometry is part of the Blender asset; runtime code only
+  selects imported meshes and updates team/roster materials. These assets do
+  not use Unreal mesh or sprite geometry.
 - Semantic haptic composition, portable Godot rumble, and the fork's bounded
   native DualSense/DualSense Edge adaptive-trigger API.
 - `docs/art_direction/references/pixiball-pitcher-delivery-sheet-v2.png` is a
@@ -88,7 +87,7 @@ The following are new or rebuilt assets and systems for this repository:
 - Unreal sprite sheets are preserved under `content/legacy/sprites/`; only two
   landing-screen mascot frames are loaded. Gameplay ballplayers remain 3D.
 - The Blender athlete does not derive geometry from an Unreal mesh or sprite
-  sheet. Its fallback is the repository's procedural `VoxelBallplayer`.
+  sheet, and there is no generated or voxel character fallback.
 
 ## Reproduce the current comparison
 

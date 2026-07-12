@@ -30,24 +30,31 @@ func _run() -> void:
 	_expect(_label_text(batter, "JerseyNumberFront") == "7", "one-digit jersey number was not preserved")
 	_expect(_label_text(batter, "JerseyNumberBack") == "7", "one-digit back number was not preserved")
 	_expect(_label_text(batter, "JerseyNameBack") == "OKAFOR", "surname was not extracted for the back nameplate")
-	_expect_identity_label(batter, "TeamMark", Vector3.FORWARD)
-	_expect_identity_label(batter, "JerseyNumberFront", Vector3.FORWARD, 0.085, 0.105)
-	_expect_identity_label(batter, "JerseyNumberBack", Vector3.BACK, 0.18, 0.21)
-	_expect_identity_label(batter, "JerseyNameBack", Vector3.BACK, 0.04, 0.06)
+	_expect_identity_label(batter, "TeamMark", "front")
+	_expect_identity_label(batter, "JerseyNumberFront", "front")
+	_expect_identity_label(batter, "JerseyNumberBack", "back")
+	_expect_identity_label(batter, "JerseyNameBack", "back")
+	_expect_identity_surface(batter, "JerseyIdentityFront")
+	_expect_identity_surface(batter, "JerseyIdentityBack")
+	var equipment_meshes: Array[MeshInstance3D] = []
+	_collect_meshes(batter.get_node_or_null("Equipment"), equipment_meshes)
+	_expect(equipment_meshes.is_empty(), "equipment controller created runtime character geometry")
 	_expect(_mesh_visible(batter, "Bat_Skinned"), "batter lost imported bat visibility")
 	_expect(not _mesh_visible(batter, "Glove_Skinned"), "batter unexpectedly shows imported glove")
 	_expect(not _mesh_visible(batter, "Cap_Skinned"), "batting helmet did not replace imported cap")
-	_expect(_piece_is_bone_attached(batter, "BattingHelmet"), "batting helmet is not bone-attached")
+	_expect(_piece_is_blender_mesh(batter, "BattingHelmet", "Gear_BattingHelmet"), "batting helmet is not the authored Blender mesh")
 
 	var recolor := Color("245ca8")
 	batter.set_uniform_colors(recolor, Color("f5eee0"), Color("e5a333"))
-	_expect(_piece_material_color(batter, "BattingHelmet", "Equipment_Primary").is_equal_approx(recolor), "helmet did not follow the team palette")
+	_expect(_piece_material_color(batter, "BattingHelmet", "TEAM_Primary").is_equal_approx(recolor), "helmet did not follow the team palette")
 	batter.set_team_mark("R")
 	_expect(_label_text(batter, "TeamMark") == "R", "live team-mark update did not reach equipment")
 	batter.set_player_name("Nia Rodriguez")
 	batter.set_jersey_number(27)
 	_expect(_label_text(batter, "JerseyNameBack") == "RODRIGUEZ", "live player-name update did not reach equipment")
 	_expect(_label_text(batter, "JerseyNumberBack") == "27", "live jersey-number update did not reach equipment")
+	_expect(_canvas_label_text(batter, "JerseyIdentityBackViewport/BackIdentityCanvas/SurnameLabel") == "RODRIGUEZ", "back viewport did not redraw the live surname")
+	_expect(_canvas_label_text(batter, "JerseyIdentityBackViewport/BackIdentityCanvas/BackNumberLabel") == "27", "back viewport did not redraw the live number")
 
 	var catcher := _actor({
 		"seed": 12,
@@ -66,11 +73,15 @@ func _run() -> void:
 	_expect(_mesh_visible(catcher, "Glove_Skinned"), "catcher lost imported mitt visibility")
 	_expect(not _mesh_visible(catcher, "Bat_Skinned"), "catcher unexpectedly shows imported bat")
 	for piece_name in ["CatcherMask", "CatcherChestProtector", "CatcherShinGuardL", "CatcherShinGuardR"]:
-		_expect(_piece_is_bone_attached(catcher, piece_name), "%s is not bone-attached" % piece_name)
+		_expect(_piece_is_blender_mesh(catcher, piece_name, {
+			"CatcherMask": "Gear_CatcherMask",
+			"CatcherChestProtector": "Gear_CatcherChest",
+			"CatcherShinGuardL": "Gear_CatcherShinL",
+			"CatcherShinGuardR": "Gear_CatcherShinR",
+		}[piece_name]), "%s is not an authored skinned mesh" % piece_name)
 
 	var mask := catcher.get_equipment_piece("CatcherMask")
 	var mask_local := mask.transform
-	var mask_before := mask.global_transform
 	catcher.play_action("catch")
 	var catcher_player := _first_animation_player(catcher)
 	_expect(catcher_player != null, "catcher has no imported AnimationPlayer")
@@ -79,7 +90,7 @@ func _run() -> void:
 		catcher._physics_process(0.42)
 	await process_frame
 	_expect(mask.transform.is_equal_approx(mask_local), "catcher mask drifted from its attachment")
-	_expect(not mask.global_transform.is_equal_approx(mask_before), "catcher mask did not follow the animated head")
+	_expect(mask is MeshInstance3D and (mask as MeshInstance3D).skin != null, "catcher mask lost its shared skin during animation")
 
 	var umpire := _actor({
 		"seed": 9001,
@@ -132,7 +143,7 @@ func _run() -> void:
 	_expect(_label_text(switch_hitter, "JerseyNameBack") == "RIVERA", "hand switch changed the back jersey name")
 
 	if _failures.is_empty():
-		print("PIXIBALL_EQUIPMENT_OK batter=helmet catcher=4 umpire=2 identity=mark+name+number vector_twill=verified")
+		print("PIXIBALL_EQUIPMENT_OK blender_gear=verified identity=viewport_texture name+number=live")
 		quit(0)
 		return
 	for failure in _failures:
@@ -161,27 +172,28 @@ func _label_text(actor: BallplayerActor, piece_name: String) -> String:
 	return String(piece.get_meta("identity_text", ""))
 
 
-func _expect_identity_label(actor: BallplayerActor, piece_name: String, _outward: Vector3, minimum_height := 0.0, maximum_height := INF) -> void:
+func _expect_identity_label(actor: BallplayerActor, piece_name: String, surface_name: String) -> void:
 	var piece := actor.get_equipment_piece(piece_name) as Node3D
 	_expect(is_instance_valid(piece), "%s identity lettering is missing" % piece_name)
 	if not is_instance_valid(piece):
 		return
-	_expect(String(piece.get_meta("identity_style", "")) == "graduate_vector_twill", "%s did not use the vector twill system" % piece_name)
-	var meshes: Array[MeshInstance3D] = []
-	_collect_meshes(piece, meshes)
-	_expect(meshes.size() >= 2, "%s is not layered tackle-twill (border + fill)" % piece_name)
-	var has_border := false
-	var has_fill := false
-	for mesh_instance in meshes:
-		has_border = has_border or mesh_instance.name == "TwillBorder"
-		has_fill = has_fill or mesh_instance.name == "TwillFill"
-		if mesh_instance.mesh != null:
-			var material := mesh_instance.mesh.surface_get_material(0) as StandardMaterial3D
-			_expect(material != null and material.normal_texture != null, "%s twill layer lacks the stitched fabric response" % piece_name)
-	_expect(has_border and has_fill, "%s lacks a fill or contrast border layer" % piece_name)
+	_expect(String(piece.get_meta("identity_style", "")) == "screen_printed_viewport_texture", "%s did not use the roster texture system" % piece_name)
+	_expect(String(piece.get_meta("identity_surface", "")) == surface_name, "%s targets the wrong Blender UV surface" % piece_name)
+	_expect(piece.get_child_count() == 0, "%s created runtime identity geometry" % piece_name)
 	_expect(piece.global_transform.basis.determinant() > 0.0, "%s basis reflects its lettering" % piece_name)
-	var height := float(piece.get_meta("identity_height", 0.0))
-	_expect(height >= minimum_height and height <= maximum_height, "%s height %.4fm is outside %.2f-%.2fm" % [piece_name, height, minimum_height, maximum_height])
+
+
+func _expect_identity_surface(actor: BallplayerActor, mesh_name: String) -> void:
+	var mesh_instance := actor.get_imported_mesh(mesh_name)
+	_expect(is_instance_valid(mesh_instance), "%s Blender UV surface is missing" % mesh_name)
+	if not is_instance_valid(mesh_instance):
+		return
+	_expect(mesh_instance.mesh is ArrayMesh, "%s is not imported authored geometry" % mesh_name)
+	_expect(mesh_instance.skin != null, "%s is not skinned with the jersey" % mesh_name)
+	var material := mesh_instance.get_active_material(0) as StandardMaterial3D
+	_expect(material != null, "%s has no runtime identity material" % mesh_name)
+	if material != null:
+		_expect(material.albedo_texture is ViewportTexture, "%s is not driven by the high-resolution roster viewport" % mesh_name)
 
 
 func _expect_identity_handedness(actor: BallplayerActor, context: String) -> void:
@@ -190,11 +202,17 @@ func _expect_identity_handedness(actor: BallplayerActor, context: String) -> voi
 		_expect(is_instance_valid(piece), "%s lost %s" % [context, piece_name])
 		if is_instance_valid(piece):
 			_expect(piece.global_transform.basis.determinant() > 0.0, "%s reflected %s" % [context, piece_name])
+	var expected_u_scale := -1.0 if actor.is_model_mirrored() else 1.0
+	for mesh_name in ["JerseyIdentityFront", "JerseyIdentityBack"]:
+		var mesh_instance := actor.get_imported_mesh(mesh_name)
+		var material := mesh_instance.get_active_material(0) as StandardMaterial3D if is_instance_valid(mesh_instance) else null
+		_expect(material != null and is_equal_approx(material.uv1_scale.x, expected_u_scale), "%s gave %s mirrored lettering" % [context, mesh_name])
 
 
-func _piece_is_bone_attached(actor: BallplayerActor, piece_name: String) -> bool:
+func _piece_is_blender_mesh(actor: BallplayerActor, piece_name: String, mesh_name: String) -> bool:
 	var piece := actor.get_equipment_piece(piece_name)
-	return is_instance_valid(piece) and piece.get_parent() is BoneAttachment3D
+	var imported := actor.get_imported_mesh(mesh_name)
+	return is_instance_valid(piece) and piece == imported and imported.mesh is ArrayMesh and imported.skin != null
 
 
 func _piece_material_color(actor: BallplayerActor, piece_name: String, material_name: String) -> Color:
@@ -205,10 +223,15 @@ func _piece_material_color(actor: BallplayerActor, piece_name: String, material_
 		if mesh_instance.mesh == null:
 			continue
 		for surface in range(mesh_instance.mesh.get_surface_count()):
-			var material := mesh_instance.mesh.surface_get_material(surface) as BaseMaterial3D
+			var material := mesh_instance.get_active_material(surface) as BaseMaterial3D
 			if material != null and material.resource_name == material_name:
 				return material.albedo_color
 	return Color.TRANSPARENT
+
+
+func _canvas_label_text(actor: BallplayerActor, relative_path: String) -> String:
+	var label := actor.get_node_or_null("Equipment/" + relative_path) as Label
+	return label.text if is_instance_valid(label) else ""
 
 
 func _mesh_visible(actor: BallplayerActor, mesh_name: String) -> bool:

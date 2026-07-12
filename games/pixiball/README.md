@@ -96,19 +96,17 @@ it returns the normal live-play commit packet without mutating the match.
 
 ### Production characters and equipment
 
-The primary athlete is `assets/models/ballplayer/ballplayer.glb`, built with
-Blender 5.1.2. Asset version 12 combines the procedurally sculpted athlete
-body with the professionally sculpted CC0 head (and layered eyes) from
-Blender Studio's Human Base Meshes bundle, fitted onto the rig by the
-deterministic recipe: a 31-bone armature, eight continuously skinned logical
-meshes, roughly 84k exported vertices and 157k triangles, naturalistic
-7.7-heads proportions at a ~1.88 m nominal height, and nine native clips:
+The primary athlete is `assets/models/ballplayer/ballplayer.glb`, authored in
+Blender 5.1.2. Asset version 14 replaces the former generated figure with a
+complete, editable Blender character based on Blender Studio's CC0 Human Base
+Meshes anatomy. It has a slimmer professional-athlete silhouette, modeled face
+and eyes, fitted uniform, cap, short hair, cleats, glove, bat, and role gear;
+35 skinned mesh objects share one 31-bone armature and nine native clips:
 `idle`, `run`, `pitch`, `swing`, `catch`, `field_ready`, `field_throw`,
 `celebrate`, and `slide`. Ball-release, bat-contact, glove-contact,
 celebration-peak, and base-contact markers are part of the animation
-contract. In-engine, the surface shader layers CC0 Poly Haven
-photogrammetry micro-detail (jersey knit, leather grain, wood figure,
-sampled triplanar) over Burley/GGX response, and the world composite now
+contract. The exported PBR materials retain their authored CC0 knit surface
+maps, and the world composite now
 renders at 1920x1080 with near-lossless color so the realistic character
 survives presentation.
 
@@ -122,18 +120,14 @@ eyeballs under skin lids, brows, nose with nostrils, lips, and ears -- so the
 expression remains calm and lifelike through the delivery.
 
 `characters/ballplayer_actor.tscn` is the stable gameplay facade. It adds
-per-instance body variation, handedness, team palettes, a physically based
-surface shader layering procedural pore/weave/grain/strand micro-detail and
-a warm skin-scatter approximation over Burley/GGX response, sockets,
-animation aliases, and a procedural voxel fallback used only when the
-imported production asset fails validation. Modular bone-attached equipment
-supplies batting helmets; catcher and umpire protection; team marks; and
-one- or two-digit jersey numbers without rebuilding the base athlete. Front
-and back numbers are stitched tackle-twill geometry: authored varsity block
-glyphs extruded as a raised fill layer over a contrasting border layer,
-wrapped to the torso's measured curvature and shaded with the knit fabric
-normal map, with a handedness correction so they remain sharp and readable
-instead of mirroring when the model changes batting or throwing side.
+per-instance body variation, handedness, team palettes, sockets, and animation
+aliases while preserving the Blender materials and geometry. Batting helmets
+and catcher/umpire protection are hidden skinned meshes authored in the same
+Blender file. Two dedicated jersey UV surfaces receive high-resolution runtime
+textures for the team mark, surname, and one- or two-digit number. Palette and
+roster changes therefore remain programmatic without constructing any 3D
+character geometry, and a U-coordinate correction keeps text readable when an
+action mirrors the model.
 
 See [Ballplayer asset](assets/models/ballplayer/README.md) and
 [Equipment architecture](characters/equipment/README.md) for the exact runtime
@@ -240,20 +234,15 @@ bin/godot.macos.editor.dev.arm64 --headless --path games/pixiball \
 
 ## Blender 5 production pipeline
 
-The editable `.blend`, deterministic Python recipe, exported GLB, asset
-contract, and SHA-256 build manifest live together under
-`assets/models/ballplayer/`. Rebuild from the repository root:
+The editable `.blend` is the character source of truth and the checked-in GLB
+is its runtime export. Open
+`assets/models/ballplayer/source/ballplayer.blend`, edit geometry, weights, or
+actions directly, and export glTF 2.0 binary with materials, skins, all actions,
+Y-up conversion, applied modifiers, and extras. Then refresh Godot:
 
 ```sh
-uv run --project agent godot-agent \
-  --project games/pixiball \
-  blender-build res://assets/blender/build_ballplayer.py \
-  --output res://assets/models/ballplayer/ballplayer.glb \
-  --blend res://assets/models/ballplayer/source/ballplayer.blend \
-  --blender /Applications/Blender.app
-
-bin/godot.macos.editor.dev.arm64 --headless --editor \
-  --path games/pixiball --quit
+bin/godot.windows.editor.dev.x86_64.console.exe --headless \
+  --path games/pixiball --import
 ```
 
 Render the fixed rest, pitching, batting, catching, and running QA poses without
@@ -310,7 +299,7 @@ bin/godot.macos.editor.dev.arm64 --headless --path games/pixiball \
 bin/godot.macos.editor.dev.arm64 --headless --path games/pixiball \
   --script res://gameplay/tests/test_live_play_controller.gd
 
-# Imported production rig, equipment, and facade/fallback construction
+# Imported Blender rig, equipment selection, and roster identity
 bin/godot.macos.editor.dev.arm64 --headless --path games/pixiball \
   --script res://characters/tests/test_ballplayer_asset.gd
 bin/godot.macos.editor.dev.arm64 --headless --path games/pixiball \
@@ -356,8 +345,8 @@ test -s "$pack"
   presentation-free semantic defense.
 - `gameplay/` — Endless and Versus simulation, bullpens, stamina, live fielding,
   and controller-facing commands.
-- `characters/` — production rig facade, modular equipment, gallery, and
-  emergency procedural fallback.
+- `characters/` — production Blender rig facade, imported role equipment,
+  roster identity controller, and gallery.
 - `world/` / `presentation/` — stadium, camera, ball, audio, shader, and haptics.
 - `ui/` — landing flow, team/pitcher selection, save data, scoreboard, strike
   zone, results, and pitch-intelligence panel.

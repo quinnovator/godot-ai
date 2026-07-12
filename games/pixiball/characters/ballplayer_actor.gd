@@ -2,22 +2,21 @@
 class_name BallplayerActor
 extends Node3D
 
-## Production ballplayer facade.
+## Gameplay facade for the authored Blender ballplayer.
 ##
-## The imported, rigged GLB is the primary implementation. The procedural
-## VoxelBallplayer is instantiated only when the model cannot be loaded. This
-## class preserves the gameplay-facing API and adds stable attachment nodes so
-## presentation code never needs to know the imported scene hierarchy.
+## Geometry, skinning, uniform pieces, role equipment, materials, and native
+## actions all come from the checked-in Blender/GLB asset. Runtime code only
+## selects authored meshes, applies per-instance palette overrides, and renders
+## roster identity into the jersey's Blender-authored UV surfaces.
 
 signal action_started(action_name: String)
 signal action_marker(action_name: String, marker_name: String)
 signal action_finished(action_name: String)
 
 const MODEL_SCENE_PATH := "res://assets/models/ballplayer/ballplayer.glb"
-const FALLBACK_SCRIPT = preload("res://characters/voxel_ballplayer.gd")
 const EQUIPMENT_SCENE = preload("res://characters/equipment/ballplayer_equipment.tscn")
 const CHARACTER_RENDER_LAYER := 1 << 1
-const BROADCAST_HEAD_SCALE := 1.08
+const NOMINAL_HEIGHT_METERS := 1.84
 
 const ACTION_CLIPS := {
 	"idle": "idle",
@@ -32,21 +31,8 @@ const ACTION_CLIPS := {
 	"slide": "slide",
 }
 
-const FALLBACK_ACTION_CLIPS := {
-	"field_ready": "idle",
-	"field_throw": "throw",
-	"throw": "throw",
-	"celebrate": "celebrate",
-	"slide": "run",
-}
-
 const ACTION_DURATIONS := {
-	# Preserve the authored gather, stride, release, and balanced recovery. The
-	# old 1.20 s override compressed the release pop and made the head/arm path
-	# difficult to read from the mound camera.
 	"pitch": 1.42,
-	# A major-league swing reaches contact in roughly 0.23 seconds. The source
-	# marker is 18/28 through the clip, so 0.36 seconds total aligns that beat.
 	"swing": 0.36,
 	"catch": 0.68,
 	"field_throw": 0.86,
@@ -56,8 +42,6 @@ const ACTION_DURATIONS := {
 }
 
 const ACTION_MARKERS := {
-	# Blender actions begin on frame 1; normalized playback therefore uses
-	# (marker - 1) / (end - 1), not marker / end.
 	"pitch": {"ball_release": 27.0 / 44.0},
 	"swing": {"bat_contact": 19.0 / 29.0},
 	"catch": {"glove_contact": 14.0 / 25.0},
@@ -102,190 +86,16 @@ const HAIR_TONES := [
 	Color("7d2e20"),
 ]
 
-## Physically based surface shader with per-family procedural micro-detail.
-## Burley diffuse and GGX specular carry the realistic light response; the
-## detail pass layers pore-scale skin variation, a triplanar cloth weave,
-## leather grain, hair strand anisotropy hints, and wood grain so close-up
-## surfaces read as material rather than smooth vinyl.  Skin additionally
-## gets a faint warm fresnel term approximating subsurface scattering.
-const SURFACE_SHADER_CODE := """
-shader_type spatial;
-render_mode diffuse_burley, specular_schlick_ggx, cull_disabled;
-
-uniform vec4 base_color : source_color = vec4(1.0);
-uniform float roughness_value : hint_range(0.0, 1.0) = 0.72;
-uniform float metallic_value : hint_range(0.0, 1.0) = 0.0;
-uniform float specular_value : hint_range(0.0, 1.0) = 0.32;
-uniform float detail_scale : hint_range(1.0, 64.0) = 10.0;
-uniform float detail_strength : hint_range(0.0, 0.12) = 0.025;
-uniform int surface_profile = 0;
-uniform float highlight_strength : hint_range(0.0, 1.0) = 0.0;
-// Real scanned micro-surface (CC0 photogrammetry maps) sampled triplanar in
-// object space, so the untextured procedural meshes still get true knit,
-// leather grain, and wood figure instead of synthetic noise alone.
-uniform bool detail_maps_enabled = false;
-uniform sampler2D detail_normal_map : hint_normal, filter_linear_mipmap, repeat_enable;
-uniform sampler2D detail_rough_map : hint_default_white, filter_linear_mipmap, repeat_enable;
-uniform bool detail_albedo_enabled = false;
-uniform sampler2D detail_albedo_map : source_color, filter_linear_mipmap, repeat_enable;
-uniform float detail_albedo_strength = 0.16;
-uniform float detail_map_scale = 8.0;
-uniform float detail_map_normal_strength = 0.4;
-uniform float detail_map_rough_strength = 0.25;
-
-varying vec3 model_position;
-varying vec3 model_normal;
-
-void vertex() {
-	model_position = VERTEX;
-	model_normal = NORMAL;
-}
-
-float hash31(vec3 p) {
-	return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
-}
-
-float noise3(vec3 p) {
-	vec3 cell = floor(p);
-	vec3 f = fract(p);
-	f = f * f * (3.0 - 2.0 * f);
-	float n000 = hash31(cell);
-	float n100 = hash31(cell + vec3(1.0, 0.0, 0.0));
-	float n010 = hash31(cell + vec3(0.0, 1.0, 0.0));
-	float n110 = hash31(cell + vec3(1.0, 1.0, 0.0));
-	float n001 = hash31(cell + vec3(0.0, 0.0, 1.0));
-	float n101 = hash31(cell + vec3(1.0, 0.0, 1.0));
-	float n011 = hash31(cell + vec3(0.0, 1.0, 1.0));
-	float n111 = hash31(cell + vec3(1.0, 1.0, 1.0));
-	float lower = mix(mix(n000, n100, f.x), mix(n010, n110, f.x), f.y);
-	float upper = mix(mix(n001, n101, f.x), mix(n011, n111, f.x), f.y);
-	return mix(lower, upper, f.z);
-}
-
-float weave2(vec2 p) {
-	float warp = sin(p.x * 6.2831853 * 2.0);
-	float weft = sin(p.y * 6.2831853 * 2.0);
-	return warp * weft;
-}
-
-float triplanar_weave(vec3 p, vec3 normal_value) {
-	vec3 weights = pow(abs(normal_value), vec3(5.0));
-	weights /= max(weights.x + weights.y + weights.z, 0.0001);
-	return weave2(p.yz) * weights.x + weave2(p.xz) * weights.y + weave2(p.xy) * weights.z;
-}
-
-void fragment() {
-	vec3 p = model_position * detail_scale;
-	vec3 n = normalize(model_normal);
-	float broad = noise3(p * 0.38) - 0.5;
-	float micro = noise3(p * 2.7 + vec3(7.1, 3.7, 11.9)) - 0.5;
-	float tonal = broad * detail_strength;
-	float rough_delta = micro * detail_strength * 1.7;
-	vec3 sss = vec3(0.0);
-
-	if (surface_profile == 1) {
-		// Skin: low-frequency tonal mottling, restrained pore roughness, and
-		// a faint warm fresnel standing in for subsurface scattering.
-		tonal = broad * detail_strength + micro * detail_strength * 0.22;
-		rough_delta = micro * detail_strength * 1.25;
-		float rim = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0);
-		sss = base_color.rgb * vec3(1.0, 0.42, 0.30) * rim * 0.045;
-	} else if (surface_profile == 2) {
-		// Cloth: object-space triplanar double-knit weave.
-		float weave = triplanar_weave(p, n);
-		tonal = weave * detail_strength * 0.42 + broad * detail_strength * 0.30;
-		rough_delta = abs(weave) * detail_strength * 1.8 + micro * detail_strength * 0.35;
-	} else if (surface_profile == 3) {
-		// Leather: broad mottling with finer, uneven grain.
-		float grain = noise3(p * 5.2 + vec3(2.0, 19.0, 5.0)) - 0.5;
-		tonal = broad * detail_strength * 0.75 + grain * detail_strength * 0.35;
-		rough_delta = grain * detail_strength * 1.65;
-	} else if (surface_profile == 4) {
-		// Hair: directional strand banding with a glossy break.
-		float strand = sin((model_position.y + model_position.z * 0.34) * detail_scale * 5.0);
-		tonal = strand * detail_strength * 0.30 + broad * detail_strength * 0.40;
-		rough_delta = strand * detail_strength * 1.4 + micro * detail_strength * 0.5;
-	} else if (surface_profile == 5) {
-		// Lacquered maple: long grain lines under a clear coat.
-		float grain = sin((model_position.y + broad * 0.08) * detail_scale * 7.0);
-		tonal = grain * detail_strength * 0.35 + broad * detail_strength * 0.50;
-		rough_delta = micro * detail_strength * 0.75;
-	}
-
-	if (detail_maps_enabled) {
-		vec3 uvp = model_position * detail_map_scale;
-		vec3 blend_w = pow(abs(n), vec3(4.0));
-		blend_w /= max(blend_w.x + blend_w.y + blend_w.z, 0.0001);
-		vec3 tx = texture(detail_normal_map, uvp.zy).xyz * 2.0 - 1.0;
-		vec3 ty = texture(detail_normal_map, uvp.xz).xyz * 2.0 - 1.0;
-		vec3 tz = texture(detail_normal_map, uvp.xy).xyz * 2.0 - 1.0;
-		vec3 offset =
-			vec3(0.0, tx.y, tx.x) * blend_w.x +
-			vec3(ty.x, 0.0, ty.y) * blend_w.y +
-			vec3(tz.x, tz.y, 0.0) * blend_w.z;
-		vec3 detailed = normalize(n + offset * detail_map_normal_strength);
-		NORMAL = normalize((VIEW_MATRIX * MODEL_MATRIX * vec4(detailed, 0.0)).xyz);
-		float rough_sample =
-			texture(detail_rough_map, uvp.zy).r * blend_w.x +
-			texture(detail_rough_map, uvp.xz).r * blend_w.y +
-			texture(detail_rough_map, uvp.xy).r * blend_w.z;
-		rough_delta += (rough_sample - 0.5) * detail_map_rough_strength;
-		if (detail_albedo_enabled) {
-			float cloth_sample =
-				texture(detail_albedo_map, uvp.zy).r * blend_w.x +
-				texture(detail_albedo_map, uvp.xz).r * blend_w.y +
-				texture(detail_albedo_map, uvp.xy).r * blend_w.z;
-			tonal += (cloth_sample - 0.5) * detail_albedo_strength;
-		}
-	}
-
-	ALBEDO = clamp(base_color.rgb * (1.0 + tonal), vec3(0.0), vec3(1.0));
-	ROUGHNESS = clamp(roughness_value + rough_delta, 0.05, 0.98);
-	METALLIC = metallic_value;
-	SPECULAR = specular_value;
-	EMISSION = base_color.rgb * highlight_strength * 0.30 + sss;
-}
-"""
-
-const DETAIL_MAPS := {
-	"cloth": {
-		"albedo": preload("res://assets/textures/uniform/double_knit_albedo.png"),
-		"albedo_strength": 0.14,
-		"normal": preload("res://assets/textures/surface/cotton_jersey_nor_gl_1k.jpg"),
-		"rough": preload("res://assets/textures/surface/cotton_jersey_rough_1k.jpg"),
-		"scale": 9.0,
-		"normal_strength": 0.5,
-		"rough_strength": 0.22,
-	},
-	"leather": {
-		"normal": preload("res://assets/textures/surface/brown_leather_nor_gl_1k.jpg"),
-		"rough": preload("res://assets/textures/surface/brown_leather_rough_1k.jpg"),
-		"scale": 6.0,
-		"normal_strength": 0.55,
-		"rough_strength": 0.30,
-	},
-	"wood": {
-		"normal": preload("res://assets/textures/surface/fine_grained_wood_nor_gl_1k.jpg"),
-		"rough": preload("res://assets/textures/surface/fine_grained_wood_rough_1k.jpg"),
-		"scale": 4.0,
-		"normal_strength": 0.30,
-		"rough_strength": 0.28,
-	},
-}
-
 @export_file("*.glb") var model_scene_path := MODEL_SCENE_PATH
-@export var allow_voxel_fallback := true
 
 var _spec: Dictionary = {}
 var _configured := false
-var _using_fallback := false
-var _fallback: Node3D
+var _visual_ready := false
 var _model_root: Node3D
 var _skeleton: Skeleton3D
 var _animation_player: AnimationPlayer
 var _meshes: Array[MeshInstance3D] = []
 var _material_overrides: Array[Dictionary] = []
-var _surface_shader: Shader
 var _sockets: Dictionary = {}
 var _equipment: BallplayerEquipment
 var _equipment_pending := false
@@ -309,14 +119,13 @@ var _pants_color := Color("e9e6da")
 func _ready() -> void:
 	if not _configured:
 		configure({})
-	elif _equipment_pending and not _using_fallback:
+	elif _equipment_pending and _visual_ready:
 		_configure_modular_equipment()
 	set_physics_process(true)
 
 
-## Configures appearance and handedness using the same Dictionary accepted by
-## VoxelBallplayer. Important keys are seed, role, number, mark, height, build,
-## player_name, skin_tone, hair_color, throws, bats, primary_color, secondary_color,
+## Important keys are seed, role, number, mark, height, build, player_name,
+## skin_tone, hair_color, throws, bats, primary_color, secondary_color,
 ## accent_color, pants_color, glove, bat, and helmet.
 func configure(spec: Dictionary) -> void:
 	_spec = spec.duplicate(true)
@@ -331,9 +140,7 @@ func configure(spec: Dictionary) -> void:
 	_pants_color = _as_color(_spec.get("pants_color", _pants_color), _pants_color)
 
 	_ensure_visual()
-	if _using_fallback:
-		_fallback.call("configure", _spec)
-		_assign_character_render_layer(_fallback)
+	if not _visual_ready:
 		_configured = true
 		return
 
@@ -354,12 +161,9 @@ func configure(spec: Dictionary) -> void:
 	_configured = true
 
 
-## Starts an authored action. `throw` is a compatibility alias for the native
-## `field_throw` clip; every other listed action maps one-to-one to the GLB.
 func play_action(name: String) -> void:
 	var requested := name.to_lower().strip_edges()
-	if _using_fallback:
-		_fallback.call("play_action", String(FALLBACK_ACTION_CLIPS.get(requested, requested)))
+	if not _visual_ready:
 		return
 	if not ACTION_CLIPS.has(requested):
 		push_warning("BallplayerActor: unknown action '%s'" % name)
@@ -371,14 +175,8 @@ func play_action(name: String) -> void:
 	_play_imported_clip(requested, true)
 
 
-## Holds an authored clip at one reviewed pose for broadcast staging. Gameplay
-## actions still restart normally through play_action(); no simulation state or
-## action marker is advanced while a pose is held.
 func hold_action_pose(name: String, normalized_time := 0.0) -> void:
 	var requested := name.to_lower().strip_edges()
-	if _using_fallback:
-		_fallback.call("play_action", String(FALLBACK_ACTION_CLIPS.get(requested, requested)))
-		return
 	if not ACTION_CLIPS.has(requested) or not is_instance_valid(_animation_player):
 		return
 	_apply_action_handedness(requested)
@@ -393,11 +191,9 @@ func hold_action_pose(name: String, normalized_time := 0.0) -> void:
 	_emitted_markers.clear()
 
 
-## Supplies world-space motion for locomotion cadence and idle/run selection.
 func set_motion(velocity: Vector3) -> void:
 	_motion_velocity = velocity
-	if _using_fallback:
-		_fallback.call("set_motion", velocity)
+	if not _visual_ready:
 		return
 	var moving := Vector2(velocity.x, velocity.z).length() > 0.12
 	if _current_action in ["idle", "run"]:
@@ -410,11 +206,7 @@ func set_motion(velocity: Vector3) -> void:
 		_animation_player.speed_scale = clampf(Vector2(velocity.x, velocity.z).length() / 3.2, 0.72, 1.65)
 
 
-## Turns the actor toward a world-space direction while keeping it upright.
 func set_facing(direction: Vector3) -> void:
-	if _using_fallback:
-		_fallback.call("set_facing", direction)
-		return
 	var planar := Vector3(direction.x, 0.0, direction.z)
 	if planar.length_squared() < 0.000001:
 		return
@@ -422,12 +214,7 @@ func set_facing(direction: Vector3) -> void:
 	_target_yaw = atan2(-planar.x, -planar.z)
 
 
-## Returns a world-space gameplay socket. Stable names are head, chest,
-## left_hand, right_hand, glove, catch, throw_hand, ball_release, bat_grip,
-## bat_tip, left_foot, right_foot, and feet.
 func get_socket_position(name: String) -> Vector3:
-	if _using_fallback:
-		return _fallback.call("get_socket_position", name) as Vector3
 	var key := name.to_lower().strip_edges()
 	if key == "feet":
 		var left := get_socket_node("left_foot")
@@ -437,20 +224,13 @@ func get_socket_position(name: String) -> Vector3:
 	var socket := get_socket_node(key)
 	if is_instance_valid(socket):
 		return socket.global_position
-	push_warning("BallplayerActor: unknown socket '%s'" % name)
 	return global_position
 
 
-## Returns the live BoneAttachment3D for attaching props, particles, or IK
-## targets. The fallback actor exposes positions only and therefore returns null.
 func get_socket_node(name: String) -> Node3D:
-	if _using_fallback:
-		return null
 	return _sockets.get(name.to_lower().strip_edges()) as Node3D
 
 
-## Parents a node to a semantic socket and returns whether the attachment was
-## made. By default the node snaps to the socket's local origin.
 func attach_to_socket(node: Node3D, socket_name: String, keep_global := false) -> bool:
 	var socket := get_socket_node(socket_name)
 	if not is_instance_valid(socket) or not is_instance_valid(node):
@@ -467,75 +247,51 @@ func attach_to_socket(node: Node3D, socket_name: String, keep_global := false) -
 	return true
 
 
-## Applies a restrained emissive selection treatment without mutating the GLB's
-## shared embedded materials.
 func set_highlighted(enabled: bool) -> void:
 	_highlighted = enabled
-	if _using_fallback:
-		_fallback.call("set_highlighted", enabled)
-		return
 	for entry in _material_overrides:
-		var value := entry.get("material") as Material
-		if value is ShaderMaterial:
-			(value as ShaderMaterial).set_shader_parameter("highlight_strength", 0.34 if enabled else 0.0)
-		elif value is BaseMaterial3D:
-			var pbr := value as BaseMaterial3D
-			pbr.emission_enabled = enabled
-			pbr.emission = pbr.albedo_color
-			pbr.emission_energy_multiplier = 0.34 if enabled else 0.0
+		var value := entry.get("material") as BaseMaterial3D
+		if value == null:
+			continue
+		value.emission_enabled = enabled
+		value.emission = value.albedo_color
+		value.emission_energy_multiplier = 0.30 if enabled else 0.0
 	if is_instance_valid(_equipment):
 		_equipment.set_highlighted(enabled)
 
 
-## Recolors stable team slots. No mesh or animation is rebuilt.
+## Recolors the authored material slots without changing geometry or UVs.
 func set_uniform_colors(primary: Color, secondary: Color, accent: Color, pants := Color("e9e6da")) -> void:
 	_primary_color = primary
 	_secondary_color = secondary
 	_accent_color = accent
 	_pants_color = pants
-	if _using_fallback:
-		_fallback.call("set_uniform_colors", primary, secondary, accent, pants)
-		return
 	_apply_material_color("TEAM_Primary", primary)
 	_apply_material_color("TEAM_Secondary", secondary)
 	_apply_material_color("TEAM_Accent", accent)
+	_apply_material_color("MAT_Jersey", primary)
 	_apply_material_color("MAT_Pants", pants)
-	_apply_material_color("MAT_PantsShadow", pants.darkened(0.22))
 	if is_instance_valid(_equipment):
 		_equipment.set_palette(primary, secondary, accent)
 	if _highlighted:
 		set_highlighted(true)
 
 
-## Updates the semantic one-character team mark and its bone-attached front
-## glyph without changing the base character mesh.
 func set_team_mark(mark: String) -> void:
 	_team_mark = mark.to_upper().left(1)
 	_spec["mark"] = _team_mark
-	if _using_fallback:
-		_fallback.call("set_team_mark", _team_mark)
-	elif is_instance_valid(_equipment):
-		_equipment.set_identity(_team_mark, int(_spec.get("number", 0)), _player_name)
+	_refresh_identity()
 
 
-## Changes the roster identity without rebuilding the rigged GLB. These
-## setters are intentionally independent so lineup, trade, and customization
-## screens can update only the field that changed.
 func set_jersey_number(number: int) -> void:
 	_spec["number"] = posmod(number, 100)
-	if _using_fallback:
-		_fallback.call("configure", _spec)
-	elif is_instance_valid(_equipment):
-		_equipment.set_identity(_team_mark, get_jersey_number(), _player_name)
+	_refresh_identity()
 
 
 func set_player_name(player_name: String) -> void:
 	_player_name = player_name.strip_edges()
 	_spec["player_name"] = _player_name
-	if _using_fallback:
-		_fallback.call("configure", _spec)
-	elif is_instance_valid(_equipment):
-		_equipment.set_identity(_team_mark, get_jersey_number(), _player_name)
+	_refresh_identity()
 
 
 func get_team_mark() -> String:
@@ -574,33 +330,40 @@ func get_equipment_piece(piece_name: String) -> Node3D:
 	return _equipment.get_piece(piece_name)
 
 
+func get_imported_mesh(mesh_name: String) -> MeshInstance3D:
+	for mesh_instance in _meshes:
+		if mesh_instance.name == mesh_name:
+			return mesh_instance
+	return null
+
+
+func is_model_mirrored() -> bool:
+	return is_instance_valid(_model_root) and _model_root.scale.x < 0.0
+
+
 func get_current_action() -> String:
-	if _using_fallback:
-		return String(_fallback.call("get_current_action"))
 	return _current_action
 
 
 func get_generation_signature() -> String:
-	if _using_fallback:
-		return String(_fallback.call("get_generation_signature"))
-	return "rigged-v5:%s:%s:%s:%s:%s:%s:%s:%s" % [
+	return "blender-v1:%s:%s:%s:%s:%s:%s:%s:%s" % [
 		int(_spec.get("seed", 1)),
 		_role,
 		_throwing_hand,
 		_batting_side,
 		String(_spec.get("build", "balanced")),
 		_team_mark,
-		int(_spec.get("number", 0)),
+		get_jersey_number(),
 		_player_name,
 	]
 
 
 func is_using_fallback() -> bool:
-	return _using_fallback
+	return false
 
 
 func get_model_kind() -> String:
-	return "voxel_fallback" if _using_fallback else "rigged_glb"
+	return "rigged_glb" if _visual_ready else "missing_model"
 
 
 func get_available_actions() -> PackedStringArray:
@@ -608,33 +371,39 @@ func get_available_actions() -> PackedStringArray:
 
 
 func _physics_process(delta: float) -> void:
-	if not _configured or _using_fallback:
+	if not _configured or not _visual_ready:
 		return
 	rotation.y = lerp_angle(rotation.y, _target_yaw, minf(1.0, delta * 10.0))
 	_update_action_markers()
 
 
 func _ensure_visual() -> void:
-	if is_instance_valid(_model_root) or is_instance_valid(_fallback):
+	if is_instance_valid(_model_root):
 		return
-	if ResourceLoader.exists(model_scene_path, "PackedScene"):
-		var packed := ResourceLoader.load(model_scene_path, "PackedScene") as PackedScene
-		if packed != null:
-			_model_root = packed.instantiate() as Node3D
-			if _model_root != null:
-				_model_root.name = "RiggedBallplayer"
-				add_child(_model_root)
-				_collect_imported_nodes(_model_root)
-				if is_instance_valid(_skeleton) and is_instance_valid(_animation_player) and not _meshes.is_empty():
-					_install_material_overrides()
-					_install_sockets()
-					_configure_animation_library()
-					_animation_player.animation_finished.connect(_on_animation_finished)
-					_using_fallback = false
-					return
-				_model_root.free()
-				_model_root = null
-	_install_fallback("rigged model was unavailable or missing its skeleton, meshes, or animations")
+	if not ResourceLoader.exists(model_scene_path, "PackedScene"):
+		push_error("BallplayerActor: authored Blender model is unavailable: %s" % model_scene_path)
+		return
+	var packed := ResourceLoader.load(model_scene_path, "PackedScene") as PackedScene
+	if packed == null:
+		push_error("BallplayerActor: authored Blender model failed to load: %s" % model_scene_path)
+		return
+	_model_root = packed.instantiate() as Node3D
+	if _model_root == null:
+		push_error("BallplayerActor: authored Blender scene has no Node3D root")
+		return
+	_model_root.name = "RiggedBallplayer"
+	add_child(_model_root)
+	_collect_imported_nodes(_model_root)
+	if not is_instance_valid(_skeleton) or not is_instance_valid(_animation_player) or _meshes.is_empty():
+		push_error("BallplayerActor: authored Blender model is missing its rig, meshes, or actions")
+		_model_root.free()
+		_model_root = null
+		return
+	_install_material_overrides()
+	_install_sockets()
+	_configure_animation_library()
+	_animation_player.animation_finished.connect(_on_animation_finished)
+	_visual_ready = true
 
 
 func _collect_imported_nodes(node: Node) -> void:
@@ -648,11 +417,10 @@ func _collect_imported_nodes(node: Node) -> void:
 		_collect_imported_nodes(child)
 
 
+## Keep the GLB's authored PBR materials and UV textures; only duplicate them
+## per instance so team palettes never mutate the imported shared resources.
 func _install_material_overrides() -> void:
 	_material_overrides.clear()
-	if _surface_shader == null:
-		_surface_shader = Shader.new()
-		_surface_shader.code = SURFACE_SHADER_CODE
 	for mesh_instance in _meshes:
 		if mesh_instance.mesh == null:
 			continue
@@ -660,61 +428,11 @@ func _install_material_overrides() -> void:
 			var source := mesh_instance.mesh.surface_get_material(surface)
 			if source == null:
 				continue
-			var local: Material
-			if source is BaseMaterial3D and (source as BaseMaterial3D).albedo_texture != null:
-				# Authored pixel-art decals (face, cap mark) keep their
-				# imported nearest-filtered texture material; the cel shader
-				# path would discard the texel art.
-				local = source.duplicate(true) as Material
-			elif source is BaseMaterial3D:
-				var source_pbr := source as BaseMaterial3D
-				var procedural := ShaderMaterial.new()
-				procedural.shader = _surface_shader
-				procedural.set_shader_parameter("base_color", source_pbr.albedo_color)
-				procedural.set_shader_parameter("roughness_value", source_pbr.roughness)
-				procedural.set_shader_parameter("metallic_value", source_pbr.metallic)
-				var profile := _surface_profile(source.resource_name)
-				procedural.set_shader_parameter("specular_value", float(profile.specular))
-				procedural.set_shader_parameter("surface_profile", int(profile.profile))
-				procedural.set_shader_parameter("detail_scale", float(profile.scale))
-				procedural.set_shader_parameter("detail_strength", float(profile.strength))
-				var family := String(profile.get("maps", ""))
-				if DETAIL_MAPS.has(family):
-					var maps: Dictionary = DETAIL_MAPS[family]
-					procedural.set_shader_parameter("detail_maps_enabled", true)
-					procedural.set_shader_parameter("detail_normal_map", maps.normal)
-					procedural.set_shader_parameter("detail_rough_map", maps.rough)
-					if maps.has("albedo"):
-						procedural.set_shader_parameter("detail_albedo_enabled", true)
-						procedural.set_shader_parameter("detail_albedo_map", maps.albedo)
-						procedural.set_shader_parameter("detail_albedo_strength", float(maps.get("albedo_strength", 0.16)))
-					procedural.set_shader_parameter("detail_map_scale", float(maps.scale))
-					procedural.set_shader_parameter("detail_map_normal_strength", float(maps.normal_strength))
-					procedural.set_shader_parameter("detail_map_rough_strength", float(maps.rough_strength))
-				local = procedural
-			else:
-				local = source.duplicate(true) as Material
+			var local := source.duplicate(true) as Material
 			local.resource_name = source.resource_name
 			local.resource_local_to_scene = true
 			mesh_instance.set_surface_override_material(surface, local)
-			_material_overrides.append({
-				"name": source.resource_name,
-				"material": local,
-			})
-
-
-func _surface_profile(material_name: String) -> Dictionary:
-	if material_name in ["MAT_Skin", "MAT_SkinLight", "MAT_Lip"]:
-		return {"profile": 1, "scale": 7.0, "strength": 0.020, "specular": 0.22}
-	if material_name.begins_with("TEAM_") or material_name in ["MAT_Pants", "MAT_PantsShadow"]:
-		return {"profile": 2, "scale": 13.0, "strength": 0.022, "specular": 0.18, "maps": "cloth"}
-	if material_name.begins_with("MAT_Leather") or material_name in ["MAT_Belt", "MAT_Cleat"]:
-		return {"profile": 3, "scale": 8.0, "strength": 0.042, "specular": 0.30, "maps": "leather"}
-	if material_name.begins_with("MAT_Hair"):
-		return {"profile": 4, "scale": 11.0, "strength": 0.030, "specular": 0.20}
-	if material_name == "MAT_Bat":
-		return {"profile": 5, "scale": 7.0, "strength": 0.032, "specular": 0.36, "maps": "wood"}
-	return {"profile": 0, "scale": 9.0, "strength": 0.018, "specular": 0.26}
+			_material_overrides.append({"name": source.resource_name, "material": local})
 
 
 func _install_sockets() -> void:
@@ -740,36 +458,14 @@ func _configure_animation_library() -> void:
 		animation.loop_mode = Animation.LOOP_LINEAR if clip_name in ["idle", "run", "field_ready"] else Animation.LOOP_NONE
 
 
-func _install_fallback(reason: String) -> void:
-	if not allow_voxel_fallback:
-		push_error("BallplayerActor: %s and fallback is disabled" % reason)
-		return
-	_using_fallback = true
-	_fallback = FALLBACK_SCRIPT.new() as Node3D
-	_fallback.name = "VoxelFallback"
-	add_child(_fallback)
-	_fallback.connect("action_started", Callable(self, "_on_fallback_action_started"))
-	_fallback.connect("action_marker", Callable(self, "_on_fallback_action_marker"))
-	_fallback.connect("action_finished", Callable(self, "_on_fallback_action_finished"))
-	push_warning("BallplayerActor: %s; using VoxelBallplayer" % reason)
-
-
 func _apply_dimensions_and_handedness() -> void:
 	var seed := int(_spec.get("seed", 1))
-	# Keep roster variety without letting the telephoto mound view turn shorter
-	# power builds into toy-like, shoulder-dominant figures. The authored mesh
-	# retains its musculature; these presentation scales only tune the range of
-	# silhouettes seen during play.
 	var sampled_height := 1.76 + float(posmod(seed * 48271, 1000)) / 1000.0 * 0.18
 	var height := clampf(float(_spec.get("height", sampled_height)), 1.55, 2.05)
 	var build := String(_spec.get("build", "balanced")).to_lower()
-	var width_scale: float = {"speed": 0.86, "balanced": 0.90, "power": 0.96}.get(build, 0.90)
+	var width_scale: float = {"speed": 0.93, "balanced": 0.98, "power": 1.04}.get(build, 0.98)
 	var mirror := -1.0 if _hand_for_action("idle") == "left" else 1.0
-	# 1.89 m is the authored nominal height of the production asset.
-	_model_root.scale = Vector3(width_scale * mirror, height / 1.89, width_scale)
-	var head_index := _skeleton.find_bone("head") if is_instance_valid(_skeleton) else -1
-	if head_index >= 0:
-		_skeleton.set_bone_pose_scale(head_index, Vector3.ONE * BROADCAST_HEAD_SCALE)
+	_model_root.scale = Vector3(width_scale * mirror, height / NOMINAL_HEIGHT_METERS, width_scale)
 
 
 func _apply_equipment_visibility() -> void:
@@ -778,7 +474,9 @@ func _apply_equipment_visibility() -> void:
 	var helmet_default := _role in ["batter", "hitter", "slugger"]
 	var hide_cap := bool(_spec.get("helmet", helmet_default)) or _role in ["catcher", "umpire"]
 	for mesh_instance in _meshes:
-		if mesh_instance.name == "Bat_Skinned":
+		if mesh_instance.name.begins_with("Gear_"):
+			mesh_instance.visible = false
+		elif mesh_instance.name == "Bat_Skinned":
 			mesh_instance.visible = show_bat
 		elif mesh_instance.name == "Glove_Skinned":
 			mesh_instance.visible = show_glove
@@ -792,9 +490,14 @@ func _configure_modular_equipment() -> void:
 		_equipment.name = "Equipment"
 		add_child(_equipment)
 	_equipment.configure(self, _spec, _primary_color, _secondary_color, _accent_color)
-	_equipment.sync_identity_orientation()
+	_equipment.sync_identity_orientation(is_model_mirrored())
 	_assign_character_render_layer(_equipment)
 	_equipment_pending = false
+
+
+func _refresh_identity() -> void:
+	if is_instance_valid(_equipment):
+		_equipment.set_identity(_team_mark, get_jersey_number(), _player_name)
 
 
 func _assign_character_render_layer(node: Node) -> void:
@@ -811,8 +514,6 @@ func _apply_character_palette() -> void:
 	var skin := _as_color(_spec.get("skin_tone", default_skin), default_skin)
 	var hair := _as_color(_spec.get("hair_color", default_hair), default_hair)
 	_apply_material_color("MAT_Skin", skin)
-	_apply_material_color("MAT_SkinLight", skin.lightened(0.18))
-	_apply_material_color("MAT_SkinShadow", skin.darkened(0.30))
 	_apply_material_color("MAT_Hair", hair)
 	_apply_material_color("MAT_HairHighlight", hair.lightened(0.18))
 
@@ -821,11 +522,9 @@ func _apply_material_color(material_name: String, color: Color) -> void:
 	for entry in _material_overrides:
 		if String(entry.get("name", "")) != material_name:
 			continue
-		var value := entry.get("material") as Material
-		if value is ShaderMaterial:
-			(value as ShaderMaterial).set_shader_parameter("base_color", color)
-		elif value is BaseMaterial3D:
-			(value as BaseMaterial3D).albedo_color = color
+		var value := entry.get("material") as BaseMaterial3D
+		if value != null:
+			value.albedo_color = color
 
 
 func _play_imported_clip(action: String, emit_started: bool) -> void:
@@ -842,9 +541,7 @@ func _play_imported_clip(action: String, emit_started: bool) -> void:
 		speed = animation.length / float(ACTION_DURATIONS[action])
 	elif action == "run":
 		speed = clampf(Vector2(_motion_velocity.x, _motion_velocity.z).length() / 3.2, 0.72, 1.65)
-	var blend_time := 0.10
-	if action == "pitch" or String(_animation_player.current_animation) == "pitch":
-		blend_time = 0.18
+	var blend_time := 0.18 if action == "pitch" or String(_animation_player.current_animation) == "pitch" else 0.10
 	_animation_player.play(clip_name, blend_time, speed)
 	if emit_started:
 		action_started.emit(action)
@@ -856,7 +553,7 @@ func _apply_action_handedness(action: String) -> void:
 	var magnitude := absf(_model_root.scale.x)
 	_model_root.scale.x = -magnitude if _hand_for_action(action) == "left" else magnitude
 	if is_instance_valid(_equipment):
-		_equipment.sync_identity_orientation()
+		_equipment.sync_identity_orientation(_model_root.scale.x < 0.0)
 
 
 func _hand_for_action(action: String) -> String:
@@ -889,18 +586,6 @@ func _on_animation_finished(_animation_name: StringName) -> void:
 	_current_action = "run" if Vector2(_motion_velocity.x, _motion_velocity.z).length() > 0.12 else "idle"
 	_emitted_markers.clear()
 	_play_imported_clip(_current_action, false)
-
-
-func _on_fallback_action_started(action_name: String) -> void:
-	action_started.emit(action_name)
-
-
-func _on_fallback_action_marker(action_name: String, marker_name: String) -> void:
-	action_marker.emit(action_name, marker_name)
-
-
-func _on_fallback_action_finished(action_name: String) -> void:
-	action_finished.emit(action_name)
 
 
 func _normalized_hand(value: String) -> String:

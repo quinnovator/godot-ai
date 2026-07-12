@@ -1,203 +1,95 @@
-# Pixiball production ballplayer
+# Pixiball Blender ballplayer
 
-This is a deterministic, rigged character asset for Pixiball. Version 13
-rebuilds the figure around a leaner professional-athlete silhouette and stable
-foot mechanics while retaining the realistic open-asset head: the
-head is the professionally sculpted realistic animation head from Blender
-Studio's CC0 "Human Base Meshes" bundle (vendored as
-`source/cc0_head_base.blend`), registered onto the rig's eye targets,
-rigidly weighted to the head bone, and completed with the bundle's layered
-sclera/iris eye parts, added pupils, and brow chains raycast-anchored to the
-sculpted brow ridge. Its cut neck rim hides under an undershirt mock-collar
-exactly where a real compression shirt sits. Proportions are naturalistic
-(about 7.7 heads at a ~1.88 m nominal height) and all materials are
-physically based (subsurface-weighted skin, layered glossy eyes, double-knit
-cloth, oiled leather, lacquered maple, brushed steel). In-engine,
-`BallplayerActor` mirrors those families with a Burley/GGX shader that
-layers real CC0 photogrammetry micro-surface maps (cotton jersey knit,
-leather grain, wood figure from Poly Haven, sampled triplanar -- see
-`assets/textures/surface/LICENSES.md`) and a generated tint-neutral double-knit
-albedo tile, plus procedural pore/strand detail
-and a warm fresnel scatter approximation on skin.
+Asset version 14 is an authored Blender character. The editable source of
+truth is `source/ballplayer.blend`; `ballplayer.glb` is its checked-in runtime
+export. There is no character generator and no primitive/voxel fallback.
 
-The continuous multi-weight anatomy authors restrained musculature and wardrobe
-directly into the deforming ring surfaces: deltoid/bicep/tricep/forearm
-bellies, pectoral plates and a spinal groove under the fitted jersey, a
-classic home uniform (white body, team-piped button placket, red raglan
-sleeves and side panels, belt with loops and buckle, striped team stirrups),
-team wristbands, and cloth that drapes over muscle with authored clearance
-so skin never pokes through garments. The pants tuck inside the jersey hem
-with shared hips weighting so the midriff can never open, and the hands are
-sculpted chains with knuckle and finger-scallop profiles: a half-open glove
-hand plus a throwing-hand fist that wraps the resting bat handle. A lobed
-baseball mitt with a recessed pocket and one open web bridge, sculpted
-cleats, and a structured six-panel cap with a curved tapered brim and small
-embroidered monogram complete the figure. The rig keeps individually reviewed,
-frame-baked quaternion clips. Version 13 replaces position-only three-bone foot
-IK with a two-bone ankle solve and explicit shoe orientation, so balance,
-stride, plant, toe-off, and recovery no longer roll a cleat onto its side. It
-also grounds the swing stance through the same contact system. No Unreal mesh
-or sprite geometry is used, and the asset does not attempt a real-player
-likeness. For all open and generated sources, see
-[Asset provenance](../../../docs/ASSET_PROVENANCE.md).
+The base anatomy comes from Blender Studio's CC0 [Human Base Meshes
+bundle](https://download.blender.org/demo/bundles/bundles-3.6/) and is modified
+for Pixiball as a slim, naturalistic baseball athlete. The Blender file owns
+the complete body and face, fitted jersey/pants/socks, cap, short hair, cleats,
+glove, bat, belt, collar, placket, sleeve trim, hidden role gear, skinning, and
+nine actions. The runtime GLB contains 35 skinned mesh objects on one 31-bone
+armature.
 
-The GLB is the runtime source of truth. The `.blend` remains beside it under the
-ignored `source/` directory so Godot never tries to invoke Blender while a
-ready-to-import GLB is present. `ballplayer.glb.agent.json` records the exact
-Blender version plus SHA-256 hashes; `ballplayer.asset.json` records the stable
-gameplay/art contract.
+Cloth materials retain embedded knit normal and roughness maps. Named material
+slots (`TEAM_Primary`, `TEAM_Secondary`, `TEAM_Accent`, `MAT_Jersey`, and
+`MAT_Pants`) let each actor change uniform colors without changing geometry.
+The front and back of the jersey contain dedicated skinned UV panels named
+`JerseyIdentityFront` and `JerseyIdentityBack`. Godot renders the team mark,
+player surname, and number into high-resolution transparent textures for those
+surfaces, so roster changes remain programmatic while the lettering deforms
+with the authored jersey.
 
-## Rebuild
+Role gear is also modeled and skinned in Blender. `BallplayerEquipment` only
+selects the hidden `Gear_*` meshes for batter, catcher, or umpire roles; it does
+not construct character geometry at runtime.
 
-Install or select Blender 5.x (the promoted receipt records Blender 5.1.2), then
-run from the repository root:
+## Editing and export
+
+Open `source/ballplayer.blend` in Blender 5.x and edit the meshes, weights, or
+actions directly. Export `ballplayer.glb` with glTF 2.0 settings that include:
+
+- binary GLB format;
+- materials, UVs, skins, and all vertex influences;
+- all actions as separate animations;
+- Y-up conversion and applied mesh modifiers;
+- extras enabled so the asset contract metadata is retained.
+
+The source directory contains `.gdignore`, so Godot imports the GLB rather than
+trying to import the working Blender file. After export, refresh imports with:
 
 ```sh
-uv run --project agent godot-agent \
-  --project games/pixiball \
-  blender-build res://assets/blender/build_ballplayer.py \
-  --output res://assets/models/ballplayer/ballplayer.glb \
-  --blend res://assets/models/ballplayer/source/ballplayer.blend \
-  --blender /path/to/Blender.app
+bin/godot.windows.editor.dev.x86_64.console.exe --headless \
+  --path games/pixiball --import
 ```
 
-The companion stages and validates both binary outputs before replacing them.
-Open the project or run the repository editor headlessly after a rebuild so
-Godot refreshes the PackedScene:
+## Visual QA
+
+The QA helper renders fixed rest and action views without modifying the source:
 
 ```sh
-bin/godot.macos.editor.dev.arm64 --headless --editor \
-  --path games/pixiball --quit
-```
-
-## Deterministic visual QA
-
-Render the same rest, field-ready, mound delivery, infield throw, swing, catch,
-run, celebration, and slide review poses after any geometry or animation
-change:
-
-```sh
-/Applications/Blender.app/Contents/MacOS/Blender \
-  --background games/pixiball/assets/models/ballplayer/source/ballplayer.blend \
+blender --background \
+  games/pixiball/assets/models/ballplayer/source/ballplayer.blend \
   --python games/pixiball/assets/blender/render_ballplayer_qa.py -- \
   --output-dir /tmp/pixiball-ballplayer-qa --size 512
 ```
 
-The renderer uses a fixed three-point studio, camera/lens, action frames, color
-management, and equipment visibility. It writes individual PNGs plus
-`qa_receipt.json`; it never saves changes back to the production `.blend`.
+The pitching receipt currently reports release at frame 28, 25.053 m/s hand
+speed, 0.230 m root excursion, full root recovery, and 0.015173 m lead-foot
+drift. Delivery changes should be authored as new/revised Blender actions; the
+actor API and marker contract do not need to change.
 
-The pitching QA set covers balance, hand break, stride, plant, late cock,
-release, extension, follow-through, and finish. Its telemetry rejects an early
-velocity peak, excessive or unrecovered root motion, unstable lead-foot plant,
-missing deceleration, and discontinuous gather rotations. The promoted v13
-receipt measures release at frame 28, 25.053 m/s authored hand speed, 0.230 m
-root excursion, 0.000 m end offset, and 0.015173 m planted-foot drift.
-
-## Instantiate
-
-The facade loads the rigged model first and creates `VoxelBallplayer` only when
-the GLB cannot be loaded or lacks its skeleton, meshes, or animations.
-
-```gdscript
-const BallplayerScene = preload("res://characters/ballplayer_actor.tscn")
-
-var player := BallplayerScene.instantiate() as BallplayerActor
-player.configure({
-    "seed": 34,
-    "role": "pitcher",
-    "number": 34,
-    "player_name": "Maya Rodriguez",
-    "build": "power",
-    "throws": "right",
-    "primary_color": Color("173f73"),
-    "secondary_color": Color("f1ead9"),
-    "accent_color": Color("e2b447"),
-})
-add_child(player)
-player.set_facing(Vector3.FORWARD)
-player.play_action("pitch")
-```
-
-`configure()` is safe before `add_child()`. World-space socket transforms become
-valid once the actor is inside the scene tree. The current game instantiates
-this facade as its primary character path; `voxel_ballplayer.gd` remains the
-validated emergency fallback when the GLB contract cannot be loaded.
-
-The authored skeleton is right-sided. `BallplayerActor` mirrors the complete
-model on X per action: batting side owns `swing`, while throwing hand owns
-`pitch`, `catch`, `field_ready`, `field_throw`, and the `throw` alias. A player
-configured to bat left and throw right therefore changes orientation correctly
-between offense and defense without duplicate GLBs.
-
-## Exact gameplay API
-
-| Member | Contract |
-| --- | --- |
-| `configure(spec: Dictionary)` | Applies deterministic height/build variation, handed mirroring, skin/hair palette, equipment visibility, and team colors. |
-| `play_action(name: String)` | Plays nine native clips: `idle`, `run`, `pitch`, `swing`, `catch`, `field_ready`, `field_throw`, `celebrate`, and `slide`; `throw` is a compatibility alias for `field_throw`. |
-| `set_motion(velocity: Vector3)` | Selects idle/run and scales run cadence. |
-| `set_facing(direction: Vector3)` | Smoothly rotates the actor toward a world-space direction. |
-| `get_socket_position(name: String) -> Vector3` | Returns a stable world-space gameplay point. |
-| `get_socket_node(name: String) -> Node3D` | Returns the live `BoneAttachment3D`, or `null` on voxel fallback. |
-| `attach_to_socket(node, name, keep_global=false) -> bool` | Parents props/effects to the live rig socket. |
-| `set_uniform_colors(primary, secondary, accent, pants)` | Overrides local material copies without mutating the imported scene. |
-| `set_team_mark(mark: String)` | Stores the semantic mark; generated/licensed logo meshes should attach to `chest`. |
-| `set_player_name(player_name: String)` | Rebuilds the curved back surname from vector contours without rebuilding the GLB. |
-| `set_jersey_number(number: int)` | Updates front/back numbers in place and normalizes them to 0-99. |
-| `get_team_mark() -> String` | Returns the live one-character identity mark. |
-| `get_jersey_number() -> int` | Returns the normalized 0-99 jersey number. |
-| `get_player_name() -> String` | Returns the live roster name used for the surname plate. |
-| `get_equipment_profile() -> Dictionary` | Reports role, mark, number, and installed modular piece names. |
-| `get_equipment_piece(name: String) -> Node3D` | Returns a live helmet/mask/protector/identity attachment for QA or presentation. |
-| `set_highlighted(enabled: bool)` | Applies a local emissive selection treatment. |
-| `get_current_action() -> String` | Returns the requested gameplay action, including compatibility aliases. |
-| `get_generation_signature() -> String` | Returns the deterministic actor identity signature. |
-| `is_using_fallback() -> bool` | Reports whether the procedural actor was selected. |
-| `get_model_kind() -> String` | Returns `rigged_glb` or `voxel_fallback`. |
-| `get_available_actions() -> PackedStringArray` | Returns all accepted gameplay action names. |
-
-Signals are `action_started(action_name)`, `action_marker(action_name,
-marker_name)`, and `action_finished(action_name)`. Native markers are
-`pitch:ball_release`, `swing:bat_contact`, `catch:glove_contact`,
-`field_throw:ball_release`, `celebrate:celebration_peak`, and
-`slide:base_contact`.
-
-Stable socket names are `head`, `chest`, `left_hand`, `right_hand`, `glove`,
-`catch`, `throw_hand`, `ball_release`, `bat_grip`, `bat_tip`, `left_foot`,
-`right_foot`, `left_shin`, `right_shin`, and `feet`.
-
-The base asset stays role-neutral. `characters/equipment/ballplayer_equipment.tscn`
-adds batting helmets, catcher/umpire protection, team marks, jersey surnames,
-and numbers as bone-attached, per-instance pieces. This preserves the GLB
-contract and lets future agents replace one equipment family without rebuilding
-the athlete. Identity is stitched tackle-twill geometry, not a billboard: the
-OFL-licensed Graduate font is converted to layered `TextMesh` contours, and
-each glyph is curved around the measured torso with a raised fill, contrasting
-border, and knit response. The team mark, surname, number, and palette all
-update at runtime. Their basis is corrected after every handedness change,
-preventing negative-scale mirroring; the back number remains the dominant
-uniform read from the pitching camera.
-
-For an in-engine look (surface shader plus vector-twill identity, which Blender QA
-renders cannot show), run the capture harness without `--headless`:
+For the Godot material and identity view, run:
 
 ```sh
 bin/godot.windows.editor.dev.x86_64.console.exe --path games/pixiball \
   --script res://tools/capture_ballplayer_review.gd -- --output-dir /tmp/review
 ```
 
-## Validation
+## Runtime contract
+
+`BallplayerActor` loads the GLB, duplicates its PBR materials per instance,
+selects imported equipment, applies palette/height/handedness settings, and
+plays the imported actions. It exposes the existing gameplay sockets and
+signals. `get_model_kind()` returns `rigged_glb` when the asset loads and
+`missing_model` otherwise. `is_using_fallback()` remains as a compatibility
+query and always returns `false`.
+
+Stable actions are `idle`, `run`, `pitch`, `swing`, `catch`, `field_ready`,
+`field_throw`, `celebrate`, and `slide`; `throw` aliases `field_throw`. Stable
+sockets are `head`, `chest`, `left_hand`, `right_hand`, `glove`, `catch`,
+`throw_hand`, `ball_release`, `bat_grip`, `bat_tip`, `left_foot`, `right_foot`,
+`left_shin`, `right_shin`, and `feet`.
+
+Validate the imported asset and roster/equipment path with:
 
 ```sh
-bin/godot.macos.editor.dev.arm64 --headless --path games/pixiball \
+bin/godot.windows.editor.dev.x86_64.console.exe --headless --path games/pixiball \
   --script res://characters/tests/test_ballplayer_asset.gd
-
-bin/godot.macos.editor.dev.arm64 --headless --path games/pixiball \
+bin/godot.windows.editor.dev.x86_64.console.exe --headless --path games/pixiball \
   --script res://characters/tests/test_ballplayer_equipment.gd
 ```
 
-The check loads the real imported scene, verifies the 31-bone armature, eight
-skinned logical meshes, nine distinct native animations, per-action handedness,
-material slots, grounded bounds, facade sockets/recoloring/equipment, action
-signals, and the intentional voxel fallback path.
+See [asset provenance](../../../docs/ASSET_PROVENANCE.md) for source and
+license details.

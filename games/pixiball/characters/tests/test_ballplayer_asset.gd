@@ -14,14 +14,19 @@ const REQUIRED_BONES := [
 ]
 
 const REQUIRED_MESHES := [
-	"Body_Skinned", "Uniform_Skinned", "Hair_Skinned", "Face_Details_Skinned",
-	"Cap_Skinned", "Cleats_Skinned", "Glove_Skinned", "Bat_Skinned",
+	"Body_Skinned", "Jersey_Skinned", "Pants_Skinned", "Socks_Skinned",
+	"Hair_Skinned", "Face_Details_Skinned", "Cap_Skinned", "Cleats_Skinned",
+	"Glove_Skinned", "Bat_Skinned", "Jersey_Collar", "Jersey_Placket",
+	"Jersey_Cuff_L", "Jersey_Cuff_R", "Uniform_Belt", "Uniform_Belt_Buckle",
+	"JerseyIdentityFront", "JerseyIdentityBack", "Gear_BattingHelmet",
+	"Gear_CatcherMask", "Gear_CatcherChest", "Gear_CatcherShinL",
+	"Gear_CatcherShinR", "Gear_UmpireMask", "Gear_UmpireChest",
 ]
 
 const REQUIRED_MATERIALS := [
 	"TEAM_Primary", "TEAM_Secondary", "TEAM_Accent", "MAT_Skin",
-	"MAT_Hair", "MAT_EyeWhite", "MAT_Iris", "MAT_Pants", "MAT_Leather",
-	"MAT_Bat", "MAT_Cleat",
+	"MAT_Hair", "MAT_EyeWhite", "MAT_Iris", "MAT_Pants", "MAT_Jersey",
+	"MAT_Leather", "MAT_Bat", "MAT_Cleat", "MAT_Metal",
 ]
 
 const REQUIRED_ACTIONS := [
@@ -58,7 +63,7 @@ func _run() -> void:
 	_collect(model, skeletons, animation_players, meshes)
 	_expect(skeletons.size() == 1, "expected one shared Skeleton3D, got %d" % skeletons.size())
 	_expect(animation_players.size() == 1, "expected one AnimationPlayer, got %d" % animation_players.size())
-	_expect(meshes.size() == 8, "expected eight logical skinned meshes, got %d" % meshes.size())
+	_expect(meshes.size() == 35, "expected 35 authored Blender mesh objects, got %d" % meshes.size())
 
 	if not skeletons.is_empty():
 		var skeleton := skeletons[0]
@@ -89,35 +94,42 @@ func _run() -> void:
 	var material_names: Dictionary = {}
 	var total_vertices := 0
 	var blended_vertices := 0
-	var bounds := AABB()
-	var has_bounds := false
+	var body_bounds := AABB()
+	var has_body_bounds := false
+	var pbr_textured_surfaces := 0
 	for mesh_instance in meshes:
 		mesh_names.append(String(mesh_instance.name))
 		_expect(mesh_instance.skin != null, "%s is not assigned to the shared skin" % mesh_instance.name)
 		_expect(mesh_instance.scale.is_equal_approx(Vector3.ONE), "%s has non-unit object scale" % mesh_instance.name)
 		if mesh_instance.mesh == null:
 			continue
-		var transformed := mesh_instance.global_transform * mesh_instance.get_aabb()
-		bounds = transformed if not has_bounds else bounds.merge(transformed)
-		has_bounds = true
+		if mesh_instance.name == "Body_Skinned":
+			body_bounds = mesh_instance.global_transform * mesh_instance.get_aabb()
+			has_body_bounds = true
 		for surface in range(mesh_instance.mesh.get_surface_count()):
 			total_vertices += mesh_instance.mesh.surface_get_array_len(surface)
 			blended_vertices += _count_blended_vertices(mesh_instance.mesh, surface)
 			var material := mesh_instance.mesh.surface_get_material(surface)
 			if material != null:
 				material_names[material.resource_name] = true
+				if material is BaseMaterial3D:
+					var pbr := material as BaseMaterial3D
+					if pbr.normal_texture != null or pbr.roughness_texture != null:
+						pbr_textured_surfaces += 1
 	for mesh_name in REQUIRED_MESHES:
 		_expect(mesh_name in mesh_names, "missing logical mesh %s" % mesh_name)
 	for material_name in REQUIRED_MATERIALS:
 		_expect(material_names.has(material_name), "missing material slot %s" % material_name)
 	_expect(total_vertices > 8000, "asset geometry is below the production detail floor")
 	_expect(blended_vertices > 500, "asset has too few multi-weight deformation vertices: %d" % blended_vertices)
-	_expect(has_bounds, "model did not produce bounds")
-	if has_bounds:
-		_expect(bounds.position.y >= -0.01 and bounds.position.y <= 0.02, "feet are not grounded: %s" % bounds)
-		_expect(bounds.size.y >= 1.84 and bounds.size.y <= 1.94, "model height is outside contract: %s" % bounds.size.y)
-		_expect(bounds.size.x >= 1.05 and bounds.size.x <= 1.30, "rest silhouette width is outside contract: %s" % bounds.size.x)
-		_expect(absf(bounds.position.z) > bounds.end.z, "model does not face canonical -Z: %s" % bounds)
+	_expect(pbr_textured_surfaces > 0, "authored cloth lost its PBR normal/roughness maps")
+	_expect(has_body_bounds, "authored body did not produce bounds")
+	if has_body_bounds:
+		_expect(body_bounds.position.y >= -0.02 and body_bounds.position.y <= 0.03, "body feet are not grounded: %s" % body_bounds)
+		_expect(body_bounds.size.y >= 1.78 and body_bounds.size.y <= 1.90, "body height is outside contract: %s" % body_bounds.size.y)
+		# This includes the lowered arms and hands, not just the torso.
+		_expect(body_bounds.size.x >= 0.82 and body_bounds.size.x <= 0.98, "body span is outside the athletic silhouette contract: %s" % body_bounds.size.x)
+		_expect(body_bounds.size.y / body_bounds.size.x >= 1.85, "body span is not proportionally athletic: %s" % body_bounds)
 
 	var actor_scene := load(ACTOR_SCENE_PATH) as PackedScene
 	_expect(actor_scene != null, "BallplayerActor scene did not load")
@@ -138,7 +150,7 @@ func _run() -> void:
 		})
 		root.add_child(actor)
 		await process_frame
-		_expect(not actor.is_using_fallback(), "BallplayerActor unexpectedly selected voxel fallback")
+		_expect(not actor.is_using_fallback(), "BallplayerActor reported a removed fallback path")
 		_expect(actor.get_model_kind() == "rigged_glb", "BallplayerActor reported the wrong model kind")
 		for socket_name in REQUIRED_SOCKETS:
 			_expect(_is_finite_vector(actor.get_socket_position(socket_name)), "socket %s is not finite" % socket_name)
@@ -150,7 +162,9 @@ func _run() -> void:
 		_expect(is_instance_valid(bat) and bat.visible, "batter did not enable imported bat")
 		_expect(is_instance_valid(glove) and not glove.visible, "batter did not hide imported glove")
 		_expect(_active_material_color(actor_meshes, "TEAM_Primary").is_equal_approx(Color("813348")), "primary team material override failed")
-		_expect(_procedural_surface_count(actor_meshes) > 0, "actor did not install UV-independent production materials")
+		_expect(_authored_pbr_surface_count(actor_meshes) > 0, "actor did not preserve authored PBR materials")
+		_expect(_mesh_named(actor_meshes, "JerseyIdentityFront") != null, "actor lost the authored front identity surface")
+		_expect(_mesh_named(actor_meshes, "JerseyIdentityBack") != null, "actor lost the authored back identity surface")
 
 		var started: Array[String] = []
 		var markers: Array[String] = []
@@ -222,13 +236,6 @@ func _run() -> void:
 		_expect(duplicate.get_generation_signature() == signature, "same actor identity produced a different signature")
 		duplicate.free()
 
-		var fallback = actor_scene.instantiate()
-		fallback.model_scene_path = "res://assets/models/ballplayer/does-not-exist.glb"
-		fallback.configure({"seed": 9, "role": "fielder"})
-		_expect(fallback.is_using_fallback(), "missing GLB did not select procedural fallback")
-		_expect(fallback.get_model_kind() == "voxel_fallback", "fallback reported the wrong model kind")
-		fallback.free()
-
 	_finish()
 
 
@@ -274,13 +281,14 @@ func _active_material_color(meshes: Array[MeshInstance3D], wanted: String) -> Co
 	return Color.TRANSPARENT
 
 
-func _procedural_surface_count(meshes: Array[MeshInstance3D]) -> int:
+func _authored_pbr_surface_count(meshes: Array[MeshInstance3D]) -> int:
 	var count := 0
 	for mesh_instance in meshes:
 		if mesh_instance.mesh == null:
 			continue
 		for surface in range(mesh_instance.mesh.get_surface_count()):
-			if mesh_instance.get_active_material(surface) is ShaderMaterial:
+			var material := mesh_instance.get_active_material(surface) as BaseMaterial3D
+			if material != null and (material.normal_texture != null or material.roughness_texture != null):
 				count += 1
 	return count
 
@@ -342,7 +350,7 @@ func _is_finite_vector(value: Vector3) -> bool:
 
 func _finish() -> void:
 	if _failures.is_empty():
-		print("PIXIBALL_BALLPLAYER_ASSET_OK bones=31 meshes=8 actions=9 handedness=verified fallback=verified")
+		print("PIXIBALL_BALLPLAYER_ASSET_OK bones=31 meshes=35 actions=9 authored_pbr=verified handedness=verified")
 		quit(0)
 		return
 	for failure in _failures:

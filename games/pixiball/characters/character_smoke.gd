@@ -33,7 +33,7 @@ func _run() -> void:
 		)
 		player.position.x = float(index) * 2.0
 		player.configure(specs[index])
-		_expect(not player.is_using_fallback(), "player %d unexpectedly selected voxel fallback" % index)
+		_expect(not player.is_using_fallback(), "player %d did not load the Blender model" % index)
 		_expect(player.get_model_kind() == "rigged_glb", "player %d did not load the rigged GLB" % index)
 		player.set_facing(Vector3(0.4, 0.0, -1.0))
 		player.set_motion(Vector3(0.0, 0.0, -3.2))
