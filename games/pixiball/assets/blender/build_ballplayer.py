@@ -3,8 +3,14 @@
 The recipe deliberately uses only Blender's bundled Python API.  Every visible
 piece is weighted to the shared armature, even when a piece is rigid, so the
 result remains easy to art-direct while exporting as a conventional skinned
-glTF.  Rounded low-poly forms and small planar accents create a high-resolution
-pixel-art silhouette without copying any third-party character or texture.
+glTF.  Version 11 targets maximum realism the procedural pipeline can
+express: naturalistic adult-athlete proportions (a 7.5-heads figure with an
+anatomically sized skull), a fully sculpted face with recessed eyeballs,
+lids, nose, lips, and ears, muscle bellies and cloth response authored into
+the deforming ring surfaces, physically based material response (subsurface
+skin, fabric, leather, lacquered wood), and subdivision-level density in the
+hundreds of thousands of triangles.  No third-party character, scan, or
+texture data is used.
 """
 
 from __future__ import annotations
@@ -13,12 +19,71 @@ import math
 from pathlib import Path
 
 import bpy
-from mathutils import Vector
+from mathutils import Euler, Matrix, Vector
+from mathutils.bvhtree import BVHTree
 
-ASSET_VERSION = 7
+# Professionally sculpted CC0 head (Blender Studio "Human Base Meshes"
+# bundle, animation-topology realistic head with layered eye parts),
+# vendored beside the production .blend.  Landmarks below were measured from
+# the vendored file; the fit maps its interpupillary line onto the rig's
+# authored eye targets.
+CC0_HEAD_BLEND = "cc0_head_base.blend"
+CC0_HEAD_OBJECTS = {
+    "head": "GEO-head_animation_realistic",
+    "sclera_l": "GEO-head_animation_realistic.sclera.L",
+    "sclera_r": "GEO-head_animation_realistic.sclera.R",
+    "iris_l": "GEO-head_animation_realistic.iris.L",
+    "iris_r": "GEO-head_animation_realistic.iris.R",
+}
+CC0_SRC_EYE_MID = Vector((1.4626, -0.1203, 0.7667))
+CC0_SRC_INTERPUPIL = 0.0632
+CC0_TARGET_EYE_MID = Vector((0.0, -0.072, 1.732))
+CC0_TARGET_INTERPUPIL = 0.060
+CC0_NECK_CUT_Z = 1.578
+CC0_NECK_BLEND_TOP = 1.664
+
+ASSET_VERSION = 12
 DEG = math.pi / 180.0
 RIG = None
 MATERIALS = {}
+CC0_PROBE = None
+CC0_EYE_PARTS = []
+
+# Realistic default wardrobe/character colors (classic road-gray uniform with
+# navy and red trim).  TEAM_* values are the neutral defaults baked into the
+# GLB; gameplay recolors those slots per team at runtime, and skin/hair are
+# reseeded per player by the actor.
+PALETTE = {
+    "skin": "c28257",
+    "skin_light": "d69c6e",
+    "lip": "ad6b52",
+    "hair": "2c1c12",
+    "hair_light": "4a3320",
+    "team_primary": "20395c",
+    "team_secondary": "9e2f2a",
+    "team_accent": "cfa14a",
+    "cream": "e8e4d8",
+    "cream_shadow": "c5c0b1",
+    "belt": "241d18",
+    "mitt": "7a4526",
+    "mitt_dark": "4c2814",
+    "bat": "b57a42",
+    "tape": "2a231d",
+    "cleat": "1d222d",
+    "cleat_trim": "d8d4c8",
+    "metal": "9aa1a8",
+}
+
+
+def srgb(hex_value):
+    """Convert an sRGB hex string to Blender's linear-space color tuple."""
+
+    text = hex_value.lstrip("#")
+    channels = tuple(int(text[index : index + 2], 16) / 255.0 for index in (0, 2, 4))
+    return tuple(
+        channel / 12.92 if channel <= 0.04045 else ((channel + 0.055) / 1.055) ** 2.4
+        for channel in channels
+    )
 
 
 def reset_scene():
@@ -32,7 +97,16 @@ def reset_scene():
                 datablocks.remove(block)
 
 
-def material(name, color, roughness=0.72, metallic=0.0, emission=None):
+def material(
+    name,
+    color,
+    roughness=0.72,
+    metallic=0.0,
+    specular_ior=0.32,
+    coat_weight=0.0,
+    coat_roughness=0.25,
+    subsurface_weight=0.0,
+):
     value = bpy.data.materials.new(name)
     value.diffuse_color = (*color, 1.0)
     value.use_nodes = True
@@ -42,14 +116,16 @@ def material(name, color, roughness=0.72, metallic=0.0, emission=None):
     shader.inputs["Metallic"].default_value = metallic
     specular = shader.inputs.get("Specular IOR Level")
     if specular is not None:
-        specular.default_value = 0.32
-    if emission is not None:
-        emission_color = shader.inputs.get("Emission Color") or shader.inputs.get("Emission")
-        if emission_color is not None:
-            emission_color.default_value = (*emission, 1.0)
-        strength = shader.inputs.get("Emission Strength")
-        if strength is not None:
-            strength.default_value = 0.18
+        specular.default_value = specular_ior
+    coat = shader.inputs.get("Coat Weight")
+    if coat is not None:
+        coat.default_value = coat_weight
+    coat_roughness_input = shader.inputs.get("Coat Roughness")
+    if coat_roughness_input is not None:
+        coat_roughness_input.default_value = coat_roughness
+    subsurface = shader.inputs.get("Subsurface Weight")
+    if subsurface is not None:
+        subsurface.default_value = subsurface_weight
     value["pixiball_material"] = True
     if name.startswith("TEAM_"):
         value["team_color_slot"] = name.removeprefix("TEAM_").lower()
@@ -57,30 +133,60 @@ def material(name, color, roughness=0.72, metallic=0.0, emission=None):
     return value
 
 
+def radial_profile(segments, phase, bumps, base=1.0):
+    """Build a per-segment radius-multiplier list from angular bumps.
+
+    ``bumps`` is a sequence of ``(center_deg, width_deg, amplitude)`` tuples
+    in the chain ring-angle frame (the front of an upward chain sits at 270
+    degrees).  Each bump adds a smooth raised-cosine lobe, so eye sockets,
+    brow ridges, cheekbones, muscle bellies, and cloth folds can be sculpted
+    directly into the deforming ring surfaces instead of bolted on as
+    separate primitives.
+    """
+
+    values = []
+    for segment in range(segments):
+        angle = 360.0 * (float(segment) + float(phase)) / float(segments)
+        value = float(base)
+        for center, width, amplitude in bumps:
+            delta = (angle - float(center) + 180.0) % 360.0 - 180.0
+            if abs(delta) < float(width):
+                value += float(amplitude) * 0.5 * (1.0 + math.cos(math.pi * delta / float(width)))
+        values.append(value)
+    return values
+
+
 def build_materials():
-    material("MAT_Skin", (0.67, 0.345, 0.175), roughness=0.82)
-    material("MAT_SkinLight", (0.91, 0.58, 0.36), roughness=0.80)
-    material("MAT_Hair", (0.055, 0.026, 0.018), roughness=0.90)
-    material("MAT_HairHighlight", (0.17, 0.072, 0.035), roughness=0.88)
-    material("MAT_EyeWhite", (0.91, 0.91, 0.82), roughness=0.72)
-    material("MAT_Iris", (0.045, 0.16, 0.17), roughness=0.55)
-    material("MAT_Pupil", (0.006, 0.009, 0.012), roughness=0.38)
-    material("MAT_Mouth", (0.23, 0.035, 0.04), roughness=0.78)
-    material("TEAM_Primary", (0.035, 0.18, 0.31), roughness=0.72)
-    material("TEAM_Secondary", (0.72, 0.045, 0.065), roughness=0.72)
-    material("TEAM_Accent", (0.95, 0.58, 0.08), roughness=0.64)
-    material("MAT_Pants", (0.78, 0.79, 0.75), roughness=0.78)
-    material("MAT_PantsShadow", (0.48, 0.51, 0.51), roughness=0.82)
-    material("MAT_Belt", (0.055, 0.045, 0.04), roughness=0.72)
-    material("MAT_Leather", (0.23, 0.075, 0.026), roughness=0.88)
-    material("MAT_LeatherLight", (0.53, 0.20, 0.065), roughness=0.84)
-    material("MAT_Bat", (0.52, 0.27, 0.075), roughness=0.63)
-    material("MAT_BatTape", (0.055, 0.06, 0.065), roughness=0.78)
-    material("MAT_Cleat", (0.025, 0.032, 0.042), roughness=0.62)
-    material("MAT_CleatEdge", (0.18, 0.20, 0.22), roughness=0.58)
-    material("MAT_Sock", (0.90, 0.88, 0.79), roughness=0.82)
-    material("MAT_Rubber", (0.012, 0.017, 0.025), roughness=0.76)
-    material("MAT_Metal", (0.46, 0.52, 0.55), roughness=0.33, metallic=0.68)
+    # Physically based wardrobe: sweat-sheened subsurface skin, wet layered
+    # eyes, polyester double-knit cloth, oiled leather, lacquered maple, and
+    # brushed steel.  The realism read comes from distinct micro-response per
+    # family; the actor's runtime shader mirrors these families in-engine.
+    material("MAT_Skin", srgb(PALETTE["skin"]), roughness=0.52, specular_ior=0.40, subsurface_weight=0.06)
+    material("MAT_SkinLight", srgb(PALETTE["skin_light"]), roughness=0.55, specular_ior=0.38, subsurface_weight=0.09)
+    material("MAT_Lip", srgb(PALETTE["lip"]), roughness=0.42, specular_ior=0.44, subsurface_weight=0.13)
+    material("MAT_Nostril", (0.012, 0.006, 0.005), roughness=0.7, specular_ior=0.2)
+    material("MAT_Hair", srgb(PALETTE["hair"]), roughness=0.46, specular_ior=0.42, coat_weight=0.12, coat_roughness=0.35)
+    material("MAT_HairHighlight", srgb(PALETTE["hair_light"]), roughness=0.42, specular_ior=0.44, coat_weight=0.14, coat_roughness=0.32)
+    # Layered wet eyes: bright sclera with a glossy film, a matte-fibrous
+    # iris, and a near-black pupil.  The corneal glint comes from the low
+    # sclera roughness under the key light.
+    material("MAT_EyeWhite", (0.86, 0.85, 0.83), roughness=0.09, specular_ior=0.52, coat_weight=0.35, coat_roughness=0.06)
+    material("MAT_Iris", srgb("5d3a1f"), roughness=0.30, specular_ior=0.40, coat_weight=0.30, coat_roughness=0.08)
+    material("MAT_Pupil", (0.004, 0.004, 0.005), roughness=0.12, specular_ior=0.45, coat_weight=0.30, coat_roughness=0.06)
+    material("TEAM_Primary", srgb(PALETTE["team_primary"]), roughness=0.74, specular_ior=0.26)
+    material("TEAM_Secondary", srgb(PALETTE["team_secondary"]), roughness=0.74, specular_ior=0.26)
+    material("TEAM_Accent", srgb(PALETTE["team_accent"]), roughness=0.68, specular_ior=0.3)
+    material("MAT_Pants", srgb(PALETTE["cream"]), roughness=0.78, specular_ior=0.24)
+    material("MAT_PantsShadow", srgb(PALETTE["cream_shadow"]), roughness=0.8, specular_ior=0.22)
+    material("MAT_Belt", srgb(PALETTE["belt"]), roughness=0.38, specular_ior=0.4, coat_weight=0.18, coat_roughness=0.2)
+    material("MAT_Leather", srgb(PALETTE["mitt_dark"]), roughness=0.5, specular_ior=0.38, coat_weight=0.12)
+    material("MAT_LeatherLight", srgb(PALETTE["mitt"]), roughness=0.46, specular_ior=0.4, coat_weight=0.14)
+    material("MAT_Bat", srgb(PALETTE["bat"]), roughness=0.24, specular_ior=0.46, coat_weight=0.35, coat_roughness=0.12)
+    material("MAT_BatTape", srgb(PALETTE["tape"]), roughness=0.82, specular_ior=0.2)
+    material("MAT_Cleat", srgb(PALETTE["cleat"]), roughness=0.3, specular_ior=0.44, coat_weight=0.25, coat_roughness=0.15)
+    material("MAT_CleatEdge", srgb(PALETTE["cleat_trim"]), roughness=0.62, specular_ior=0.3)
+    material("MAT_Rubber", (0.012, 0.017, 0.025), roughness=0.72, specular_ior=0.28)
+    material("MAT_Metal", srgb(PALETTE["metal"]), roughness=0.22, metallic=0.85, specular_ior=0.45)
 
 
 def create_rig():
@@ -103,8 +209,11 @@ def create_rig():
         ("hips", (0.0, 0.0, 0.84), (0.0, 0.0, 1.05), "root", True),
         ("spine", (0.0, 0.0, 1.05), (0.0, 0.0, 1.28), "hips", True),
         ("chest", (0.0, 0.0, 1.28), (0.0, 0.0, 1.48), "spine", True),
-        ("neck", (0.0, 0.0, 1.48), (0.0, 0.0, 1.58), "chest", True),
-        ("head", (0.0, 0.0, 1.58), (0.0, 0.0, 1.86), "neck", True),
+        # Realistic cervical proportions: a short exposed neck above the
+        # collar and a naturalistic 0.28 m head-bone span, sized so the
+        # figure reads about 7.7 heads tall against the fixed shoulder line.
+        ("neck", (0.0, 0.0, 1.48), (0.0, 0.0, 1.56), "chest", True),
+        ("head", (0.0, 0.0, 1.56), (0.0, 0.0, 1.84), "neck", True),
         ("clavicle.L", (0.0, 0.0, 1.43), (0.255, 0.0, 1.43), "chest", True),
         ("upper_arm.L", (0.255, 0.0, 1.43), (0.39, 0.0, 1.16), "clavicle.L", True),
         ("forearm.L", (0.39, 0.0, 1.16), (0.43, -0.005, 0.91), "upper_arm.L", True),
@@ -121,7 +230,7 @@ def create_rig():
         ("shin.R", (-0.14, 0.006, 0.59), (-0.14, 0.0, 0.17), "thigh.R", True),
         ("foot.R", (-0.14, 0.0, 0.17), (-0.14, -0.22, 0.075), "shin.R", True),
         ("toe.R", (-0.14, -0.22, 0.075), (-0.14, -0.34, 0.07), "foot.R", True),
-        ("socket_head", (0.0, -0.19, 1.79), (0.0, -0.27, 1.79), "head", False),
+        ("socket_head", (0.0, -0.11, 1.75), (0.0, -0.19, 1.75), "head", False),
         ("socket_chest", (0.0, -0.17, 1.35), (0.0, -0.25, 1.35), "chest", False),
         ("socket_glove", (0.43, -0.07, 0.82), (0.43, -0.17, 0.82), "hand.L", False),
         ("socket_catch", (0.43, -0.20, 0.84), (0.43, -0.29, 0.84), "hand.L", False),
@@ -147,15 +256,41 @@ def create_rig():
         bone["semantic_bone"] = True
         if bone.name.startswith("socket_"):
             bone["semantic_role"] = "attachment_socket"
+    # Quaternion tracks are essential for the large compound rotations in a
+    # pitching delivery.  Baking independent IK solves back to XYZ Euler keys
+    # produced branch flips between otherwise quiet frames (and visible arm
+    # whips through the face).  glTF exports these quaternion curves natively.
     for pose_bone in rig.pose.bones:
-        pose_bone.rotation_mode = "XYZ"
+        pose_bone.rotation_mode = "QUATERNION"
     RIG = rig
     return rig
 
 
-def finish_mesh(obj, name, mat_name, bone_name, smooth=True, bevel=0.0):
+def apply_subdivision(obj, levels):
+    """Bake Catmull-Clark subdivision into the mesh before it is skinned.
+
+    Applied ahead of the armature modifier so vertex-group weights authored
+    on the control cage interpolate smoothly across the dense result.
+    """
+
+    if levels <= 0:
+        return
+    modifier = obj.modifiers.new("RealismSubdivision", "SUBSURF")
+    modifier.levels = levels
+    modifier.render_levels = levels
+    bpy.ops.object.select_all(action="DESELECT")
+    bpy.context.view_layer.objects.active = obj
+    obj.select_set(True)
+    bpy.ops.object.modifier_apply(modifier=modifier.name)
+
+
+def finish_mesh(obj, name, mat_name, bone_name, smooth=True, bevel=0.0, subdiv=0):
     obj.name = name
     obj.data.name = name + "_Mesh"
+    # Deselect strays first: transform_apply acts on every selected object,
+    # and selection bleed from earlier operators once smeared a stale
+    # transform across appended meshes.
+    bpy.ops.object.select_all(action="DESELECT")
     bpy.context.view_layer.objects.active = obj
     obj.select_set(True)
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
@@ -166,6 +301,7 @@ def finish_mesh(obj, name, mat_name, bone_name, smooth=True, bevel=0.0):
         modifier.limit_method = "ANGLE"
         bpy.context.view_layer.objects.active = obj
         bpy.ops.object.modifier_apply(modifier=modifier.name)
+    apply_subdivision(obj, subdiv)
     if smooth:
         for polygon in obj.data.polygons:
             polygon.use_smooth = True
@@ -179,7 +315,7 @@ def finish_mesh(obj, name, mat_name, bone_name, smooth=True, bevel=0.0):
     return obj
 
 
-def uv_part(name, location, scale, mat, bone, segments=16, rings=10, smooth=True, rotation=(0.0, 0.0, 0.0)):
+def uv_part(name, location, scale, mat, bone, segments=16, rings=10, smooth=True, rotation=(0.0, 0.0, 0.0), subdiv=0):
     bpy.ops.mesh.primitive_uv_sphere_add(
         segments=segments,
         ring_count=rings,
@@ -189,7 +325,7 @@ def uv_part(name, location, scale, mat, bone, segments=16, rings=10, smooth=True
     )
     obj = bpy.context.object
     obj.scale = scale
-    return finish_mesh(obj, name, mat, bone, smooth=smooth)
+    return finish_mesh(obj, name, mat, bone, smooth=smooth, subdiv=subdiv)
 
 
 def ico_part(name, location, scale, mat, bone, subdivisions=2, smooth=False, rotation=(0.0, 0.0, 0.0)):
@@ -238,7 +374,193 @@ def torus_part(name, location, major_radius, minor_radius, mat, bone, rotation=(
     return finish_mesh(bpy.context.object, name, mat, bone, smooth=True)
 
 
-def weighted_chain_part(name, rings, mat, segments=20, smooth=True, phase=0.0, face_materials=None, cap_materials=None):
+def fit_cc0_point(point):
+    """Map a coordinate from the vendored head's space into rig space."""
+
+    scale = CC0_TARGET_INTERPUPIL / CC0_SRC_INTERPUPIL
+    return CC0_TARGET_EYE_MID + (Vector(point) - CC0_SRC_EYE_MID) * scale
+
+
+def append_cc0_head_objects():
+    """Append the vendored CC0 head parts and fit them onto the rig.
+
+    The fit is a uniform scale + translation registering the sculpt's
+    interpupillary line onto the rig's authored eye targets.  The neck stump
+    is cut just above the jersey collar so the recipe's own deforming neck
+    tube carries the visible neck, and the sculpt's upper-neck rim tucks
+    invisibly inside it.
+    """
+
+    source = Path(__file__).resolve().parent.parent / "models" / "ballplayer" / "source" / CC0_HEAD_BLEND
+    with bpy.data.libraries.load(str(source), link=False) as (data_from, data_to):
+        data_to.objects = [name for name in data_from.objects if name in CC0_HEAD_OBJECTS.values()]
+    appended = {}
+    for obj in data_to.objects:
+        bpy.context.collection.objects.link(obj)
+        appended[obj.name] = obj
+    # matrix_world is only composed from loc/rot/scale after a depsgraph
+    # update; reading it straight after linking returns identity.
+    bpy.context.view_layer.update()
+    # The bundle parents the eye parts to the head object.  Clear that
+    # hierarchy (preserving world transforms) before fitting, or later
+    # identity assignments resolve against a parent that no longer exists
+    # once the head is joined into the body mesh.
+    for obj in appended.values():
+        world = obj.matrix_world.copy()
+        obj.parent = None
+        obj.matrix_world = world
+    bpy.context.view_layer.update()
+    for obj in appended.values():
+        source_matrix = obj.matrix_world.copy()
+        for vertex in obj.data.vertices:
+            world = source_matrix @ vertex.co
+            vertex.co = fit_cc0_point(world)
+        obj.matrix_world = Matrix.Identity(4)
+        obj.data.update()
+        vertices = obj.data.vertices
+        print(
+            "CC0_FIT", obj.name,
+            "x %.4f..%.4f" % (min(v.co.x for v in vertices), max(v.co.x for v in vertices)),
+            "y %.4f..%.4f" % (min(v.co.y for v in vertices), max(v.co.y for v in vertices)),
+            "z %.4f..%.4f" % (min(v.co.z for v in vertices), max(v.co.z for v in vertices)),
+        )
+    bpy.context.view_layer.update()
+
+    head = appended[CC0_HEAD_OBJECTS["head"]]
+    import bmesh
+
+    mesh_data = head.data
+    editor = bmesh.new()
+    editor.from_mesh(mesh_data)
+    doomed = [vertex for vertex in editor.verts if vertex.co.z < CC0_NECK_CUT_Z]
+    bmesh.ops.delete(editor, geom=doomed, context="VERTS")
+    editor.to_mesh(mesh_data)
+    editor.free()
+    mesh_data.update()
+
+    # The sculpt's own neck (sternocleidomastoid, trapezius roots) is the
+    # visible neck; the cut rim below hides under the undershirt mock-collar
+    # that build_uniform wraps around it, exactly where a real jersey covers.
+    # The residual trapezius flare just above the rim tucks radially into the
+    # collar; the chin/jaw region (front of the y guard) stays untouched.
+    axis_y = 0.006
+    for vertex in mesh_data.vertices:
+        if vertex.co.z >= 1.615 or vertex.co.y <= -0.052:
+            continue
+        blend = max(0.0, min(1.0, (vertex.co.z - CC0_NECK_CUT_Z) / (1.615 - CC0_NECK_CUT_Z)))
+        radius_max = 0.052 + blend * 0.012
+        offset_y = vertex.co.y - axis_y
+        radius = math.hypot(vertex.co.x, offset_y)
+        if radius > radius_max:
+            shrink = radius_max / radius
+            vertex.co.x *= shrink
+            vertex.co.y = axis_y + offset_y * shrink
+    mesh_data.update()
+
+    # Rigid head weighting with a short blend into the neck across the
+    # concealed overlap band.
+    head_group = head.vertex_groups.new(name="head")
+    neck_group = head.vertex_groups.new(name="neck")
+    span = CC0_NECK_BLEND_TOP - CC0_NECK_CUT_Z
+    for vertex in mesh_data.vertices:
+        blend = min(1.0, max(0.0, (vertex.co.z - CC0_NECK_CUT_Z) / span))
+        head_group.add([vertex.index], blend, "REPLACE")
+        if blend < 1.0:
+            neck_group.add([vertex.index], 1.0 - blend, "REPLACE")
+    for polygon in mesh_data.polygons:
+        polygon.use_smooth = True
+    mesh_data.materials.append(MATERIALS["MAT_Skin"])
+    apply_subdivision(head, 1)
+    modifier = head.modifiers.new("BallplayerArmature", "ARMATURE")
+    modifier.object = RIG
+    modifier.use_deform_preserve_volume = True
+
+    for key in ("sclera_l", "sclera_r", "iris_l", "iris_r"):
+        obj = appended[CC0_HEAD_OBJECTS[key]]
+        for polygon in obj.data.polygons:
+            polygon.use_smooth = True
+        obj.data.materials.append(MATERIALS["MAT_EyeWhite" if "sclera" in key else "MAT_Iris"])
+        group = obj.vertex_groups.new(name="head")
+        group.add(range(len(obj.data.vertices)), 1.0, "REPLACE")
+        modifier = obj.modifiers.new("BallplayerArmature", "ARMATURE")
+        modifier.object = RIG
+        modifier.use_deform_preserve_volume = True
+    return appended
+
+
+def head_surface_probe(head_object):
+    """Return a raycast helper over the fitted head surface.
+
+    ``probe(origin, direction)`` returns the world-space hit location or
+    ``None``; anchors for brows, hair shells, the cap, and sideburns are
+    derived from real sculpt geometry instead of hardcoded offsets.
+    """
+
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    tree = BVHTree.FromObject(head_object, depsgraph)
+
+    def probe(origin, direction):
+        location, _normal, _index, _distance = tree.ray_cast(Vector(origin), Vector(direction).normalized(), 2.0)
+        return location
+
+    return probe
+
+
+def ellipsoid_plate(name, center, radii, mat, bone, azimuth, elevation, columns, rows, inflate=1.045, subdiv=0):
+    """Create a curved shell patch hugging the front of an ellipsoid.
+
+    The patch is parametrized by azimuth around Z (0 faces the character's
+    -Y front) and elevation, sampled just outside the carrier surface so the
+    texel art reads as painted-on.  UVs span the full patch: image column 0
+    lands on the character's -X side, which a front-on camera sees on its
+    left, so ASCII pixel rows render exactly as authored.
+    """
+
+    azimuth_max = float(azimuth)
+    elevation_min, elevation_max = (float(value) for value in elevation)
+    center_v = Vector(center)
+    vertices = []
+    for row in range(rows + 1):
+        pitch = elevation_max + (elevation_min - elevation_max) * row / rows
+        for column in range(columns + 1):
+            yaw = -azimuth_max + 2.0 * azimuth_max * column / columns
+            vertices.append(
+                (
+                    center_v.x + math.sin(yaw) * math.cos(pitch) * radii[0] * inflate,
+                    center_v.y - math.cos(yaw) * math.cos(pitch) * radii[1] * inflate,
+                    center_v.z + math.sin(pitch) * radii[2] * inflate,
+                )
+            )
+    faces = []
+    for row in range(rows):
+        for column in range(columns):
+            corner = row * (columns + 1) + column
+            faces.append((corner, corner + 1, corner + columns + 2, corner + columns + 1))
+
+    mesh = bpy.data.meshes.new(name + "_Mesh")
+    mesh.from_pydata(vertices, [], faces)
+    mesh.update()
+    uv_layer = mesh.uv_layers.new(name="UVMap")
+    for polygon in mesh.polygons:
+        polygon.use_smooth = True
+        for loop_index in polygon.loop_indices:
+            vertex_index = mesh.loops[loop_index].vertex_index
+            row, column = divmod(vertex_index, columns + 1)
+            uv_layer.data[loop_index].uv = (column / columns, 1.0 - row / rows)
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(obj)
+    mesh.materials.append(MATERIALS[mat])
+    apply_subdivision(obj, subdiv)
+    group = obj.vertex_groups.new(name=bone)
+    group.add(range(len(obj.data.vertices)), 1.0, "REPLACE")
+    modifier = obj.modifiers.new("BallplayerArmature", "ARMATURE")
+    modifier.object = RIG
+    modifier.use_deform_preserve_volume = True
+    obj["weighted_bone"] = bone
+    return obj
+
+
+def weighted_chain_part(name, rings, mat, segments=20, smooth=True, phase=0.0, face_materials=None, cap_materials=None, subdiv=0):
     """Create a continuous, multi-weight tube through an articulated chain.
 
     ``rings`` contains ``(center, side_radius, depth_radius, weights)`` tuples,
@@ -362,8 +684,9 @@ def join_parts(parts, name, category):
     for part in parts:
         part.select_set(True)
     bpy.context.view_layer.objects.active = parts[0]
-    bpy.ops.object.join()
-    obj = bpy.context.object
+    if len(parts) > 1:
+        bpy.ops.object.join()
+    obj = bpy.context.view_layer.objects.active
     obj.name = name
     obj.data.name = name + "_Mesh"
     obj["semantic_role"] = category
@@ -388,95 +711,104 @@ def join_parts(parts, name, category):
 
 
 def build_body():
+    global CC0_PROBE
     parts = []
-    # One coherent warm skin tone across cranium, jaw and ears keeps the face
-    # readable at gameplay scale; graphic contrast now comes from the face
-    # planes, hair, and cap rather than mottled skin patches.  The result is
-    # authored, deterministic, and intentionally not a real-player likeness.
-    parts.append(uv_part("Body_Head", (0.0, 0.002, 1.724), (0.155, 0.134, 0.186), "MAT_Skin", "head", 40, 24))
-    parts.append(ico_part("Body_Jaw", (0.0, -0.054, 1.646), (0.133, 0.106, 0.118), "MAT_Skin", "head", 3, True))
-    # Same-material cheek and brow-ridge masses push the face silhouette
-    # outward so the head reads as authored form instead of a bare sphere,
-    # without adding any value noise at gameplay scale.  A chin cap under the
-    # jaw sharpens the profile line from the mouth to the neck.
-    parts.append(uv_part("Body_Cheek_L", (0.082, -0.112, 1.688), (0.046, 0.038, 0.044), "MAT_Skin", "head", 16, 11))
-    parts.append(uv_part("Body_Cheek_R", (-0.082, -0.112, 1.688), (0.046, 0.038, 0.044), "MAT_Skin", "head", 16, 11))
-    parts.append(uv_part("Body_BrowRidge", (0.0, -0.118, 1.792), (0.118, 0.044, 0.030), "MAT_Skin", "head", 18, 9))
-    parts.append(uv_part("Body_Chin", (0.0, -0.098, 1.606), (0.058, 0.052, 0.042), "MAT_Skin", "head", 16, 10))
-    parts.append(uv_part("Body_Ear_L", (0.153, -0.002, 1.718), (0.028, 0.022, 0.054), "MAT_Skin", "head", 16, 11))
-    parts.append(uv_part("Body_Ear_R", (-0.153, 0.001, 1.713), (0.028, 0.022, 0.053), "MAT_Skin", "head", 16, 11))
-    parts.append(uv_part("Body_EarLobe_L", (0.150, -0.014, 1.694), (0.014, 0.014, 0.020), "MAT_Skin", "head", 10, 7))
-    parts.append(uv_part("Body_EarLobe_R", (-0.150, -0.011, 1.690), (0.014, 0.014, 0.020), "MAT_Skin", "head", 10, 7))
-    parts.append(
-        ico_part("Body_NoseTip", (0.0, -0.154, 1.700), (0.035, 0.030, 0.035), "MAT_SkinLight", "head", 2, True)
-    )
+    # The head is the professionally sculpted CC0 base mesh, registered onto
+    # the rig's eye targets and rigidly weighted to the head bone.  Anchors
+    # for brows, hair, and the cap are raycast from its real surface by the
+    # probe stashed here for the later builders.
+    appended = append_cc0_head_objects()
+    head = appended[CC0_HEAD_OBJECTS["head"]]
+    head.name = "Body_HeadSculpt"
+    CC0_PROBE = head_surface_probe(head)
+    parts.append(head)
+    CC0_EYE_PARTS.clear()
+    for key in ("sclera_l", "sclera_r", "iris_l", "iris_r"):
+        CC0_EYE_PARTS.append(appended[CC0_HEAD_OBJECTS[key]])
+    # A trapezius shoulder saddle bridges the sculpt's neck roots into the
+    # jersey yoke at the back; the sculpt itself carries all visible neck
+    # anatomy above the undershirt collar.
     parts.append(
         weighted_chain_part(
-            "Body_NoseBridge",
+            "Body_TrapsSaddle",
             [
-                ((0.0, -0.126, 1.752), 0.020, 0.014, {"head": 1.0}),
-                ((0.0, -0.140, 1.728), 0.024, 0.016, {"head": 1.0}),
-                ((0.0, -0.150, 1.708), 0.027, 0.018, {"head": 1.0}),
-            ],
-            "MAT_Skin",
-            10,
-        )
-    )
-    parts.append(
-        weighted_chain_part(
-            "Body_NeckBlend",
-            [
-                ((0.0, 0.0, 1.462), 0.098, 0.090, {"chest": 0.45, "neck": 0.55}),
-                ((0.0, 0.0, 1.502), 0.088, 0.081, {"chest": 0.18, "neck": 0.82}),
-                ((0.0, 0.002, 1.540), 0.083, 0.077, {"neck": 1.0}),
-                ((0.0, 0.002, 1.575), 0.084, 0.078, {"neck": 0.62, "head": 0.38}),
-                ((0.0, 0.0, 1.612), 0.088, 0.082, {"neck": 0.28, "head": 0.72}),
+                (
+                    (0.0, 0.010, 1.446),
+                    0.088,
+                    0.078,
+                    {"chest": 0.80, "neck": 0.20},
+                    radial_profile(24, 0.5, ((90.0, 85.0, 0.62),)),
+                ),
+                (
+                    (0.0, 0.008, 1.482),
+                    0.078,
+                    0.070,
+                    {"chest": 0.45, "neck": 0.55},
+                    radial_profile(24, 0.5, ((90.0, 75.0, 0.30),)),
+                ),
+                ((0.0, 0.005, 1.516), 0.070, 0.064, {"neck": 0.85, "chest": 0.15}),
+                ((0.0, 0.003, 1.545), 0.064, 0.060, {"neck": 0.70, "head": 0.30}),
             ],
             "MAT_Skin",
             24,
+            phase=0.5,
+            subdiv=2,
         )
     )
 
-    # Anatomical arm tubes: deltoid mass, a bicep peak against a flatter
-    # tricep plane, a pinched elbow landmark, a flared then tapering forearm,
-    # and a narrowing wrist that hands the surface off to the sculpted hand
-    # chains below.  The bicep/tricep asymmetry is authored with a gentle
-    # single-lobe radial profile so the upper arm reads as muscle, not pipe.
-    arm_segments = 28
-    bicep_profile = [
-        1.0 + 0.050 * math.cos(math.tau * (k + 0.5) / arm_segments + math.pi * 0.5) for k in range(arm_segments)
-    ]
-    forearm_profile = [
-        1.0 + 0.035 * math.cos(math.tau * (k + 0.5) / arm_segments - math.pi * 0.5) for k in range(arm_segments)
-    ]
+    # Anatomical arm tubes: a deltoid cap, a bicep belly against the flatter
+    # tricep plane behind it, a pinched elbow landmark, a brachioradialis and
+    # extensor wedge flaring the upper forearm on the thumb side, and a
+    # narrowing wrist that hands the surface off to the sculpted hand chains
+    # below.  In the ring-angle frame the front of the arm is 270 degrees and
+    # the lateral (outer) side is 0 degrees for the left arm / 180 for the
+    # right, so lateral muscle groups are authored per side.
+    arm_segments = 40
+    # Wristbands: two deforming team-color rings authored as face bands on
+    # the bare forearm, just above each hand -- standard on-field wear.
+    def wristband_faces(band, segment):
+        return "TEAM_Primary" if band in (12, 13) else None
+
     for side, sign in (("L", 1.0), ("R", -1.0)):
         upper_bone = "upper_arm." + side
         forearm_bone = "forearm." + side
         hand_bone = "hand." + side
         clavicle_bone = "clavicle." + side
+        lateral = 0.0 if side == "L" else 180.0
+        deltoid = ((lateral, 70.0, 0.06), (270.0, 40.0, 0.02))
+        bicep = ((270.0, 55.0, 0.10), (90.0, 65.0, 0.050))
+        elbow = ((90.0, 30.0, 0.05),)
+        extensor = ((lateral, 55.0, 0.085), (270.0, 45.0, 0.045))
+        flexor = ((270.0, 50.0, 0.045), (lateral, 45.0, 0.035))
+
+        def arm_profile(bumps):
+            return radial_profile(arm_segments, 0.5, bumps)
+
         parts.append(
             weighted_chain_part(
                 "Body_ArmBlend_" + side,
                 [
-                    ((0.305 * sign, 0.000, 1.352), 0.106, 0.104, {clavicle_bone: 0.30, upper_bone: 0.70}),
-                    ((0.330 * sign, 0.000, 1.308), 0.104, 0.102, {clavicle_bone: 0.12, upper_bone: 0.88}),
-                    ((0.352 * sign, -0.001, 1.272), 0.098, 0.096, {upper_bone: 1.0}, bicep_profile),
-                    ((0.370 * sign, -0.002, 1.240), 0.094, 0.092, {upper_bone: 1.0}, bicep_profile),
-                    ((0.383 * sign, -0.003, 1.212), 0.089, 0.087, {upper_bone: 1.0}, bicep_profile),
-                    ((0.394 * sign, -0.003, 1.188), 0.084, 0.082, {upper_bone: 0.80, forearm_bone: 0.20}),
-                    ((0.402 * sign, -0.004, 1.164), 0.079, 0.078, {upper_bone: 0.55, forearm_bone: 0.45}),
-                    ((0.407 * sign, -0.005, 1.142), 0.074, 0.073, {upper_bone: 0.30, forearm_bone: 0.70}),
-                    ((0.412 * sign, -0.006, 1.112), 0.076, 0.074, {upper_bone: 0.12, forearm_bone: 0.88}),
-                    ((0.418 * sign, -0.008, 1.072), 0.083, 0.081, {forearm_bone: 1.0}, forearm_profile),
-                    ((0.422 * sign, -0.010, 1.030), 0.080, 0.078, {forearm_bone: 1.0}, forearm_profile),
-                    ((0.426 * sign, -0.012, 0.988), 0.074, 0.072, {forearm_bone: 1.0}, forearm_profile),
-                    ((0.430 * sign, -0.015, 0.952), 0.067, 0.063, {forearm_bone: 0.88, hand_bone: 0.12}),
-                    ((0.432 * sign, -0.018, 0.926), 0.061, 0.055, {forearm_bone: 0.68, hand_bone: 0.32}),
-                    ((0.434 * sign, -0.024, 0.898), 0.055, 0.047, {forearm_bone: 0.35, hand_bone: 0.65}),
+                    ((0.305 * sign, 0.000, 1.352), 0.100, 0.098, {clavicle_bone: 0.30, upper_bone: 0.70}, arm_profile(deltoid)),
+                    ((0.330 * sign, 0.000, 1.308), 0.097, 0.095, {clavicle_bone: 0.12, upper_bone: 0.88}, arm_profile(deltoid)),
+                    ((0.352 * sign, -0.001, 1.272), 0.090, 0.088, {upper_bone: 1.0}, arm_profile(bicep)),
+                    ((0.370 * sign, -0.002, 1.240), 0.086, 0.084, {upper_bone: 1.0}, arm_profile(bicep)),
+                    ((0.383 * sign, -0.003, 1.212), 0.081, 0.079, {upper_bone: 1.0}, arm_profile(bicep)),
+                    ((0.394 * sign, -0.003, 1.188), 0.076, 0.074, {upper_bone: 0.80, forearm_bone: 0.20}, arm_profile(elbow)),
+                    ((0.402 * sign, -0.004, 1.164), 0.071, 0.070, {upper_bone: 0.55, forearm_bone: 0.45}, arm_profile(elbow)),
+                    ((0.407 * sign, -0.005, 1.142), 0.067, 0.066, {upper_bone: 0.30, forearm_bone: 0.70}, arm_profile(elbow)),
+                    ((0.412 * sign, -0.006, 1.112), 0.069, 0.067, {upper_bone: 0.12, forearm_bone: 0.88}, arm_profile(extensor)),
+                    ((0.418 * sign, -0.008, 1.072), 0.075, 0.073, {forearm_bone: 1.0}, arm_profile(extensor)),
+                    ((0.422 * sign, -0.010, 1.030), 0.072, 0.070, {forearm_bone: 1.0}, arm_profile(flexor)),
+                    ((0.426 * sign, -0.012, 0.988), 0.066, 0.064, {forearm_bone: 1.0}, arm_profile(flexor)),
+                    ((0.430 * sign, -0.015, 0.952), 0.060, 0.056, {forearm_bone: 0.88, hand_bone: 0.12}),
+                    ((0.432 * sign, -0.018, 0.926), 0.055, 0.049, {forearm_bone: 0.68, hand_bone: 0.32}),
+                    ((0.434 * sign, -0.024, 0.898), 0.051, 0.044, {forearm_bone: 0.35, hand_bone: 0.65}),
                 ],
                 "MAT_Skin",
                 arm_segments,
                 phase=0.5,
+                face_materials=wristband_faces,
+                subdiv=2,
             )
         )
 
@@ -487,15 +819,15 @@ def build_body():
     # glove-side hand stays half-open for catches and celebrations while the
     # throwing hand curls into a compact fist whose volume wraps the resting
     # bat handle, with a thumb chain crossing the front of the grip.
-    hand_segments = 22
+    hand_segments = 30
     knuckle_profile = [
-        1.0 + 0.065 * math.cos(4.0 * math.tau * (k + 0.5) / hand_segments) for k in range(hand_segments)
+        1.0 + 0.075 * math.cos(4.0 * math.tau * (k + 0.5) / hand_segments) for k in range(hand_segments)
     ]
     finger_profile = [
-        1.0 + 0.085 * math.cos(4.0 * math.tau * (k + 0.5) / hand_segments + math.pi) for k in range(hand_segments)
+        1.0 + 0.100 * math.cos(4.0 * math.tau * (k + 0.5) / hand_segments + math.pi) for k in range(hand_segments)
     ]
     fingertip_profile = [
-        1.0 + 0.060 * math.cos(4.0 * math.tau * (k + 0.5) / hand_segments + math.pi) for k in range(hand_segments)
+        1.0 + 0.070 * math.cos(4.0 * math.tau * (k + 0.5) / hand_segments + math.pi) for k in range(hand_segments)
     ]
     # A single-lobe bias toward the thumb side widens the palm over the thenar
     # mass, and the knuckle ridge above the fingers separates index from
@@ -532,6 +864,7 @@ def build_body():
             hand_segments,
             phase=0.5,
             face_materials=open_hand_faces,
+            subdiv=2,
         )
     )
     parts.append(
@@ -546,6 +879,7 @@ def build_body():
             ],
             "MAT_Skin",
             12,
+            subdiv=2,
         )
     )
     parts.append(
@@ -553,36 +887,38 @@ def build_body():
             "Body_Hand_R",
             [
                 ((-0.433, -0.020, 0.915), 0.050, 0.042, {"forearm.R": 0.55, "hand.R": 0.45}),
-                ((-0.434, -0.027, 0.898), 0.055, 0.046, {"forearm.R": 0.30, "hand.R": 0.70}),
-                ((-0.435, -0.034, 0.882), 0.060, 0.050, {"forearm.R": 0.12, "hand.R": 0.88}),
-                ((-0.436, -0.038, 0.866), 0.065, 0.050, {"hand.R": 1.0}, thenar_profile),
-                ((-0.436, -0.042, 0.850), 0.070, 0.050, {"hand.R": 1.0}, thenar_profile),
-                ((-0.437, -0.058, 0.815), 0.082, 0.058, {"hand.R": 1.0}, thenar_profile),
-                ((-0.436, -0.070, 0.782), 0.084, 0.062, {"hand.R": 1.0}, knuckle_profile),
-                ((-0.434, -0.070, 0.766), 0.080, 0.060, {"hand.R": 1.0}, knuckle_profile),
-                ((-0.432, -0.068, 0.752), 0.074, 0.056, {"hand.R": 1.0}, finger_profile),
-                ((-0.430, -0.060, 0.740), 0.064, 0.048, {"hand.R": 1.0}, finger_profile),
-                ((-0.428, -0.052, 0.732), 0.054, 0.040, {"hand.R": 1.0}),
+                ((-0.434, -0.027, 0.898), 0.052, 0.043, {"forearm.R": 0.30, "hand.R": 0.70}),
+                ((-0.435, -0.034, 0.882), 0.056, 0.046, {"forearm.R": 0.12, "hand.R": 0.88}),
+                ((-0.436, -0.038, 0.866), 0.059, 0.046, {"hand.R": 1.0}, thenar_profile),
+                ((-0.436, -0.042, 0.850), 0.062, 0.046, {"hand.R": 1.0}, thenar_profile),
+                ((-0.437, -0.058, 0.815), 0.070, 0.050, {"hand.R": 1.0}, thenar_profile),
+                ((-0.436, -0.070, 0.782), 0.072, 0.053, {"hand.R": 1.0}, knuckle_profile),
+                ((-0.434, -0.070, 0.766), 0.069, 0.051, {"hand.R": 1.0}, knuckle_profile),
+                ((-0.432, -0.068, 0.752), 0.064, 0.048, {"hand.R": 1.0}, finger_profile),
+                ((-0.430, -0.060, 0.740), 0.056, 0.042, {"hand.R": 1.0}, finger_profile),
+                ((-0.428, -0.052, 0.732), 0.047, 0.035, {"hand.R": 1.0}),
             ],
             "MAT_Skin",
             hand_segments,
             phase=0.5,
             face_materials=fist_faces,
+            subdiv=2,
         )
     )
     parts.append(
         weighted_chain_part(
             "Body_Thumb_R",
             [
-                ((-0.484, -0.056, 0.822), 0.033, 0.030, {"hand.R": 1.0}),
-                ((-0.478, -0.068, 0.812), 0.031, 0.028, {"hand.R": 1.0}),
-                ((-0.469, -0.084, 0.800), 0.029, 0.026, {"hand.R": 1.0}),
-                ((-0.460, -0.098, 0.788), 0.026, 0.023, {"hand.R": 1.0}),
-                ((-0.448, -0.104, 0.781), 0.022, 0.020, {"hand.R": 1.0}),
-                ((-0.436, -0.108, 0.775), 0.017, 0.015, {"hand.R": 1.0}),
+                ((-0.480, -0.056, 0.822), 0.027, 0.025, {"hand.R": 1.0}),
+                ((-0.474, -0.068, 0.812), 0.026, 0.024, {"hand.R": 1.0}),
+                ((-0.466, -0.084, 0.800), 0.024, 0.022, {"hand.R": 1.0}),
+                ((-0.458, -0.098, 0.788), 0.022, 0.020, {"hand.R": 1.0}),
+                ((-0.447, -0.104, 0.781), 0.019, 0.017, {"hand.R": 1.0}),
+                ((-0.436, -0.108, 0.775), 0.015, 0.013, {"hand.R": 1.0}),
             ],
             "MAT_Skin",
             12,
+            subdiv=2,
         )
     )
     return join_parts(parts, "Body_Skinned", "body_skin")
@@ -603,14 +939,16 @@ def build_uniform():
             return "MAT_Pants"  # tucked waist overlap band, reads as pants
         if band == 1:
             return "MAT_Metal" if segment == 23 else "MAT_Belt"
-        if band == 15:
-            # Raglan shoulder yoke: the same red as the sleeves so the sleeve
-            # roots read as one continuous garment with the torso.
-            return "TEAM_Accent" if segment == 23 else "TEAM_Secondary"
+        if band >= 15:
+            # Raglan shoulder yoke: the same color as the sleeves so the
+            # sleeve roots read as one continuous garment with the torso.
+            return "TEAM_Secondary"
         if 7 <= band <= 14 and segment in (14, 15, 16, 30, 31, 0):
             return "TEAM_Secondary"  # jersey side panels
         if 2 <= band <= 14 and segment == 23:
-            return "TEAM_Accent"  # button placket / central graphic stripe
+            # Team-color placket piping down the white button front, like a
+            # classic home uniform.
+            return "TEAM_Primary"
         return None
 
     # Radial contract with the pants: every pelvis-chain radius stays at least
@@ -620,88 +958,69 @@ def build_uniform():
     # authored waist fold; the stepped rib rings above it carry the chest
     # planes, and the extra rings around the belt and hem keep those material
     # bands crisp under deformation.
+    # Torso musculature reads through the fitted double-knit jersey: pectoral
+    # plates flanking a sternal channel, lat flare toward the back corners, a
+    # spinal groove, and a slight rectus plane above the belt.
+    pec_profile = radial_profile(
+        32, 0.5, ((252.0, 30.0, 0.035), (288.0, 30.0, 0.035), (90.0, 12.0, -0.020), (150.0, 25.0, 0.025), (30.0, 25.0, 0.025))
+    )
+    abs_profile = radial_profile(32, 0.5, ((270.0, 30.0, 0.018), (90.0, 12.0, -0.018)))
     parts.append(
         weighted_chain_part(
             "Uniform_TorsoBlend",
             [
-                ((0.0, 0.012, 0.868), 0.236, 0.152, {"hips": 1.0}),
-                ((0.0, 0.012, 0.918), 0.240, 0.154, {"hips": 1.0}),
-                ((0.0, 0.011, 0.958), 0.242, 0.155, {"hips": 1.0}),
-                ((0.0, 0.010, 1.000), 0.243, 0.155, {"hips": 1.0}),
-                ((0.0, 0.010, 1.044), 0.244, 0.156, {"hips": 1.0}),
-                ((0.0, 0.009, 1.080), 0.240, 0.153, {"hips": 0.85, "spine": 0.15}),
-                ((0.0, 0.008, 1.104), 0.232, 0.150, {"hips": 0.68, "spine": 0.32}),
-                ((0.0, 0.007, 1.136), 0.236, 0.150, {"hips": 0.45, "spine": 0.55}),
-                ((0.0, 0.006, 1.176), 0.242, 0.150, {"hips": 0.24, "spine": 0.76}),
-                ((0.0, 0.005, 1.216), 0.250, 0.151, {"spine": 0.90, "chest": 0.10}),
-                ((0.0, 0.003, 1.258), 0.261, 0.154, {"spine": 0.74, "chest": 0.26}),
-                ((0.0, 0.002, 1.296), 0.273, 0.158, {"spine": 0.45, "chest": 0.55}),
-                ((0.0, 0.001, 1.336), 0.286, 0.162, {"spine": 0.26, "chest": 0.74}),
-                ((0.0, -0.001, 1.378), 0.294, 0.164, {"chest": 1.0}),
-                ((0.0, -0.001, 1.412), 0.297, 0.165, {"chest": 1.0}),
-                ((0.0, -0.003, 1.466), 0.270, 0.154, {"chest": 1.0}),
-                ((0.0, -0.005, 1.508), 0.174, 0.128, {"chest": 0.80, "neck": 0.20}),
+                ((0.0, 0.012, 0.868), 0.220, 0.140, {"hips": 1.0}),
+                ((0.0, 0.012, 0.918), 0.224, 0.142, {"hips": 1.0}),
+                ((0.0, 0.011, 0.958), 0.226, 0.143, {"hips": 1.0}),
+                ((0.0, 0.010, 1.000), 0.227, 0.143, {"hips": 1.0}),
+                ((0.0, 0.010, 1.044), 0.228, 0.144, {"hips": 1.0}),
+                ((0.0, 0.009, 1.080), 0.224, 0.141, {"hips": 0.85, "spine": 0.15}),
+                ((0.0, 0.008, 1.104), 0.217, 0.138, {"hips": 0.68, "spine": 0.32}),
+                ((0.0, 0.007, 1.136), 0.220, 0.138, {"hips": 0.45, "spine": 0.55}),
+                ((0.0, 0.006, 1.176), 0.226, 0.138, {"hips": 0.24, "spine": 0.76}),
+                ((0.0, 0.005, 1.216), 0.233, 0.139, {"spine": 0.90, "chest": 0.10}, abs_profile),
+                ((0.0, 0.003, 1.258), 0.242, 0.141, {"spine": 0.74, "chest": 0.26}, abs_profile),
+                ((0.0, 0.002, 1.296), 0.252, 0.145, {"spine": 0.45, "chest": 0.55}, abs_profile),
+                ((0.0, 0.001, 1.336), 0.263, 0.148, {"spine": 0.26, "chest": 0.74}, pec_profile),
+                ((0.0, -0.001, 1.378), 0.269, 0.150, {"chest": 1.0}, pec_profile),
+                ((0.0, -0.001, 1.412), 0.272, 0.150, {"chest": 1.0}, pec_profile),
+                ((0.0, -0.003, 1.466), 0.236, 0.140, {"chest": 1.0}),
+                ((0.0, -0.004, 1.502), 0.132, 0.098, {"chest": 0.85, "neck": 0.15}),
+                ((0.0, -0.004, 1.522), 0.068, 0.058, {"chest": 0.45, "neck": 0.55}),
             ],
-            "TEAM_Primary",
+            "MAT_Pants",
             32,
             phase=0.5,
             face_materials=torso_faces,
-            cap_materials=("MAT_Pants", "TEAM_Primary"),
+            cap_materials=("MAT_Pants", "MAT_Pants"),
+            subdiv=2,
         )
     )
-    parts.append(torus_part("Uniform_Collar", (0.0, -0.004, 1.505), 0.104, 0.014, "TEAM_Accent", "chest"))
-    parts.append(torus_part("Uniform_Undershirt", (0.0, -0.002, 1.496), 0.079, 0.017, "TEAM_Secondary", "chest"))
-    # Layered V-neck: two angled accent bars descending from the collar.
-    for side, sign in (("L", 1.0), ("R", -1.0)):
-        parts.append(
-            box_part(
-                "Uniform_VNeck_" + side,
-                (0.034 * sign, -0.163, 1.460),
-                (0.011, 0.008, 0.046),
-                "TEAM_Accent",
-                "chest",
-                rotation=(0.0, 0.0, 24.0 * sign * DEG),
-                bevel=0.005,
-            )
-        )
-    # An abstract embroidered H reads crisply at field distance and remains a
-    # team-colorable original mark rather than a borrowed real-world logo.
+    # A trimmed crew collar closing snugly on the anatomical neck, over an
+    # undershirt ring.  Chest identity is per-team equipment (mark and
+    # number) so the base jersey stays role- and team-neutral.
+    parts.append(torus_part("Uniform_Collar", (0.0, -0.004, 1.524), 0.0640, 0.0075, "TEAM_Primary", "chest"))
+    # Undershirt mock-collar: wraps the sculpted neck's base (and conceals
+    # the CC0 head's cut rim) exactly where a real compression shirt sits.
     parts.append(
-        box_part(
-            "Uniform_MarkLeft",
-            (0.062, -0.172, 1.362),
-            (0.013, 0.008, 0.052),
-            "TEAM_Accent",
-            "chest",
-            rotation=(0.0, 0.0, -7.0 * DEG),
-            bevel=0.005,
-        )
-    )
-    parts.append(
-        box_part(
-            "Uniform_MarkRight",
-            (0.114, -0.172, 1.362),
-            (0.013, 0.008, 0.052),
-            "TEAM_Accent",
-            "chest",
-            rotation=(0.0, 0.0, -7.0 * DEG),
-            bevel=0.005,
-        )
-    )
-    parts.append(
-        box_part(
-            "Uniform_MarkBridge",
-            (0.088, -0.175, 1.362),
-            (0.030, 0.007, 0.011),
+        weighted_chain_part(
+            "Uniform_Undershirt",
+            [
+                ((0.0, 0.004, 1.512), 0.070, 0.078, {"chest": 0.70, "neck": 0.30}),
+                ((0.0, 0.008, 1.536), 0.067, 0.080, {"chest": 0.35, "neck": 0.65}),
+                ((0.0, 0.010, 1.558), 0.062, 0.076, {"neck": 0.90, "chest": 0.10}),
+                ((0.0, 0.012, 1.578), 0.057, 0.068, {"neck": 0.80, "head": 0.20}),
+                ((0.0, 0.013, 1.592), 0.053, 0.063, {"neck": 0.55, "head": 0.45}),
+            ],
             "TEAM_Secondary",
-            "chest",
-            rotation=(0.0, 0.0, -7.0 * DEG),
-            bevel=0.004,
+            24,
+            phase=0.5,
+            subdiv=2,
         )
     )
 
     def sleeve_faces(band, segment):
-        return "TEAM_Accent" if band == 8 else None  # deforming cuff piping
+        return None  # plain raglan sleeves; real cuffs end without armbands
 
     # Raglan sleeves grow out of the torso instead of capping it: the root
     # ring sits deep inside the chest tube and is chest-dominated, so raising
@@ -716,22 +1035,23 @@ def build_uniform():
             weighted_chain_part(
                 "Uniform_SleeveBlend_" + side,
                 [
-                    ((0.200 * sign, 0.000, 1.452), 0.124, 0.138, {"chest": 0.48, clavicle_bone: 0.42, upper_bone: 0.10}),
-                    ((0.230 * sign, 0.000, 1.442), 0.129, 0.139, {"chest": 0.30, clavicle_bone: 0.48, upper_bone: 0.22}),
-                    ((0.256 * sign, 0.000, 1.428), 0.132, 0.140, {"chest": 0.16, clavicle_bone: 0.50, upper_bone: 0.34}),
-                    ((0.283 * sign, -0.001, 1.402), 0.130, 0.136, {clavicle_bone: 0.40, upper_bone: 0.60}),
-                    ((0.306 * sign, -0.001, 1.372), 0.126, 0.130, {clavicle_bone: 0.28, upper_bone: 0.72}),
-                    ((0.325 * sign, -0.001, 1.344), 0.121, 0.126, {clavicle_bone: 0.12, upper_bone: 0.88}),
-                    ((0.340 * sign, -0.001, 1.315), 0.115, 0.121, {upper_bone: 1.0}),
-                    ((0.352 * sign, -0.001, 1.288), 0.110, 0.115, {upper_bone: 1.0}),
-                    ((0.362 * sign, -0.001, 1.258), 0.106, 0.111, {upper_bone: 0.95, forearm_bone: 0.05}),
-                    ((0.372 * sign, -0.002, 1.215), 0.103, 0.108, {upper_bone: 0.86, forearm_bone: 0.14}),
-                    ((0.377 * sign, -0.002, 1.192), 0.099, 0.104, {upper_bone: 0.80, forearm_bone: 0.20}),
+                    ((0.200 * sign, 0.000, 1.452), 0.098, 0.106, {"chest": 0.48, clavicle_bone: 0.42, upper_bone: 0.10}),
+                    ((0.230 * sign, 0.000, 1.442), 0.101, 0.108, {"chest": 0.30, clavicle_bone: 0.48, upper_bone: 0.22}),
+                    ((0.256 * sign, 0.000, 1.428), 0.104, 0.110, {"chest": 0.16, clavicle_bone: 0.50, upper_bone: 0.34}),
+                    ((0.283 * sign, -0.001, 1.402), 0.106, 0.109, {clavicle_bone: 0.40, upper_bone: 0.60}),
+                    ((0.306 * sign, -0.001, 1.372), 0.108, 0.111, {clavicle_bone: 0.28, upper_bone: 0.72}),
+                    ((0.325 * sign, -0.001, 1.344), 0.106, 0.108, {clavicle_bone: 0.12, upper_bone: 0.88}),
+                    ((0.340 * sign, -0.001, 1.315), 0.104, 0.106, {upper_bone: 1.0}),
+                    ((0.352 * sign, -0.001, 1.288), 0.102, 0.104, {upper_bone: 1.0}),
+                    ((0.362 * sign, -0.001, 1.258), 0.100, 0.102, {upper_bone: 0.95, forearm_bone: 0.05}),
+                    ((0.372 * sign, -0.002, 1.215), 0.097, 0.099, {upper_bone: 0.86, forearm_bone: 0.14}),
+                    ((0.377 * sign, -0.002, 1.192), 0.094, 0.096, {upper_bone: 0.80, forearm_bone: 0.20}),
                 ],
                 "TEAM_Secondary",
                 28,
                 phase=0.5,
                 face_materials=sleeve_faces,
+                subdiv=2,
             )
         )
 
@@ -739,20 +1059,35 @@ def build_uniform():
         weighted_chain_part(
             "Uniform_PelvisBlend",
             [
-                ((0.0, 0.012, 1.112), 0.216, 0.136, {"hips": 1.0}),
-                ((0.0, 0.012, 1.040), 0.222, 0.142, {"hips": 1.0}),
-                ((0.0, 0.012, 1.000), 0.224, 0.143, {"hips": 1.0}),
-                ((0.0, 0.012, 0.962), 0.224, 0.144, {"hips": 1.0}),
-                ((0.0, 0.011, 0.928), 0.222, 0.142, {"hips": 0.94, "thigh.L": 0.03, "thigh.R": 0.03}),
-                ((0.0, 0.010, 0.895), 0.218, 0.140, {"hips": 0.86, "thigh.L": 0.07, "thigh.R": 0.07}),
-                ((0.0, 0.008, 0.845), 0.200, 0.130, {"hips": 0.60, "thigh.L": 0.20, "thigh.R": 0.20}),
-                ((0.0, 0.006, 0.800), 0.172, 0.116, {"hips": 0.40, "thigh.L": 0.30, "thigh.R": 0.30}),
+                ((0.0, 0.012, 1.112), 0.206, 0.128, {"hips": 1.0}),
+                ((0.0, 0.012, 1.040), 0.212, 0.133, {"hips": 1.0}),
+                ((0.0, 0.012, 1.000), 0.214, 0.134, {"hips": 1.0}),
+                ((0.0, 0.012, 0.962), 0.214, 0.135, {"hips": 1.0}),
+                ((0.0, 0.011, 0.928), 0.212, 0.133, {"hips": 0.94, "thigh.L": 0.03, "thigh.R": 0.03}),
+                ((0.0, 0.010, 0.895), 0.208, 0.131, {"hips": 0.86, "thigh.L": 0.07, "thigh.R": 0.07}),
+                ((0.0, 0.008, 0.845), 0.194, 0.124, {"hips": 0.60, "thigh.L": 0.20, "thigh.R": 0.20}),
+                ((0.0, 0.006, 0.800), 0.168, 0.112, {"hips": 0.40, "thigh.L": 0.30, "thigh.R": 0.30}),
             ],
             "MAT_Pants",
             28,
             cap_materials=("MAT_Pants", "MAT_Pants"),
+            subdiv=2,
         )
     )
+
+    # Belt loops ride the waistband like real trousers.
+    for loop_index, loop_angle in enumerate((-0.62, 0.62, -1.65, 1.65, math.pi)):
+        parts.append(
+            box_part(
+                "Uniform_BeltLoop_%d" % loop_index,
+                (0.230 * math.sin(loop_angle), 0.011 - 0.146 * math.cos(loop_angle), 0.938),
+                (0.0075, 0.0045, 0.0210),
+                "MAT_Pants",
+                "hips",
+                rotation=(0.0, 0.0, -loop_angle),
+                bevel=0.002,
+            )
+        )
 
     # Each pant leg is closed against the pelvis by construction: the top ring
     # tucks deep inside the pelvis tube with hips-dominated weighting, so deep
@@ -769,9 +1104,7 @@ def build_uniform():
             if band == 13:
                 return "TEAM_Accent"  # sock stripe ring
             if band >= 14:
-                return "MAT_Sock"  # sock top into the cleat
-            if band == 8 and segment in (19, 20, 21):
-                return "MAT_PantsShadow"  # knee crease shading
+                return "TEAM_Primary"  # team-color stirrup sock into the cleat
             if 1 <= band <= 12 and segment == outer:
                 return "TEAM_Secondary"  # outer-seam piping
             return None
@@ -802,260 +1135,192 @@ def build_uniform():
                 28,
                 phase=0.5,
                 face_materials=leg_faces,
+                subdiv=2,
             )
         )
     return join_parts(parts, "Uniform_Skinned", "uniform")
 
 
 def build_hair():
-    parts = [
-        uv_part("Hair_Crown", (0.0, 0.020, 1.836), (0.151, 0.137, 0.092), "MAT_Hair", "head", 28, 16),
-        uv_part("Hair_Back", (0.0, 0.106, 1.748), (0.143, 0.056, 0.137), "MAT_Hair", "head", 24, 14),
-        # Two large swept clumps give the crown an authored parting instead of
-        # a helmet dome; both stay under the cap line in every review pose.
-        uv_part(
-            "Hair_SweepClump_L",
-            (0.066, -0.052, 1.842),
-            (0.078, 0.088, 0.048),
-            "MAT_Hair",
-            "head",
-            14,
-            9,
-            rotation=(0.0, 10.0 * DEG, -14.0 * DEG),
-        ),
-        uv_part(
-            "Hair_SweepClump_R",
-            (-0.070, -0.044, 1.836),
-            (0.070, 0.082, 0.044),
-            "MAT_HairHighlight",
-            "head",
-            14,
-            9,
-            rotation=(0.0, -10.0 * DEG, 14.0 * DEG),
-        ),
-    ]
-    for index, x in enumerate((-0.115, -0.076, -0.038, 0.002, 0.042, 0.079, 0.115)):
-        parts.append(
-            ico_part(
-                "Hair_Fringe_%02d" % index,
-                (x, -0.124, 1.820 - abs(x) * 0.14 + (0.005 if index % 2 else 0.0)),
-                (0.033, 0.024, 0.058 - abs(x) * 0.05),
-                "MAT_HairHighlight" if index in (1, 4) else "MAT_Hair",
-                "head",
-                2,
-                False,
-                rotation=(6.0 * DEG, 0.0, x * 1.2),
-            )
-        )
+    # Short athletic cut anchored to the sculpted skull by raycast: an
+    # occipital shell, tapered nape layers, side coverage above the ears, and
+    # sideburns, each buried a few millimetres into the measured surface so
+    # the hairline follows the real head instead of hardcoded offsets.
+    parts = []
+    back_hit = CC0_PROBE((0.0, 0.40, 1.778), (0.0, -1.0, 0.0))
+    nape_hit = CC0_PROBE((0.0, 0.40, 1.700), (0.0, -1.0, 0.0))
+    if back_hit is None or nape_hit is None:
+        raise RuntimeError("hair probes missed the sculpted head")
+    parts.append(
+        uv_part("Hair_Occiput", (0.0, back_hit.y - 0.060, 1.778), (0.0640, 0.0660, 0.0600), "MAT_Hair", "head", 28, 16, subdiv=2)
+    )
+    parts.append(
+        uv_part("Hair_Nape", (0.0, nape_hit.y - 0.022, 1.700), (0.0480, 0.0280, 0.0380), "MAT_Hair", "head", 20, 12, subdiv=2)
+    )
     for side, sign in (("L", 1.0), ("R", -1.0)):
+        side_hit = CC0_PROBE((0.40 * sign, 0.020, 1.768), (-sign, 0.0, 0.0))
+        if side_hit is None:
+            raise RuntimeError("side hair probes missed the sculpted head")
         parts.append(
-            box_part(
+            uv_part(
                 "Hair_Side_" + side,
-                (0.132 * sign, -0.016, 1.755),
-                (0.023, 0.103, 0.071),
+                (side_hit.x - 0.0045 * sign, side_hit.y + 0.004, 1.7660),
+                (0.0120, 0.0440, 0.0330),
                 "MAT_Hair",
                 "head",
-                rotation=(0.0, 0.0, -7.0 * sign * DEG),
-                bevel=0.011,
+                16,
+                10,
+                subdiv=2,
             )
         )
+    for index, x in enumerate((-0.0330, -0.0165, 0.0, 0.0165, 0.0330)):
         parts.append(
             ico_part(
-                "Hair_SideTuft_" + side,
-                (0.128 * sign, -0.088, 1.742),
-                (0.021, 0.028, 0.049),
-                "MAT_Hair",
+                "Hair_NapeLock_%02d" % index,
+                (x, nape_hit.y - 0.006 - abs(x) * 0.30, 1.6900 + (index % 2) * 0.0055),
+                (0.0125, 0.0100, 0.0185),
+                "MAT_HairHighlight" if index == 2 else "MAT_Hair",
                 "head",
                 2,
-                False,
-                rotation=(0.0, -12.0 * sign * DEG, 0.0),
-            )
-        )
-        parts.append(
-            ico_part(
-                "Hair_Sideburn_" + side,
-                (0.139 * sign, -0.071, 1.682),
-                (0.015, 0.018, 0.047),
-                "MAT_HairHighlight",
-                "head",
-                2,
-                False,
-            )
-        )
-    for index, x in enumerate((-0.102, -0.055, -0.008, 0.040, 0.086)):
-        parts.append(
-            ico_part(
-                "Hair_BackLock_%02d" % index,
-                (x, 0.146, 1.708 + (index % 2) * 0.022),
-                (0.036, 0.026, 0.066 - abs(x) * 0.06),
-                "MAT_Hair" if index != 2 else "MAT_HairHighlight",
-                "head",
-                2,
-                False,
-                rotation=(-8.0 * DEG, 0.0, x * 0.9),
+                True,
+                rotation=(-10.0 * DEG, 0.0, x * 2.2),
             )
         )
     return join_parts(parts, "Hair_Skinned", "hair")
 
 
 def build_face():
-    # A graphic four-value face: coherent warm skin (body mesh), big friendly
-    # eyes with bold brows, and one simple mouth plane.  No stubble, teeth,
-    # lids, or cheek patches -- those read as mottled noise at gameplay scale
-    # and poked through the profile silhouette.
-    parts = []
+    # The eyes are the CC0 sculpt's own layered parts (sclera shells plus
+    # iris discs) fitted with the head, completed by small pupil spheres and
+    # brow chains anchored by raycasting the actual sculpted brow ridge.
+    # Everything else -- lids, nose, lips, ears -- is real sculpt geometry on
+    # the head itself, so no procedural feature approximations remain.
+    parts = list(CC0_EYE_PARTS)
+    for part in parts:
+        # The fitted vertex data is authoritative; neutralize any transform
+        # an operator may have smeared onto these appended objects.
+        part.matrix_world = Matrix.Identity(4)
+        # The bundle intends a transparent cornea over a recessed iris; with
+        # opaque materials the iris would hide inside the sclera, so bring
+        # the discs proud of the sclera surface as a corneal bulge.
+        if "iris" in part.name:
+            for vertex in part.data.vertices:
+                vertex.co.y -= 0.0042
     for side, sign in (("L", 1.0), ("R", -1.0)):
-        x = 0.062 * sign
+        iris_center = fit_cc0_point((1.4626 + 0.0325 * sign, -0.1331, 0.7667))
         parts.append(
-            box_part(
-                "FacePlane_EyeWhite_" + side,
-                (x, -0.136, 1.748),
-                (0.046, 0.008, 0.028),
-                "MAT_EyeWhite",
-                "head",
-                bevel=0.012,
-            )
-        )
-        parts.append(
-            box_part(
-                "FacePlane_Iris_" + side,
-                (x - 0.006 * sign, -0.146, 1.745),
-                (0.020, 0.006, 0.019),
-                "MAT_Iris",
-                "head",
-                bevel=0.008,
-            )
-        )
-        parts.append(
-            box_part(
-                "FacePlane_Pupil_" + side,
-                (x - 0.008 * sign, -0.152, 1.744),
-                (0.010, 0.005, 0.011),
+            uv_part(
+                "Face_Pupil_" + side,
+                (iris_center.x, iris_center.y - 0.0060, iris_center.z),
+                (0.0033, 0.0016, 0.0033),
                 "MAT_Pupil",
                 "head",
-                bevel=0.004,
+                14,
+                8,
+                subdiv=1,
             )
         )
-        parts.append(
-            box_part(
-                "FacePlane_EyeGlint_" + side,
-                (x - 0.013 * sign, -0.156, 1.752),
-                (0.0045, 0.003, 0.005),
-                "MAT_EyeWhite",
-                "head",
-                bevel=0.002,
+        brow_rings = []
+        for offset_x, offset_z, radius in (
+            (0.012, 0.0245, 0.0028),
+            (0.030, 0.0265, 0.0036),
+            (0.045, 0.0250, 0.0030),
+            (0.056, 0.0205, 0.0019),
+        ):
+            hit = CC0_PROBE(
+                (offset_x * sign, -0.40, CC0_TARGET_EYE_MID.z + offset_z),
+                (0.0, 1.0, 0.0),
             )
-        )
+            if hit is None:
+                raise RuntimeError("brow probe missed the sculpted head")
+            brow_rings.append(((hit.x, hit.y - 0.0015, hit.z), radius, radius * 0.82, {"head": 1.0}))
         parts.append(
-            box_part(
-                "FacePlane_Brow_" + side,
-                (x, -0.148, 1.795),
-                (0.052, 0.008, 0.012),
+            weighted_chain_part(
+                "Face_Brow_" + side,
+                brow_rings,
                 "MAT_Hair",
-                "head",
-                rotation=(0.0, 0.0, 8.0 * sign * DEG),
-                bevel=0.005,
+                10,
+                subdiv=2,
             )
         )
-    parts.append(
-        box_part("FacePlane_Mouth", (0.0, -0.158, 1.650), (0.040, 0.008, 0.010), "MAT_Mouth", "head", bevel=0.006)
-    )
     return join_parts(parts, "Face_Details_Skinned", "face_planes")
 
 
 def build_cap():
-    # The crown drops over the hairline and the brim is a continuous curved
-    # chain whose rear ring is buried inside the crown volume, so the two can
-    # never read as separated shells in slide or profile views.  The chain
-    # tapers and dips toward the tip for a premium curved-bill silhouette.
-    # Seam cylinders and vent dots were subpixel clutter at gameplay scale;
-    # the front panel and a bolder accent mark carry the identity instead.
+    # Structured six-panel cap statically fitted to the measured CC0 skull
+    # (band-zone side extent 0.074, sagittal extent -0.099..+0.087, apex at
+    # z=1.840) with cloth clearance over the hair shells.
     parts = [
-        uv_part(
+        weighted_chain_part(
             "Cap_Crown",
-            (0.0, 0.004, 1.866),
-            (0.174, 0.160, 0.118),
+            [
+                ((0.0, -0.0050, 1.7580), 0.0840, 0.1020, {"head": 1.0}),
+                ((0.0, -0.0056, 1.7760), 0.0850, 0.1010, {"head": 1.0}),
+                ((0.0, -0.0045, 1.8000), 0.0780, 0.0900, {"head": 1.0}),
+                ((0.0, -0.0028, 1.8240), 0.0640, 0.0740, {"head": 1.0}),
+                ((0.0, 0.0000, 1.8460), 0.0440, 0.0500, {"head": 1.0}),
+                ((0.0, 0.0010, 1.8620), 0.0240, 0.0280, {"head": 1.0}),
+            ],
             "TEAM_Primary",
-            "head",
             32,
-            18,
+            phase=0.5,
+            subdiv=2,
         ),
-        torus_part("Cap_Band", (0.0, 0.006, 1.826), 0.164, 0.017, "TEAM_Secondary", "head"),
-        # Two vertical seam hoops trace the dome like real cap panels; their
-        # lower halves are buried inside the crown and head so only the seam
-        # arcs over the dome read at review scale.
-        torus_part(
-            "Cap_SeamFront",
-            (0.0, 0.004, 1.850),
-            0.138,
-            0.008,
-            "TEAM_Secondary",
-            "head",
-            rotation=(0.0, 90.0 * DEG, 0.0),
-        ),
-        torus_part(
-            "Cap_SeamSide",
-            (0.0, 0.004, 1.838),
-            0.150,
-            0.008,
-            "TEAM_Secondary",
-            "head",
-            rotation=(90.0 * DEG, 0.0, 0.0),
-        ),
+        # Curved, tapering pro-cap brim; the rear ring is buried inside the
+        # crown so the two never separate in profile.
         weighted_chain_part(
             "Cap_BrimCurve",
             [
-                ((0.0, 0.020, 1.842), 0.168, 0.021, {"head": 1.0}),
-                ((0.0, -0.030, 1.849), 0.166, 0.020, {"head": 1.0}),
-                ((0.0, -0.075, 1.852), 0.162, 0.019, {"head": 1.0}),
-                ((0.0, -0.124, 1.852), 0.155, 0.018, {"head": 1.0}),
-                ((0.0, -0.170, 1.850), 0.146, 0.017, {"head": 1.0}),
-                ((0.0, -0.212, 1.845), 0.133, 0.016, {"head": 1.0}),
-                ((0.0, -0.250, 1.838), 0.118, 0.015, {"head": 1.0}),
-                ((0.0, -0.286, 1.830), 0.098, 0.013, {"head": 1.0}),
-                ((0.0, -0.318, 1.820), 0.072, 0.012, {"head": 1.0}),
+                ((0.0, -0.0860, 1.7660), 0.0790, 0.0085, {"head": 1.0}),
+                ((0.0, -0.1260, 1.7678), 0.0760, 0.0068, {"head": 1.0}),
+                ((0.0, -0.1580, 1.7648), 0.0680, 0.0058, {"head": 1.0}),
+                ((0.0, -0.1840, 1.7575), 0.0550, 0.0050, {"head": 1.0}),
+                ((0.0, -0.2020, 1.7485), 0.0380, 0.0046, {"head": 1.0}),
             ],
             "TEAM_Secondary",
-            18,
+            28,
+            subdiv=2,
         ),
-        box_part(
-            "Cap_FrontPanel",
-            (0.0, -0.148, 1.884),
-            (0.112, 0.016, 0.068),
-            "TEAM_Primary",
-            "head",
-            rotation=(8.0 * DEG, 0.0, 0.0),
-            bevel=0.016,
-        ),
-        box_part(
-            "Cap_MarkStem",
-            (-0.020, -0.168, 1.888),
-            (0.012, 0.007, 0.042),
-            "TEAM_Accent",
-            "head",
-            rotation=(8.0 * DEG, 0.0, 0.0),
-            bevel=0.004,
-        ),
-        box_part(
-            "Cap_MarkTop",
-            (0.012, -0.170, 1.916),
-            (0.030, 0.007, 0.011),
-            "TEAM_Accent",
-            "head",
-            rotation=(8.0 * DEG, 0.0, 0.0),
-            bevel=0.004,
-        ),
-        box_part(
-            "Cap_MarkMid",
-            (0.008, -0.170, 1.884),
-            (0.024, 0.007, 0.010),
-            "TEAM_Accent",
-            "head",
-            rotation=(8.0 * DEG, 0.0, 0.0),
-            bevel=0.004,
-        ),
-        ico_part("Cap_Button", (0.0, 0.004, 1.976), (0.018, 0.018, 0.014), "TEAM_Secondary", "head", 2, False),
     ]
+    # Real caps drop lower at the back than the front: a rear skirt shell
+    # covers the occiput between the horizontal crown bottom and the nape
+    # hairline.
+    back_skirt = ellipsoid_plate(
+        "Cap_BackSkirt",
+        (0.0, -0.004, 1.7640),
+        (0.0840, 0.1000, 0.0520),
+        "TEAM_Primary",
+        "head",
+        azimuth=1.30,
+        elevation=(-0.85, 0.12),
+        columns=20,
+        rows=8,
+        inflate=1.0,
+        subdiv=1,
+    )
+    back_skirt.rotation_euler = (0.0, 0.0, math.pi)
+    parts.append(back_skirt)
+    # Small raised monogram at the crown front reads as embroidery.
+    for name, offset_x, offset_z, scale in (
+        ("Cap_MarkStem", -0.0040, 0.0040, (0.0018, 0.0026, 0.0080)),
+        ("Cap_MarkTop", 0.0022, 0.0092, (0.0048, 0.0024, 0.0020)),
+        ("Cap_MarkMid", 0.0022, 0.0018, (0.0040, 0.0024, 0.0018)),
+        ("Cap_MarkBowl", 0.0058, 0.0055, (0.0018, 0.0024, 0.0036)),
+    ):
+        parts.append(
+            box_part(
+                name,
+                (offset_x, -0.0975, 1.8020 + offset_z),
+                scale,
+                "TEAM_Accent",
+                "head",
+                rotation=(8.0 * DEG, 0.0, 0.0),
+                bevel=0.001,
+            )
+        )
+    parts.append(
+        ico_part("Cap_Button", (0.0, 0.0015, 1.8710), (0.0080, 0.0080, 0.0050), "TEAM_Primary", "head", 2, True)
+    )
     return join_parts(parts, "Cap_Skinned", "cap")
 
 
@@ -1172,7 +1437,7 @@ def build_cleats():
                     "Cleat_Lace_%s_%d" % (side, lace_index),
                     (0.140 * sign, y, z),
                     (0.056, 0.014, 0.011),
-                    "MAT_Sock",
+                    "MAT_CleatEdge",
                     foot,
                     rotation=(tilt * DEG, 0.0, 0.0),
                     bevel=0.007,
@@ -1323,7 +1588,7 @@ def build_glove():
             (0.445, -0.070, 0.764),
             0.072,
             0.018,
-            "TEAM_Secondary",
+            "MAT_Leather",
             "hand.L",
             rotation=(0.0, 90.0 * DEG, 0.0),
         ),
@@ -1337,7 +1602,7 @@ def build_bat():
     # stable gameplay endpoint even if this silhouette is later replaced.
     def bat_faces(band, segment):
         if band <= 4:
-            return "TEAM_Accent" if band % 2 == 1 else "MAT_BatTape"  # grip wrap bands
+            return "MAT_BatTape"  # one clean dark grip wrap, like the sheet
         return None
 
     parts = [
@@ -1370,7 +1635,7 @@ def build_bat():
             "Bat_Knob", (-0.405, -0.075, 0.730), (-0.405, -0.075, 0.770), 0.034, "MAT_BatTape", "hand.R", 16, True
         ),
         uv_part("Bat_EndCap", (-0.405, -0.075, 1.525), (0.046, 0.046, 0.024), "TEAM_Accent", "hand.R", 16, 8),
-        box_part("Bat_Label", (-0.405, -0.121, 1.265), (0.021, 0.004, 0.051), "TEAM_Secondary", "hand.R", bevel=0.006),
+        box_part("Bat_Label", (-0.405, -0.121, 1.265), (0.018, 0.003, 0.042), "MAT_Belt", "hand.R", bevel=0.005),
     ])
     return join_parts(parts, "Bat_Skinned", "bat")
 
@@ -1429,41 +1694,121 @@ def solve_hand_targets(targets):
         bpy.data.objects.remove(helper, do_unlink=True)
 
 
-def key_pose(frame, rotations):
+def solve_foot_targets(targets):
+    """Bake three-bone leg IK while keeping planted toes in armature space."""
+
+    helpers = []
+    constraints = []
+    affected = []
+    for side in ("L", "R"):
+        specification = targets.get(side)
+        if specification is None:
+            continue
+        sign = 1.0 if side == "L" else -1.0
+        target = bpy.data.objects.new("__IK_Foot_Target_" + side, None)
+        target.location = tuple(float(value) for value in specification["target"])
+        bpy.context.collection.objects.link(target)
+        pole = bpy.data.objects.new("__IK_Foot_Pole_" + side, None)
+        default_pole = (0.48 * sign, -0.58, 0.66)
+        pole.location = tuple(float(value) for value in specification.get("pole", default_pole))
+        bpy.context.collection.objects.link(pole)
+        helpers.extend((target, pole))
+
+        foot = RIG.pose.bones["foot." + side]
+        constraint = foot.constraints.new("IK")
+        constraint.name = "__BAKE_FOOT_TARGET__"
+        constraint.target = target
+        constraint.pole_target = pole
+        constraint.chain_count = 3
+        constraint.iterations = 128
+        constraint.use_tail = True
+        constraint.pole_angle = float(specification.get("pole_angle", 0.0)) * DEG
+        constraints.append((foot, constraint))
+        affected.extend(("thigh." + side, "shin." + side, "foot." + side))
+
+    bpy.context.view_layer.update()
+    matrices = {name: RIG.pose.bones[name].matrix.copy() for name in affected}
+    for foot, constraint in constraints:
+        foot.constraints.remove(constraint)
+    bpy.context.view_layer.update()
+
+    for segment in ("thigh", "shin", "foot"):
+        for side in ("L", "R"):
+            name = segment + "." + side
+            if name in matrices:
+                RIG.pose.bones[name].matrix = matrices[name]
+                bpy.context.view_layer.update()
+    for helper in helpers:
+        bpy.data.objects.remove(helper, do_unlink=True)
+
+
+def key_pose(frame, rotations, previous_quaternions=None):
     for pose_bone in RIG.pose.bones:
-        pose_bone.rotation_euler = (0.0, 0.0, 0.0)
+        pose_bone.rotation_quaternion = (1.0, 0.0, 0.0, 0.0)
         pose_bone.location = (0.0, 0.0, 0.0)
     for name, degrees in rotations.items():
         if name == "_root_location":
             RIG.pose.bones["root"].location = tuple(float(value) for value in degrees)
             continue
-        if name == "_hand_targets":
+        if name in ("_hand_targets", "_foot_targets"):
             continue
         pose_bone = RIG.pose.bones.get(name)
         if pose_bone is None:
             raise RuntimeError("animation references missing bone " + name)
-        pose_bone.rotation_euler = tuple(float(value) * DEG for value in degrees)
+        pose_bone.rotation_quaternion = Euler(
+            tuple(float(value) * DEG for value in degrees), "XYZ"
+        ).to_quaternion()
     if "_hand_targets" in rotations:
         solve_hand_targets(rotations["_hand_targets"])
+    if "_foot_targets" in rotations:
+        solve_foot_targets(rotations["_foot_targets"])
     for pose_bone in RIG.pose.bones:
-        pose_bone.keyframe_insert(data_path="rotation_euler", frame=frame, group=pose_bone.name)
+        # q and -q encode the same orientation, but interpolating components
+        # across opposite signs crosses the zero quaternion and creates a full
+        # one-frame flip. Keep every authored key in the previous key's
+        # hemisphere before Blender builds the curve.
+        if previous_quaternions is not None:
+            rotation = pose_bone.rotation_quaternion.copy()
+            previous = previous_quaternions.get(pose_bone.name)
+            if previous is not None and rotation.dot(previous) < 0.0:
+                rotation.negate()
+                pose_bone.rotation_quaternion = rotation
+            previous_quaternions[pose_bone.name] = rotation.copy()
+        pose_bone.keyframe_insert(data_path="rotation_quaternion", frame=frame, group=pose_bone.name)
         if pose_bone.name == "root":
             pose_bone.keyframe_insert(data_path="location", frame=frame, group=pose_bone.name)
+
+
+def action_fcurves(action):
+    """Return legacy or Blender 5 layered-action FCurves."""
+
+    if hasattr(action, "fcurves"):
+        return list(action.fcurves)
+    curves = []
+    for layer in action.layers:
+        for strip in layer.strips:
+            for channelbag in getattr(strip, "channelbags", ()):
+                curves.extend(channelbag.fcurves)
+    return curves
 
 
 def create_action(name, frame_end, poses, loop=False, markers=None):
     action = bpy.data.actions.new(name=name)
     action.use_fake_user = True
     RIG.animation_data.action = action
+    previous_quaternions = {}
     for frame, rotations in poses:
-        key_pose(frame, rotations)
-    for curve in action.fcurves:
+        key_pose(frame, rotations, previous_quaternions)
+    for curve in action_fcurves(action):
         for keyframe in curve.keyframe_points:
             keyframe.interpolation = (
                 "BEZIER"
                 if name in ("idle", "pitch", "swing", "catch", "field_ready", "field_throw", "celebrate", "slide")
                 else "LINEAR"
             )
+            if keyframe.interpolation == "BEZIER":
+                keyframe.handle_left_type = "AUTO_CLAMPED"
+                keyframe.handle_right_type = "AUTO_CLAMPED"
         if loop:
             modifier = curve.modifiers.new(type="CYCLES")
             modifier.mode_before = "REPEAT"
@@ -1480,9 +1825,318 @@ def create_action(name, frame_end, poses, loop=False, markers=None):
     return action
 
 
+def bake_action_frames(action, frame_start, frame_end):
+    """Freeze evaluated quaternion motion to one deterministic key per frame.
+
+    The authored poses remain sparse and readable above, while the exported
+    clip behaves like a high-resolution rigged sprite: Blender, glTF, and Godot
+    all receive the same sampled arc instead of independently interpolating IK
+    solutions.  Sampling is completed before any new key is inserted so the
+    source curves cannot feed back into later samples.
+    """
+
+    RIG.animation_data.action = action
+    samples = []
+    for frame in range(frame_start, frame_end + 1):
+        bpy.context.scene.frame_set(frame)
+        bpy.context.view_layer.update()
+        samples.append(
+            (
+                frame,
+                {
+                    pose_bone.name: (
+                        pose_bone.rotation_quaternion.copy(),
+                        pose_bone.location.copy(),
+                    )
+                    for pose_bone in RIG.pose.bones
+                },
+            )
+        )
+    for frame, transforms in samples:
+        for bone_name, (rotation, location) in transforms.items():
+            pose_bone = RIG.pose.bones[bone_name]
+            pose_bone.rotation_quaternion = rotation
+            pose_bone.location = location
+            pose_bone.keyframe_insert(data_path="rotation_quaternion", frame=frame, group=bone_name)
+            if bone_name == "root":
+                pose_bone.keyframe_insert(data_path="location", frame=frame, group=bone_name)
+    for curve in action_fcurves(action):
+        for keyframe in curve.keyframe_points:
+            keyframe.interpolation = "LINEAR"
+
+
 def build_actions():
     RIG.animation_data_create()
     neutral = {}
+
+    def hands(left, right, left_pole=(0.72, -0.18, 1.34), right_pole=(-0.72, -0.18, 1.42)):
+        return {
+            "L": {"target": left, "pole": left_pole},
+            "R": {"target": right, "pole": right_pole},
+        }
+
+    def feet(left, right=(-0.14, -0.22, 0.075), left_pole=(0.48, -0.58, 0.66), right_pole=(-0.48, -0.30, 0.66)):
+        return {
+            "L": {"target": left, "pole": left_pole},
+            "R": {"target": right, "pole": right_pole},
+        }
+
+    def build_pitch_action():
+        """Author a compact, camera-readable right-handed delivery.
+
+        The pelvis opens before the shoulders, the head counter-rotates just
+        enough to keep the eyes on the plate, and root motion returns almost
+        completely before the clip hands back to idle.  Hand and foot targets
+        use one continuous pole side so Blender cannot choose a different IK
+        branch between adjacent keys.
+        """
+
+        pitch_action = create_action(
+            "pitch",
+            45,
+            [
+                (
+                    1,
+                    {
+                        "hips": (0.0, -4.0, 0.0),
+                        "spine": (2.0, -3.0, 0.0),
+                        "chest": (2.0, -4.0, 0.0),
+                        "head": (-1.0, 8.0, 0.0),
+                        "_hand_targets": hands(
+                            (0.05, -0.29, 1.34),
+                            (-0.04, -0.28, 1.35),
+                            right_pole=(-0.72, -0.15, 1.42),
+                        ),
+                        "_foot_targets": feet((0.14, -0.22, 0.075)),
+                    },
+                ),
+                (
+                    8,
+                    {
+                        "_root_location": (0.0, 0.012, 0.0),
+                        "hips": (1.0, -8.0, 0.0),
+                        "spine": (1.0, -5.0, -1.0),
+                        "chest": (1.0, -8.0, -1.0),
+                        "head": (0.0, 16.0, 1.0),
+                        "_hand_targets": hands(
+                            (0.05, -0.30, 1.31),
+                            (-0.04, -0.29, 1.32),
+                            right_pole=(-0.72, -0.14, 1.44),
+                        ),
+                        "_foot_targets": feet((0.14, -0.12, 0.30)),
+                    },
+                ),
+                (
+                    16,
+                    {
+                        "_root_location": (0.0, 0.025, 0.005),
+                        "hips": (2.0, -12.0, 0.0),
+                        "spine": (2.0, -6.0, -1.0),
+                        "chest": (2.0, -10.0, -1.0),
+                        "head": (-3.0, 24.0, 1.0),
+                        "_hand_targets": hands(
+                            (0.04, -0.30, 1.31),
+                            (-0.03, -0.29, 1.32),
+                            right_pole=(-0.74, -0.12, 1.46),
+                        ),
+                        "_foot_targets": feet((0.14, -0.08, 0.68)),
+                    },
+                ),
+                (
+                    19,
+                    {
+                        "_root_location": (0.0, 0.012, 0.025),
+                        "hips": (2.0, -14.0, 0.0),
+                        "spine": (3.0, -7.0, -1.0),
+                        "chest": (3.0, -10.0, -1.0),
+                        "head": (-5.0, 25.0, 1.0),
+                        "_hand_targets": hands(
+                            (0.25, -0.42, 1.28),
+                            (-0.32, -0.02, 1.30),
+                            right_pole=(-0.78, -0.05, 1.48),
+                        ),
+                        "_foot_targets": feet((0.14, -0.18, 0.58)),
+                    },
+                ),
+                (
+                    22,
+                    {
+                        "_root_location": (0.0, -0.004, 0.075),
+                        "hips": (4.0, -12.0, 0.0),
+                        "spine": (4.0, -6.0, -1.0),
+                        "chest": (4.0, -8.0, -1.0),
+                        "head": (-7.0, 20.0, 1.0),
+                        "_hand_targets": hands(
+                            (0.36, -0.52, 1.25),
+                            (-0.45, 0.10, 1.40),
+                            right_pole=(-0.80, -0.02, 1.50),
+                        ),
+                        "_foot_targets": feet((0.15, -0.45, 0.28)),
+                    },
+                ),
+                (
+                    24,
+                    {
+                        "_root_location": (0.0, -0.018, 0.125),
+                        "hips": (5.0, 4.0, 0.0),
+                        "spine": (4.0, -8.0, -1.0),
+                        "chest": (3.0, -10.0, -1.0),
+                        "head": (-7.0, 12.0, 1.0),
+                        "_hand_targets": hands(
+                            (0.34, -0.60, 1.25),
+                            (-0.50, 0.08, 1.54),
+                            right_pole=(-0.79, -0.07, 1.54),
+                        ),
+                        "_foot_targets": feet((0.16, -0.72, 0.075)),
+                    },
+                ),
+                (
+                    25,
+                    {
+                        "_root_location": (0.0, -0.024, 0.145),
+                        "hips": (5.5, 8.0, 0.0),
+                        "spine": (4.5, -5.0, -1.0),
+                        "chest": (4.0, -8.0, -1.0),
+                        "head": (-8.5, 6.0, 1.0),
+                        "_hand_targets": hands(
+                            (0.29, -0.58, 1.24),
+                            (-0.48, 0.02, 1.63),
+                            right_pole=(-0.78, -0.11, 1.57),
+                        ),
+                        "_foot_targets": feet((0.16, -0.72, 0.075)),
+                    },
+                ),
+                (
+                    26,
+                    {
+                        "_root_location": (0.0, -0.030, 0.165),
+                        "hips": (6.0, 12.0, 0.0),
+                        "spine": (5.0, -2.0, -1.0),
+                        "chest": (5.0, -5.0, -1.0),
+                        "head": (-10.0, -2.0, 1.0),
+                        "_hand_targets": hands(
+                            (0.24, -0.56, 1.23),
+                            (-0.44, -0.03, 1.72),
+                            right_pole=(-0.76, -0.15, 1.60),
+                        ),
+                        "_foot_targets": feet((0.16, -0.72, 0.075)),
+                    },
+                ),
+                (
+                    27,
+                    {
+                        "_root_location": (0.0, -0.036, 0.190),
+                        "hips": (6.0, 15.0, 1.0),
+                        "spine": (7.0, 2.0, 0.0),
+                        "chest": (8.0, 4.0, 0.0),
+                        "head": (-12.0, -14.0, 0.0),
+                        "_hand_targets": hands(
+                            (0.16, -0.24, 1.22),
+                            (-0.32, -0.36, 1.68),
+                            right_pole=(-0.70, -0.32, 1.59),
+                        ),
+                        "_foot_targets": feet((0.16, -0.72, 0.075)),
+                    },
+                ),
+                (
+                    28,
+                    {
+                        "_root_location": (0.0, -0.042, 0.215),
+                        "hips": (7.0, 18.0, 1.0),
+                        "spine": (9.0, 8.0, 1.0),
+                        "chest": (12.0, 12.0, 1.0),
+                        "head": (-18.0, -28.0, -1.0),
+                        "_hand_targets": hands(
+                            (0.10, -0.18, 1.22),
+                            (-0.08, -1.22, 1.56),
+                            right_pole=(-0.62, -0.55, 1.55),
+                        ),
+                        "_foot_targets": feet((0.16, -0.72, 0.075)),
+                    },
+                ),
+                (
+                    29,
+                    {
+                        "_root_location": (0.0, -0.045, 0.230),
+                        "hips": (8.0, 20.0, 1.0),
+                        "spine": (10.0, 10.0, 1.0),
+                        "chest": (14.0, 14.0, 1.0),
+                        "head": (-20.0, -32.0, -1.0),
+                        "_hand_targets": hands(
+                            (0.08, -0.17, 1.20),
+                            (0.02, -1.36, 1.40),
+                            right_pole=(-0.45, -0.72, 1.43),
+                        ),
+                        "_foot_targets": feet((0.16, -0.72, 0.075)),
+                    },
+                ),
+                (
+                    34,
+                    {
+                        "_root_location": (0.0, -0.032, 0.205),
+                        "hips": (12.0, 24.0, 1.0),
+                        "spine": (14.0, 14.0, 1.0),
+                        "chest": (18.0, 14.0, 1.0),
+                        "head": (-28.0, -38.0, -2.0),
+                        "_hand_targets": hands(
+                            (0.06, -0.15, 1.15),
+                            (0.30, -0.86, 0.92),
+                            right_pole=(-0.05, -0.55, 1.15),
+                        ),
+                        "_foot_targets": feet(
+                            (0.16, -0.72, 0.075),
+                            (-0.12, -0.15, 0.50),
+                            right_pole=(-0.45, -0.38, 0.72),
+                        ),
+                    },
+                ),
+                (
+                    39,
+                    {
+                        "_root_location": (0.0, -0.012, 0.115),
+                        "hips": (8.0, 20.0, 1.0),
+                        "spine": (8.0, 10.0, 1.0),
+                        "chest": (8.0, 8.0, 1.0),
+                        "head": (-15.0, -27.0, -1.0),
+                        "_hand_targets": hands(
+                            (0.10, -0.26, 1.12),
+                            (0.32, -0.55, 0.96),
+                            right_pole=(0.02, -0.43, 1.10),
+                        ),
+                        "_foot_targets": feet(
+                            (0.14, -0.64, 0.075),
+                            (-0.12, -0.38, 0.18),
+                            right_pole=(-0.45, -0.56, 0.58),
+                        ),
+                    },
+                ),
+                (
+                    45,
+                    {
+                        "_root_location": (0.0, 0.0, 0.0),
+                        "hips": (1.0, 4.0, 0.0),
+                        "spine": (0.0, 2.0, 0.0),
+                        "chest": (0.0, 1.0, 0.0),
+                        "head": (0.0, -5.0, 0.0),
+                        "_hand_targets": hands(
+                            (0.40, -0.10, 0.82),
+                            (-0.40, -0.10, 0.80),
+                            left_pole=(0.70, -0.12, 1.15),
+                            right_pole=(-0.66, -0.18, 1.10),
+                        ),
+                        "_foot_targets": feet(
+                            (0.18, -0.30, 0.075),
+                            (-0.18, -0.22, 0.075),
+                            left_pole=(0.50, -0.55, 0.62),
+                            right_pole=(-0.50, -0.34, 0.60),
+                        ),
+                    },
+                ),
+            ],
+            markers={"ball_release": 28, "stride_plant": 24},
+        )
+        bake_action_frames(pitch_action, 1, 45)
+
     field_ready = {
         "hips": (-12.0, 0.0, 0.0),
         "spine": (14.0, 0.0, 0.0),
@@ -1611,112 +2265,274 @@ def build_actions():
         loop=True,
     )
     create_action(
-        "pitch",
-        37,
+        "__pitch_v8_diagnostic",
+        45,
         [
-            (1, neutral),
+            (
+                1,
+                {
+                    "hips": (-2.0, -4.0, 0.0),
+                    "spine": (2.0, -4.0, 0.0),
+                    "chest": (3.0, -6.0, 0.0),
+                    "head": (-2.0, 8.0, 0.0),
+                    "_hand_targets": hands((0.14, -0.20, 1.35), (-0.14, -0.18, 1.33)),
+                    "_foot_targets": feet((0.14, -0.22, 0.075)),
+                },
+            ),
+            (
+                4,
+                {
+                    "hips": (-3.0, -6.0, 0.0),
+                    "spine": (3.0, -6.0, 0.0),
+                    "chest": (4.0, -8.0, 0.0),
+                    "head": (-3.0, 10.0, 0.0),
+                    "_hand_targets": hands((0.14, -0.21, 1.37), (-0.14, -0.19, 1.35)),
+                    "_foot_targets": feet((0.14, -0.22, 0.075)),
+                },
+            ),
             (
                 7,
                 {
-                    "hips": (0.0, -10.0, 0.0),
-                    "spine": (-4.0, -9.0, -2.0),
-                    "chest": (-5.0, -12.0, -3.0),
-                    "head": (3.0, 8.0, 2.0),
-                    "upper_arm.L": (-42.0, -8.0, 22.0),
-                    "forearm.L": (-52.0, 0.0, 0.0),
-                    "upper_arm.R": (-35.0, 15.0, -45.0),
-                    "forearm.R": (78.0, 0.0, 0.0),
-                    "thigh.L": (-55.0, 3.0, 0.0),
-                    "shin.L": (82.0, 0.0, 0.0),
+                    "_root_location": (0.0, 0.0, 0.01),
+                    "hips": (-5.0, -10.0, 0.0),
+                    "spine": (2.0, -9.0, -1.0),
+                    "chest": (3.0, -13.0, -1.0),
+                    "head": (-2.0, 14.0, 1.0),
+                    "_hand_targets": hands((0.13, -0.22, 1.40), (-0.13, -0.19, 1.38)),
+                    "_foot_targets": feet((0.14, -0.22, 0.075)),
                 },
             ),
             (
-                14,
+                10,
                 {
-                    "hips": (0.0, -22.0, 0.0),
-                    "spine": (-7.0, -18.0, -3.0),
-                    "chest": (-8.0, -28.0, -4.0),
-                    "head": (6.0, 20.0, 3.0),
-                    "upper_arm.L": (-65.0, -10.0, 35.0),
-                    "forearm.L": (-76.0, 0.0, 0.0),
-                    "upper_arm.R": (-78.0, 12.0, -58.0),
-                    "forearm.R": (108.0, 3.0, -8.0),
-                    "hand.R": (-28.0, 0.0, 0.0),
-                    "thigh.L": (-78.0, 0.0, 2.0),
-                    "shin.L": (112.0, 0.0, 0.0),
-                    "foot.L": (-22.0, 0.0, 0.0),
-                    "thigh.R": (8.0, 0.0, 0.0),
-                    "shin.R": (-10.0, 0.0, 0.0),
+                    "_root_location": (0.0, 0.0, 0.025),
+                    "hips": (-7.0, -15.0, -1.0),
+                    "spine": (-1.0, -14.0, -2.0),
+                    "chest": (-3.0, -21.0, -2.0),
+                    "head": (2.0, 20.0, 2.0),
+                    "_hand_targets": hands((0.13, -0.23, 1.43), (-0.12, -0.20, 1.41)),
+                    "_foot_targets": feet((0.14, -0.20, 0.15)),
                 },
             ),
             (
-                21,
+                13,
                 {
-                    "hips": (0.0, 14.0, 0.0),
-                    "spine": (8.0, 16.0, 2.0),
-                    "chest": (12.0, 24.0, 4.0),
-                    "head": (-7.0, -18.0, -3.0),
-                    "upper_arm.L": (25.0, 20.0, -42.0),
-                    "forearm.L": (-40.0, 0.0, 0.0),
-                    "upper_arm.R": (72.0, -20.0, 46.0),
-                    "forearm.R": (-32.0, 8.0, 10.0),
-                    "hand.R": (25.0, 0.0, 0.0),
-                    "thigh.L": (24.0, 0.0, 0.0),
-                    "shin.L": (-18.0, 0.0, 0.0),
-                    "thigh.R": (-28.0, 0.0, 0.0),
-                    "shin.R": (22.0, 0.0, 0.0),
+                    "_root_location": (0.0, 0.025, 0.045),
+                    "hips": (-8.0, -20.0, -1.0),
+                    "spine": (-4.0, -20.0, -2.0),
+                    "chest": (-6.0, -28.0, -3.0),
+                    "head": (4.0, 26.0, 3.0),
+                    "_hand_targets": hands((0.12, -0.26, 1.48), (-0.12, -0.22, 1.46)),
+                    "_foot_targets": feet((0.14, -0.15, 0.50)),
+                },
+            ),
+            (
+                16,
+                {
+                    "_root_location": (0.0, 0.045, 0.075),
+                    "hips": (-7.0, -23.0, -1.0),
+                    "spine": (-5.0, -23.0, -2.0),
+                    "chest": (-7.0, -31.0, -3.0),
+                    "head": (5.0, 29.0, 3.0),
+                    "_hand_targets": hands((0.20, -0.33, 1.39), (-0.30, 0.02, 1.34)),
+                    "_foot_targets": feet((0.14, -0.19, 0.68)),
+                },
+            ),
+            (
+                19,
+                {
+                    "_root_location": (0.0, 0.035, 0.15),
+                    "hips": (-5.0, -22.0, -1.0),
+                    "spine": (-5.0, -23.0, -2.0),
+                    "chest": (-6.0, -30.0, -3.0),
+                    "head": (4.0, 27.0, 3.0),
+                    "_hand_targets": hands((0.34, -0.47, 1.32), (-0.47, 0.10, 1.46)),
+                    "_foot_targets": feet((0.16, -0.35, 0.43)),
+                },
+            ),
+            (
+                22,
+                {
+                    "_root_location": (0.0, 0.015, 0.28),
+                    "hips": (-2.0, -14.0, 0.0),
+                    "spine": (-3.0, -21.0, -1.0),
+                    "chest": (-4.0, -28.0, -2.0),
+                    "head": (2.0, 24.0, 2.0),
+                    "_hand_targets": hands(
+                        (0.31, -0.54, 1.26),
+                        (-0.45, 0.06, 1.71),
+                        right_pole=(-0.78, -0.02, 1.58),
+                    ),
+                    "_foot_targets": feet((0.17, -0.66, 0.20)),
                 },
             ),
             (
                 24,
                 {
-                    "hips": (0.0, 28.0, 0.0),
-                    "spine": (18.0, 26.0, 2.0),
-                    "chest": (24.0, 35.0, 5.0),
-                    "head": (-12.0, -26.0, -4.0),
-                    "upper_arm.L": (48.0, 18.0, -52.0),
-                    "forearm.L": (-25.0, 0.0, 0.0),
-                    "upper_arm.R": (98.0, -18.0, 54.0),
-                    "forearm.R": (-12.0, 12.0, 8.0),
-                    "hand.R": (42.0, 0.0, 0.0),
-                    "thigh.L": (35.0, 0.0, 0.0),
-                    "shin.L": (-24.0, 0.0, 0.0),
-                    "thigh.R": (-35.0, 0.0, 0.0),
-                    "shin.R": (35.0, 0.0, 0.0),
+                    "_root_location": (0.0, 0.0, 0.42),
+                    "hips": (1.0, 8.0, 1.0),
+                    "spine": (-1.0, -8.0, -1.0),
+                    "chest": (-2.0, -16.0, -2.0),
+                    "head": (0.0, 15.0, 2.0),
+                    "_hand_targets": hands(
+                        (0.23, -0.48, 1.20),
+                        (-0.39, -0.02, 1.79),
+                        right_pole=(-0.78, -0.14, 1.64),
+                    ),
+                    "_foot_targets": feet((0.16, -0.92, 0.075)),
+                },
+            ),
+            (
+                25,
+                {
+                    "_root_location": (0.0, -0.005, 0.49),
+                    "hips": (3.0, 18.0, 1.0),
+                    "spine": (1.0, 0.0, 0.0),
+                    "chest": (1.0, -7.0, -1.0),
+                    "head": (-1.0, 7.0, 1.0),
+                    "_hand_targets": hands(
+                        (0.19, -0.41, 1.18),
+                        (-0.35, -0.10, 1.82),
+                        right_pole=(-0.72, -0.23, 1.66),
+                    ),
+                    "_foot_targets": feet((0.16, -0.92, 0.075)),
+                },
+            ),
+            (
+                26,
+                {
+                    "_root_location": (0.0, -0.01, 0.55),
+                    "hips": (0.0, 27.0, 2.0),
+                    "spine": (1.0, 9.0, 0.0),
+                    "chest": (2.0, 2.0, -1.0),
+                    "head": (-3.0, 1.0, 1.0),
+                    "_hand_targets": hands(
+                        (0.15, -0.34, 1.17),
+                        (-0.22, -0.14, 1.72),
+                        right_pole=(-0.66, -0.34, 1.67),
+                    ),
+                    "_foot_targets": feet((0.16, -0.92, 0.075)),
+                },
+            ),
+            (
+                27,
+                {
+                    "_root_location": (0.0, -0.015, 0.62),
+                    "hips": (-2.0, 37.0, 2.0),
+                    "spine": (-2.0, 23.0, 1.0),
+                    "chest": (-2.0, 19.0, 1.0),
+                    "head": (-6.0, -14.0, 0.0),
+                    "_hand_targets": hands(
+                        (0.11, -0.26, 1.15),
+                        (-0.14, -0.42, 1.69),
+                        right_pole=(-0.57, -0.50, 1.64),
+                    ),
+                    "_foot_targets": feet((0.16, -0.92, 0.075)),
+                },
+            ),
+            (
+                28,
+                {
+                    "_root_location": (0.0, -0.02, 0.68),
+                    "hips": (-5.0, 45.0, 3.0),
+                    "spine": (-10.0, 38.0, 2.0),
+                    "chest": (-14.0, 41.0, 3.0),
+                    "head": (-10.0, -31.0, -2.0),
+                    "_hand_targets": hands(
+                        (0.08, -0.21, 1.13),
+                        (-0.08, -1.31, 1.60),
+                        right_pole=(-0.49, -0.66, 1.58),
+                    ),
+                    "_foot_targets": feet((0.16, -0.92, 0.075)),
+                },
+            ),
+            (
+                29,
+                {
+                    "_root_location": (0.0, -0.025, 0.74),
+                    "hips": (-8.0, 49.0, 3.0),
+                    "spine": (-18.0, 49.0, 3.0),
+                    "chest": (-24.0, 56.0, 4.0),
+                    "head": (-13.0, -43.0, -3.0),
+                    "_hand_targets": hands(
+                        (0.06, -0.18, 1.12),
+                        (0.04, -1.48, 1.48),
+                        right_pole=(-0.40, -0.75, 1.50),
+                    ),
+                    "_foot_targets": feet((0.16, -0.92, 0.075)),
                 },
             ),
             (
                 31,
                 {
-                    "hips": (0.0, 38.0, 0.0),
-                    "spine": (28.0, 34.0, 3.0),
-                    "chest": (34.0, 46.0, 6.0),
-                    "head": (-18.0, -34.0, -5.0),
-                    "upper_arm.L": (26.0, 12.0, -30.0),
-                    "forearm.L": (-55.0, 0.0, 0.0),
-                    "upper_arm.R": (62.0, -12.0, 30.0),
-                    "forearm.R": (35.0, 6.0, 0.0),
-                    "thigh.L": (48.0, 0.0, 0.0),
-                    "shin.L": (-12.0, 0.0, 0.0),
-                    "thigh.R": (-20.0, 0.0, 0.0),
-                    "shin.R": (50.0, 0.0, 0.0),
+                    "_root_location": (0.0, -0.03, 0.82),
+                    "hips": (-8.0, 51.0, 3.0),
+                    "spine": (-18.0, 57.0, 4.0),
+                    "chest": (-23.0, 64.0, 5.0),
+                    "head": (-18.0, -50.0, -4.0),
+                    "_hand_targets": hands(
+                        (0.06, -0.17, 1.10),
+                        (0.20, -1.35, 1.25),
+                        right_pole=(-0.25, -0.75, 1.38),
+                    ),
+                    "_foot_targets": feet((0.16, -0.92, 0.075), (-0.14, -0.46, 0.18)),
                 },
             ),
             (
-                37,
+                34,
                 {
-                    "hips": (0.0, 8.0, 0.0),
-                    "spine": (8.0, 7.0, 1.0),
-                    "chest": (10.0, 8.0, 1.0),
-                    "upper_arm.R": (18.0, 0.0, 8.0),
-                    "forearm.R": (25.0, 0.0, 0.0),
-                    "thigh.L": (12.0, 0.0, 0.0),
-                    "shin.R": (15.0, 0.0, 0.0),
+                    "_root_location": (0.0, -0.035, 0.88),
+                    "hips": (-10.0, 50.0, 3.0),
+                    "spine": (-22.0, 58.0, 4.0),
+                    "chest": (-28.0, 66.0, 5.0),
+                    "head": (-21.0, -52.0, -4.0),
+                    "_hand_targets": hands(
+                        (0.08, -0.18, 1.08),
+                        (0.39, -1.05, 1.02),
+                        right_pole=(0.05, -0.66, 1.24),
+                    ),
+                    "_foot_targets": feet((0.16, -0.92, 0.075), (-0.05, -0.70, 0.30)),
+                },
+            ),
+            (
+                38,
+                {
+                    "_root_location": (0.0, -0.025, 0.91),
+                    "hips": (-8.0, 45.0, 2.0),
+                    "spine": (-17.0, 48.0, 3.0),
+                    "chest": (-21.0, 51.0, 4.0),
+                    "head": (-16.0, -39.0, -3.0),
+                    "_hand_targets": hands(
+                        (0.10, -0.21, 1.05),
+                        (0.46, -0.78, 0.93),
+                        right_pole=(0.22, -0.48, 1.10),
+                    ),
+                    "_foot_targets": feet((0.16, -0.92, 0.075), (0.10, -0.88, 0.19)),
+                },
+            ),
+            (
+                45,
+                {
+                    "_root_location": (0.0, -0.01, 0.91),
+                    "hips": (-4.0, 34.0, 1.0),
+                    "spine": (-8.0, 34.0, 2.0),
+                    "chest": (-10.0, 35.0, 2.0),
+                    "head": (-10.0, -26.0, -2.0),
+                    "_hand_targets": hands(
+                        (0.12, -0.24, 1.02),
+                        (0.33, -0.47, 1.02),
+                        right_pole=(0.18, -0.36, 1.08),
+                    ),
+                    "_foot_targets": feet((0.16, -0.92, 0.075), (0.15, -0.86, 0.075)),
                 },
             ),
         ],
-        markers={"ball_release": 24},
+        markers={"ball_release": 28, "stride_plant": 24},
     )
+    # Keep the previous v8 target set in source history for comparison while
+    # ensuring it never reaches the authored asset or exported action list.
+    bpy.data.actions.remove(bpy.data.actions["__pitch_v8_diagnostic"])
+    build_pitch_action()
     create_action(
         "swing",
         29,
@@ -2241,12 +3057,15 @@ def build_actions():
     )
     RIG.animation_data.action = None
     for pose_bone in RIG.pose.bones:
-        pose_bone.rotation_euler = (0.0, 0.0, 0.0)
+        pose_bone.rotation_quaternion = (1.0, 0.0, 0.0, 0.0)
         pose_bone.location = (0.0, 0.0, 0.0)
 
 
 def finish_scene(meshes):
     scene = bpy.context.scene
+    # Godot Agent validates the raw BLENDER header. Blender 5 defaults to Zstd
+    # compression, so keep authored build outputs portable and inspectable.
+    bpy.context.preferences.filepaths.use_file_compression = False
     scene.unit_settings.system = "METRIC"
     scene.unit_settings.scale_length = 1.0
     scene.render.fps = 30
@@ -2255,9 +3074,9 @@ def finish_scene(meshes):
     scene["agent_recipe"] = Path(__file__).name
     scene["agent_recipe_version"] = ASSET_VERSION
     scene["asset_name"] = "Pixiball Ballplayer"
-    scene["asset_style"] = "premium hybrid pixel-art baseball athlete"
+    scene["asset_style"] = "realistic procedurally sculpted baseball athlete"
     scene["license"] = "original project asset"
-    scene["nominal_height_m"] = 1.98
+    scene["nominal_height_m"] = 1.89
     scene["actions"] = "idle,run,pitch,swing,catch,field_ready,field_throw,celebrate,slide"
     scene["team_materials"] = "TEAM_Primary,TEAM_Secondary,TEAM_Accent"
     scene["attachment_sockets"] = (

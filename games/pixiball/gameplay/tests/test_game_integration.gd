@@ -14,6 +14,9 @@ func _run() -> void:
 	root.add_child(game)
 	# Let the complete generated hierarchy enter the tree and receive _ready.
 	await process_frame
+	var sample_aim := Vector2(0.62, -0.37)
+	_check(game._plate_feet_to_aim(game._aim_to_plate_feet(sample_aim)).is_equal_approx(sample_aim), "aim and plate-feet presentation mapping must round-trip")
+	_check(game._plate_pitch_world(Vector2(0.0, 1.5)).is_equal_approx(game.broadcast_camera.plate_location_world(0.0, 1.5)), "pitch endpoint and projected strike zone must share one world mapping")
 	_check(game.batter is BallplayerActor, "playable batter should use BallplayerActor")
 	_check(game.batter.get_model_kind() == "rigged_glb", "playable batter should load the rigged GLB")
 	_check(not game.batter.is_using_fallback(), "playable batter unexpectedly selected voxel fallback")
@@ -39,6 +42,9 @@ func _run() -> void:
 
 	var saw_bottom := false
 	var saw_live_play := false
+	var saw_batting_camera := false
+	var saw_fielding_camera := false
+	var ready_camera_valid := true
 	var ticks := 0
 	# The presentation state machines are deterministic and fixed-step. Driving
 	# them directly makes this full-game test finish in seconds instead of
@@ -50,12 +56,19 @@ func _run() -> void:
 		var state: Dictionary = game.sim.snapshot()
 		saw_bottom = saw_bottom or state.half == "bottom"
 		saw_live_play = saw_live_play or state.phase == "live_play"
+		saw_batting_camera = saw_batting_camera or game.broadcast_camera.mode == "batting"
+		saw_fielding_camera = saw_fielding_camera or game.broadcast_camera.mode == "fielding"
+		if game.flow == "ready":
+			var expected_camera := "pitching" if state.half == "top" else "batting"
+			ready_camera_valid = ready_camera_valid and game.broadcast_camera.mode == expected_camera
 		ticks += 1
 
 	var final_state: Dictionary = game.sim.snapshot()
 	_check(int(final_state.pitch_serial) >= 6, "a quick game should exercise multiple pitches")
 	_check(saw_bottom, "the integration game should exercise user batting")
 	_check(saw_live_play, "the integration game should exercise a live batted ball")
+	_check(saw_batting_camera and saw_fielding_camera, "the integration game should exercise distinct batting and fielding cameras")
+	_check(ready_camera_valid, "every ready phase must restore its role camera after live play")
 	_check(game.flow == "game_over", "deterministic autoplay should finish the game")
 	_check(String(final_state.winner) in ["home", "away"], "a completed game should name a winner")
 	_check(game._godot_ai_describe().intents.has("autoplay"), "semantic gameplay contract should advertise autoplay")

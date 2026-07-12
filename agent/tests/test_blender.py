@@ -15,6 +15,7 @@ from godot_agent import blender_bootstrap
 from godot_agent.blender import (
     BLENDER_INVOCATION_SCHEMA_VERSION,
     BlenderBuildError,
+    _validate_blend,
     build_blender_asset,
     locate_blender,
 )
@@ -94,7 +95,7 @@ class BlenderBuildTests(unittest.TestCase):
             project = Path(temporary)
             script = project / "tools" / "make_runner.py"
             script.parent.mkdir()
-            script.write_text("import bpy\n", encoding="utf-8")
+            script.write_bytes(b"import bpy\n")
             executable = make_executable(project / "fake-blender")
 
             with mock.patch("godot_agent.blender.subprocess.run", side_effect=successful_blender) as runner:
@@ -223,6 +224,42 @@ class BlenderBuildTests(unittest.TestCase):
             self.assertEqual(exit_code, 0, stderr.getvalue())
             self.assertEqual(json.loads(stdout.getvalue())["paths"]["output"], "res://model.glb")
             self.assertFalse((project / ".godot" / "agent" / "endpoint.json").exists())
+
+
+class BlenderHeaderValidationTests(unittest.TestCase):
+    def test_accepts_legacy_header(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            blend = Path(temporary) / "legacy.blend"
+            blend.write_bytes(b"BLENDER-v400REND")
+
+            _validate_blend(blend)
+
+    def test_accepts_blender_5_extended_header(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            blend = Path(temporary) / "extended.blend"
+            blend.write_bytes(b"BLENDER17-01v0501REND")
+
+            _validate_blend(blend)
+
+    def test_rejects_malformed_and_truncated_headers(self):
+        invalid_headers = (
+            b"BLENDER17-01v050",
+            b"BLENDER18-01v0501",
+            b"BLENDER17_01v0501",
+            b"BLENDER17-02v0501",
+            b"BLENDER17-01V0501",
+            b"BLENDER17-01v05A1",
+            b"BLENDER-v40",
+            b"NOTBLENDER-v400",
+        )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            blend = Path(temporary) / "invalid.blend"
+            for header in invalid_headers:
+                with self.subTest(header=header):
+                    blend.write_bytes(header)
+                    with self.assertRaisesRegex(BlenderBuildError, "invalid Blender header"):
+                        _validate_blend(blend)
 
 
 class BlenderDiscoveryTests(unittest.TestCase):

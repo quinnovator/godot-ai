@@ -1,0 +1,76 @@
+{
+  "name": "Pixiball model and pitch presentation baseline",
+  "pause": true,
+  "restore_pause": true,
+  "steps": [
+    {
+      "intent": {
+        "name": "start_versus",
+        "params": {
+          "seed": 78031,
+          "innings": 3,
+          "difficulty": 0.5,
+          "player_team": 3,
+          "cpu_team": 8
+        }
+      }
+    },
+    { "advance": 120 },
+    { "assert": { "path": "presentation.flow", "equals": "ready" } },
+    { "assert": { "path": "presentation.camera_mode", "equals": "pitching" } },
+    { "capture": "res://.godot/agent/captures/realism-final-pitching-day.png" },
+    {
+      "intent": {
+        "name": "aim",
+        "params": { "x": 0.45, "y": -0.1 }
+      }
+    },
+    { "intent": { "name": "primary", "params": {} } },
+    { "advance": 43 },
+    { "assert": { "path": "presentation.flow", "equals": "windup" } },
+    { "capture": "res://.godot/agent/captures/realism-final-pitch-late-cock.png" },
+    {
+      "wait": {
+        "path": "presentation.flow",
+        "equals": "pitch_flight",
+        "max_frames": 12,
+        "step_frames": 1
+      }
+    },
+    { "capture": "res://.godot/agent/captures/realism-final-pitch-release.png" },
+    { "advance": 6 },
+    { "assert": { "path": "presentation.flow", "equals": "pitch_flight" } },
+    { "capture": "res://.godot/agent/captures/realism-final-pitch-flight.png" },
+    {
+      "intent": {
+        "name": "autoplay",
+        "params": { "enabled": true }
+      }
+    },
+    {
+      "wait": {
+        "path": "user_role",
+        "equals": "batting",
+        "max_frames": 12000,
+        "step_frames": 120
+      }
+    },
+    {
+      "intent": {
+        "name": "autoplay",
+        "params": { "enabled": false }
+      }
+    },
+    {
+      "wait": {
+        "path": "presentation.flow",
+        "equals": "ready",
+        "max_frames": 1200,
+        "step_frames": 15
+      }
+    },
+    { "assert": { "path": "presentation.camera_mode", "equals": "batting" } },
+    { "capture": "res://.godot/agent/captures/realism-final-batting-zone.png" },
+    { "observe": "realism-baseline-complete" }
+  ]
+}

@@ -1,16 +1,13 @@
 shader_type canvas_item;
 render_mode unshaded;
 
-// Applied to the WorldView SubViewportContainer. TEXTURE is the fixed
-// 640x360 world render target (4x MSAA inside the target, shared World3D),
-// so the pixel grid is defined by the render resolution itself and is
-// identical on any display or framebuffer scale. This pass only quantizes
-// color and applies restrained ordered dithering keyed to the logical
-// texel grid; the container's nearest filter performs the integer upscale.
-// UI CanvasLayers draw after this container and stay native-resolution sharp.
-uniform vec2 logical_size = vec2(640.0, 360.0);
+// Applied to the native-resolution WorldView SubViewportContainer. Geometry
+// keeps 4x MSAA while this finish quantizes luminance, rather than crushing
+// each RGB channel independently. The result retains colorful material detail
+// and uses the pixel treatment as a restrained accent. UI draws afterward.
+uniform vec2 logical_size = vec2(1280.0, 720.0);
 uniform float color_steps : hint_range(16.0, 64.0, 1.0) = 48.0;
-uniform float dither_strength : hint_range(0.0, 1.0, 0.01) = 0.35;
+uniform float dither_strength : hint_range(0.0, 1.0, 0.01) = 0.08;
 
 float bayer4(vec2 cell) {
 	ivec2 q = ivec2(mod(cell, 4.0));
@@ -26,10 +23,11 @@ float bayer4(vec2 cell) {
 
 void fragment() {
 	vec3 source = texture(TEXTURE, UV).rgb;
-	// One dither cell per world texel, indexed on the logical grid so the
-	// pattern can never alias against the display resolution, and rounded
-	// (not truncated) quantization so mean brightness is preserved.
+	// One stable dither cell per native world texel. Quantizing luminance keeps
+	// team colors and skin tones intact instead of building noisy RGB ramps.
 	float dither = bayer4(floor(UV * logical_size)) * dither_strength;
-	vec3 quantized = floor(source * color_steps + 0.5 + dither) / color_steps;
+	float luma = dot(source, vec3(0.2126, 0.7152, 0.0722));
+	float quantized_luma = floor(luma * color_steps + 0.5 + dither) / color_steps;
+	vec3 quantized = source + vec3(quantized_luma - luma);
 	COLOR = vec4(clamp(quantized, 0.0, 1.0), 1.0);
 }

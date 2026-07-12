@@ -9,9 +9,14 @@ const SLOT_COLORS := [
 	Color("ffd94a"),
 	Color("c78bff"),
 ]
-# UE comet: 5 shrinking spheres, per-node alpha, x3 emissive.
-const TRAIL_COUNT := 5
-const TRAIL_ALPHAS := [0.35, 0.22, 0.16, 0.10, 0.06]
+# Short shutter streak. It is velocity-aligned and time-based, so its apparent
+# length does not change with frame rate and it never reads as extra baseballs.
+const TRAIL_COUNT := 4
+const TRAIL_ALPHAS := [0.18, 0.11, 0.065, 0.03]
+const TRAIL_RADII := [0.34, 0.27, 0.20, 0.12]
+const SHUTTER_SECONDS := 1.0 / 120.0
+const MIN_TRAIL_LENGTH := 0.06
+const MAX_TRAIL_LENGTH := 0.72
 const BALL_RADIUS := 0.18
 const SEAM_BASE_SCALE := Vector3(0.68, 1.0, 0.68)
 # Per-view multipliers on BALL_RADIUS. The pitch ball reads as a small bright
@@ -30,9 +35,14 @@ var shadow: MeshInstance3D
 
 var _trail_color := Color("6ee76e")
 var _visual_scale := PITCH_SCALE
-var _history: Array[Vector3] = []
-# Samples of ball position we drop the comet nodes onto; ~sub-pixel spacing.
-var _sample_stride := 3
+var _last_position := Vector3.ZERO
+var _last_velocity := Vector3.ZERO
+var _has_last_position := false
+var _flight_time := 0.0
+var _spin_radians_per_second := 0.0
+var _spin_axis := Vector3.RIGHT
+var _trail_enabled := true
+var _batting_trail := false
 
 
 func _ready() -> void:
@@ -92,22 +102,21 @@ func _ready() -> void:
 
 
 func _build_trail() -> void:
-	# Comet nodes live in world space (siblings of the ball), trailing the head
-	# along its recent path. Head (i<=1) stays white; tail nodes take the slot
-	# tint. Scale follows UE's 0.13 * 0.82^(i+1) ratio relative to the ball.
+	# Streak segments live in world space as siblings of the ball. Cylinders join
+	# end-to-end behind the measured velocity vector and taper into transparency.
 	for i in range(TRAIL_COUNT):
 		var node := MeshInstance3D.new()
-		node.name = "BallTrail%d" % i
-		var mesh := SphereMesh.new()
-		var node_radius := BALL_RADIUS * (0.13 * pow(0.82, i + 1)) / 0.09
-		mesh.radius = node_radius
-		mesh.height = node_radius * 2.0
+		node.name = "BallStreak%d" % i
+		var mesh := CylinderMesh.new()
+		mesh.top_radius = 0.01
+		mesh.bottom_radius = 0.01
+		mesh.height = 0.01
 		mesh.radial_segments = 8
-		mesh.rings = 4
 		node.mesh = mesh
 		var mat := StandardMaterial3D.new()
 		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 		node.material_override = mat
 		node.visible = false
 		trail.append(node)
@@ -123,12 +132,27 @@ func set_trail_slot(slot: int) -> void:
 
 ## Small bright dot for the center-field pitch view.
 func use_pitch_ball() -> void:
+	_trail_enabled = true
 	set_visual_scale(PITCH_SCALE)
 
 
 ## Exaggerated ball so the overhead live-play sky cam can see it.
 func use_play_ball() -> void:
+	_trail_enabled = false
+	_hide_trail()
 	set_visual_scale(PLAY_SCALE)
+
+
+func begin_pitch_motion(spin_rate_rpm: float, spin_axis_degrees: float, batting_view: bool) -> void:
+	_flight_time = 0.0
+	_last_velocity = Vector3.ZERO
+	_has_last_position = false
+	_spin_radians_per_second = maxf(0.0, spin_rate_rpm) * TAU / 60.0
+	var axis_radians := deg_to_rad(spin_axis_degrees)
+	_spin_axis = Vector3(cos(axis_radians), sin(axis_radians), 0.0).normalized()
+	_batting_trail = batting_view
+	_trail_enabled = true
+	_refresh_trail_colors()
 
 
 func set_visual_scale(mult: float) -> void:
@@ -138,9 +162,6 @@ func set_visual_scale(mult: float) -> void:
 	for seam in seams:
 		if is_instance_valid(seam):
 			seam.scale = SEAM_BASE_SCALE * _visual_scale
-	for node in trail:
-		if is_instance_valid(node):
-			node.scale = Vector3.ONE * _visual_scale
 
 
 func _refresh_trail_colors() -> void:
@@ -148,14 +169,15 @@ func _refresh_trail_colors() -> void:
 		var mat := trail[i].material_override as StandardMaterial3D
 		if mat == null:
 			continue
-		var tint := Color.WHITE if i <= 1 else _trail_color
-		var alpha := float(TRAIL_ALPHAS[i]) if i < TRAIL_ALPHAS.size() else 0.06
-		# Translucent node (soft comet glow, NOT an opaque balloon); the x3 gain
-		# is emissive energy only.
+		var tint_amount := 0.04 if i <= 1 else 0.12 + float(i) * 0.03
+		var tint := Color.WHITE.lerp(_trail_color, tint_amount)
+		var alpha := float(TRAIL_ALPHAS[i]) if i < TRAIL_ALPHAS.size() else 0.03
+		if _batting_trail:
+			alpha *= 0.58
 		mat.albedo_color = Color(tint.r, tint.g, tint.b, alpha)
 		mat.emission_enabled = true
 		mat.emission = tint
-		mat.emission_energy_multiplier = 3.0
+		mat.emission_energy_multiplier = 0.55
 
 
 func set_active(value: bool) -> void:
@@ -163,16 +185,19 @@ func set_active(value: bool) -> void:
 	if is_instance_valid(shadow):
 		shadow.visible = value
 	if not value:
-		_history.clear()
-		for node in trail:
-			if is_instance_valid(node):
-				node.visible = false
+		_has_last_position = false
+		_last_velocity = Vector3.ZERO
+		_hide_trail()
 
 
-func set_ball_position(value: Vector3) -> void:
+func set_ball_position(value: Vector3, delta := 0.0) -> void:
 	global_position = value
-	rotation += Vector3(0.09, 0.16, 0.12)
-	_push_history(value)
+	if delta > 0.00001 and _has_last_position:
+		_last_velocity = (value - _last_position) / delta
+		_flight_time += delta
+		quaternion = Quaternion(_spin_axis, _spin_radians_per_second * _flight_time)
+	_last_position = value
+	_has_last_position = true
 	_update_trail()
 	if is_instance_valid(shadow):
 		shadow.global_position = Vector3(value.x, 0.075, value.z)
@@ -184,24 +209,47 @@ func set_ball_position(value: Vector3) -> void:
 		if mat != null:
 			mat.albedo_color.a = clampf(0.30 - 0.024 * z_ft, 0.08, 0.30)
 
-
-func _push_history(value: Vector3) -> void:
-	_history.push_front(value)
-	var cap := TRAIL_COUNT * _sample_stride + 2
-	if _history.size() > cap:
-		_history.resize(cap)
-
-
 func _update_trail() -> void:
-	if not visible:
+	if not visible or not _trail_enabled:
+		_hide_trail()
 		return
+	var speed := _last_velocity.length()
+	if speed < 0.5:
+		_hide_trail()
+		return
+	var direction := _last_velocity / speed
+	var streak_length := clampf(speed * SHUTTER_SECONDS, MIN_TRAIL_LENGTH, MAX_TRAIL_LENGTH)
+	var segment_length := streak_length / float(TRAIL_COUNT)
+	var head := global_position - direction * BALL_RADIUS * _visual_scale * 0.45
 	for i in range(trail.size()):
 		var node := trail[i]
 		if not is_instance_valid(node):
 			continue
-		var index := (i + 1) * _sample_stride
-		if index < _history.size():
-			node.global_position = _history[index]
-			node.visible = true
-		else:
+		var segment_start := head - direction * segment_length * float(i)
+		var segment_end := segment_start - direction * segment_length
+		var segment := segment_end - segment_start
+		var mesh := node.mesh as CylinderMesh
+		var radius := BALL_RADIUS * _visual_scale * float(TRAIL_RADII[i])
+		mesh.top_radius = radius
+		mesh.bottom_radius = radius * 0.82
+		mesh.height = segment.length()
+		node.global_transform = Transform3D(
+			_basis_from_y(segment.normalized()),
+			(segment_start + segment_end) * 0.5
+		)
+		node.visible = true
+
+
+func _basis_from_y(direction: Vector3) -> Basis:
+	var side := direction.cross(Vector3.FORWARD)
+	if side.length_squared() < 0.000001:
+		side = direction.cross(Vector3.RIGHT)
+	side = side.normalized()
+	var forward := side.cross(direction).normalized()
+	return Basis(side, direction, forward)
+
+
+func _hide_trail() -> void:
+	for node in trail:
+		if is_instance_valid(node):
 			node.visible = false

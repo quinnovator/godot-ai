@@ -10,6 +10,73 @@ extends Node
 ## while making masks, protectors, labels, and shin guards follow animation.
 
 const PLAYER_ROLES := ["pitcher", "batter", "hitter", "slugger", "catcher", "fielder"]
+const IDENTITY_LABEL_NAMES := ["TeamMark", "JerseyNumberFront", "JerseyNumberBack"]
+
+const KNIT_NORMAL_MAP := preload("res://assets/textures/surface/cotton_jersey_nor_gl_1k.jpg")
+
+## Authored varsity block glyph outlines in a 100x140 em box, each entry a
+## list of quads (a 2-point entry is an axis-aligned rect [min, max]; a
+## 4-point entry is a free quad). These are cut into two-layer tackle-twill
+## applique geometry -- a contrasting border layer under a raised fill layer
+## -- exactly like stitched pro uniform lettering, so no font rendering is
+## involved anywhere in jersey identity.
+const BLOCK_GLYPHS := {
+	"0": [[Vector2(0, 114), Vector2(100, 140)], [Vector2(0, 0), Vector2(100, 26)], [Vector2(0, 26), Vector2(26, 114)], [Vector2(74, 26), Vector2(100, 114)]],
+	"1": [[Vector2(37, 0), Vector2(63, 140)], [Vector2(10, 114), Vector2(37, 140)], [Vector2(14, 0), Vector2(86, 26)]],
+	"2": [[Vector2(0, 114), Vector2(100, 140)], [Vector2(74, 88), Vector2(100, 114)], [Vector2(0, 62), Vector2(100, 88)], [Vector2(0, 26), Vector2(26, 62)], [Vector2(0, 0), Vector2(100, 26)]],
+	"3": [[Vector2(0, 114), Vector2(100, 140)], [Vector2(74, 88), Vector2(100, 114)], [Vector2(26, 62), Vector2(100, 88)], [Vector2(74, 26), Vector2(100, 62)], [Vector2(0, 0), Vector2(100, 26)]],
+	"4": [[Vector2(0, 62), Vector2(26, 140)], [Vector2(0, 62), Vector2(100, 88)], [Vector2(58, 0), Vector2(84, 140)]],
+	"5": [[Vector2(0, 114), Vector2(100, 140)], [Vector2(0, 88), Vector2(26, 114)], [Vector2(0, 62), Vector2(100, 88)], [Vector2(74, 26), Vector2(100, 62)], [Vector2(0, 0), Vector2(100, 26)]],
+	"6": [[Vector2(0, 114), Vector2(100, 140)], [Vector2(0, 26), Vector2(26, 114)], [Vector2(26, 62), Vector2(100, 88)], [Vector2(74, 26), Vector2(100, 62)], [Vector2(0, 0), Vector2(100, 26)]],
+	"7": [[Vector2(0, 114), Vector2(100, 140)], [Vector2(52, 0), Vector2(78, 0), Vector2(96, 114), Vector2(70, 114)]],
+	"8": [[Vector2(0, 114), Vector2(100, 140)], [Vector2(0, 0), Vector2(100, 26)], [Vector2(0, 26), Vector2(26, 114)], [Vector2(74, 26), Vector2(100, 114)], [Vector2(26, 62), Vector2(74, 88)]],
+	"9": [[Vector2(0, 114), Vector2(100, 140)], [Vector2(74, 26), Vector2(100, 114)], [Vector2(0, 52), Vector2(74, 78)], [Vector2(0, 78), Vector2(26, 114)], [Vector2(0, 0), Vector2(100, 26)]],
+	"A": [[Vector2(0, 114), Vector2(100, 140)], [Vector2(0, 0), Vector2(26, 114)], [Vector2(74, 0), Vector2(100, 114)], [Vector2(26, 52), Vector2(74, 78)]],
+	"B": [[Vector2(0, 0), Vector2(26, 140)], [Vector2(0, 114), Vector2(100, 140)], [Vector2(0, 57), Vector2(100, 83)], [Vector2(0, 0), Vector2(100, 26)], [Vector2(74, 83), Vector2(100, 114)], [Vector2(74, 26), Vector2(100, 57)]],
+	"C": [[Vector2(0, 26), Vector2(26, 114)], [Vector2(0, 114), Vector2(100, 140)], [Vector2(0, 0), Vector2(100, 26)]],
+	"D": [[Vector2(0, 0), Vector2(26, 140)], [Vector2(0, 114), Vector2(88, 140)], [Vector2(0, 0), Vector2(88, 26)], [Vector2(62, 26), Vector2(88, 114)]],
+	"E": [[Vector2(0, 0), Vector2(26, 140)], [Vector2(0, 114), Vector2(100, 140)], [Vector2(0, 57), Vector2(78, 83)], [Vector2(0, 0), Vector2(100, 26)]],
+	"F": [[Vector2(0, 0), Vector2(26, 140)], [Vector2(0, 114), Vector2(100, 140)], [Vector2(0, 57), Vector2(78, 83)]],
+	"G": [[Vector2(0, 26), Vector2(26, 114)], [Vector2(0, 114), Vector2(100, 140)], [Vector2(0, 0), Vector2(100, 26)], [Vector2(74, 26), Vector2(100, 62)], [Vector2(52, 62), Vector2(100, 88)]],
+	"H": [[Vector2(0, 0), Vector2(26, 140)], [Vector2(74, 0), Vector2(100, 140)], [Vector2(26, 57), Vector2(74, 83)]],
+	"I": [[Vector2(37, 0), Vector2(63, 140)], [Vector2(10, 114), Vector2(90, 140)], [Vector2(10, 0), Vector2(90, 26)]],
+	"J": [[Vector2(74, 26), Vector2(100, 140)], [Vector2(0, 0), Vector2(100, 26)], [Vector2(0, 26), Vector2(26, 62)]],
+	"K": [[Vector2(0, 0), Vector2(26, 140)], [Vector2(26, 62), Vector2(26, 88), Vector2(100, 140), Vector2(74, 140)], [Vector2(26, 78), Vector2(26, 52), Vector2(74, 0), Vector2(100, 0)]],
+	"L": [[Vector2(0, 0), Vector2(26, 140)], [Vector2(0, 0), Vector2(100, 26)]],
+	"M": [[Vector2(0, 0), Vector2(26, 140)], [Vector2(74, 0), Vector2(100, 140)], [Vector2(0, 140), Vector2(26, 140), Vector2(63, 52), Vector2(37, 52)], [Vector2(100, 140), Vector2(74, 140), Vector2(37, 52), Vector2(63, 52)]],
+	"N": [[Vector2(0, 0), Vector2(26, 140)], [Vector2(74, 0), Vector2(100, 140)], [Vector2(0, 140), Vector2(26, 140), Vector2(100, 0), Vector2(74, 0)]],
+	"O": [[Vector2(0, 114), Vector2(100, 140)], [Vector2(0, 0), Vector2(100, 26)], [Vector2(0, 26), Vector2(26, 114)], [Vector2(74, 26), Vector2(100, 114)]],
+	"P": [[Vector2(0, 0), Vector2(26, 140)], [Vector2(0, 114), Vector2(100, 140)], [Vector2(0, 57), Vector2(100, 83)], [Vector2(74, 83), Vector2(100, 114)]],
+	"Q": [[Vector2(0, 114), Vector2(100, 140)], [Vector2(0, 0), Vector2(100, 26)], [Vector2(0, 26), Vector2(26, 114)], [Vector2(74, 26), Vector2(100, 114)], [Vector2(52, 42), Vector2(74, 64), Vector2(100, 22), Vector2(78, 0)]],
+	"R": [[Vector2(0, 0), Vector2(26, 140)], [Vector2(0, 114), Vector2(100, 140)], [Vector2(0, 57), Vector2(100, 83)], [Vector2(74, 83), Vector2(100, 114)], [Vector2(38, 57), Vector2(64, 57), Vector2(100, 0), Vector2(74, 0)]],
+	"S": [[Vector2(0, 114), Vector2(100, 140)], [Vector2(0, 88), Vector2(26, 114)], [Vector2(0, 57), Vector2(100, 83)], [Vector2(74, 26), Vector2(100, 57)], [Vector2(0, 0), Vector2(100, 26)]],
+	"T": [[Vector2(0, 114), Vector2(100, 140)], [Vector2(37, 0), Vector2(63, 114)]],
+	"U": [[Vector2(0, 26), Vector2(26, 140)], [Vector2(74, 26), Vector2(100, 140)], [Vector2(0, 0), Vector2(100, 26)]],
+	"V": [[Vector2(0, 140), Vector2(26, 140), Vector2(63, 0), Vector2(37, 0)], [Vector2(100, 140), Vector2(74, 140), Vector2(37, 0), Vector2(63, 0)]],
+	"W": [[Vector2(0, 0), Vector2(26, 140)], [Vector2(74, 0), Vector2(100, 140)], [Vector2(0, 0), Vector2(26, 0), Vector2(63, 88), Vector2(37, 88)], [Vector2(100, 0), Vector2(74, 0), Vector2(37, 88), Vector2(63, 88)]],
+	"X": [[Vector2(0, 140), Vector2(26, 140), Vector2(100, 0), Vector2(74, 0)], [Vector2(74, 140), Vector2(100, 140), Vector2(26, 0), Vector2(0, 0)]],
+	"Y": [[Vector2(0, 140), Vector2(26, 140), Vector2(63, 70), Vector2(37, 70)], [Vector2(100, 140), Vector2(74, 140), Vector2(37, 70), Vector2(63, 70)], [Vector2(37, 0), Vector2(63, 70)]],
+	"Z": [[Vector2(0, 114), Vector2(100, 140)], [Vector2(0, 0), Vector2(100, 26)], [Vector2(74, 114), Vector2(100, 114), Vector2(26, 26), Vector2(0, 26)]],
+}
+
+const GLYPH_EM_WIDTH := 100.0
+const GLYPH_EM_HEIGHT := 140.0
+const GLYPH_EM_GAP := 24.0
+const TWILL_BORDER_EM := 9.0
+const TWILL_BORDER_HEIGHT := 0.0022
+const TWILL_FILL_HEIGHT := 0.0042
+
+## Placement of each tackle-twill piece in the actor's neutral space: the
+## lettering is curved around the measured torso barrel (parabolic sagitta
+## approximation of the chest ellipse) and stands a few millimetres proud of
+## the cloth like real stitched applique. The back number spans ~22 cm of
+## character height and stays the dominant uniform read from the mound
+## camera.
+const IDENTITY_SPECS := {
+	"TeamMark": {"kind": "mark", "cap_height": 0.098, "center": Vector2(0.095, 1.315), "standoff": 0.163, "side": 0.264, "forward": -1.0},
+	"JerseyNumberFront": {"kind": "number", "cap_height": 0.090, "center": Vector2(-0.095, 1.245), "standoff": 0.163, "side": 0.264, "forward": -1.0},
+	"JerseyNumberBack": {"kind": "number", "cap_height": 0.195, "center": Vector2(0.0, 1.260), "standoff": 0.164, "side": 0.260, "forward": 1.0},
+}
 
 var _pieces: Dictionary = {}
 var _materials: Dictionary = {}
@@ -52,15 +119,7 @@ func set_palette(primary: Color, secondary: Color, accent: Color) -> void:
 	_set_material_color("secondary", secondary)
 	_set_material_color("accent", accent)
 	_set_material_color("primary_dark", primary.darkened(0.42))
-	var mark := _pieces.get("TeamMark") as Label3D
-	if is_instance_valid(mark):
-		mark.modulate = accent
-		mark.outline_modulate = primary.darkened(0.55)
-	for piece_name in ["JerseyNumberFront", "JerseyNumberBack"]:
-		var label := _pieces.get(piece_name) as Label3D
-		if is_instance_valid(label):
-			label.modulate = secondary
-			label.outline_modulate = primary.darkened(0.55)
+	_refresh_identity()
 	if _highlighted:
 		set_highlighted(true)
 
@@ -68,14 +127,7 @@ func set_palette(primary: Color, secondary: Color, accent: Color) -> void:
 func set_identity(mark: String, number: int) -> void:
 	_mark = mark.to_upper().left(1)
 	_number = posmod(number, 100)
-	var mark_label := _pieces.get("TeamMark") as Label3D
-	if is_instance_valid(mark_label):
-		mark_label.text = _mark
-	var number_text := str(_number)
-	for piece_name in ["JerseyNumberFront", "JerseyNumberBack"]:
-		var label := _pieces.get(piece_name) as Label3D
-		if is_instance_valid(label):
-			label.text = number_text
+	_refresh_identity()
 
 
 func set_highlighted(enabled: bool) -> void:
@@ -100,6 +152,21 @@ func get_profile() -> Dictionary:
 
 func get_piece(piece_name: String) -> Node3D:
 	return _pieces.get(piece_name) as Node3D
+
+
+## Keeps bone-attached identity glyphs readable when BallplayerActor changes
+## the imported model's X scale between batting and throwing handedness. The
+## initial keep-global attachment bakes the current sign into each local basis;
+## a later sign change would otherwise reflect the glyphs.
+func sync_identity_orientation() -> void:
+	for piece_name in IDENTITY_LABEL_NAMES:
+		var glyphs := _pieces.get(piece_name) as Node3D
+		if not is_instance_valid(glyphs):
+			continue
+		if glyphs.global_transform.basis.determinant() < 0.0:
+			var corrected := glyphs.transform
+			corrected.basis.x = -corrected.basis.x
+			glyphs.transform = corrected
 
 
 func _clear_pieces() -> void:
@@ -141,19 +208,19 @@ func _set_material_color(key: String, color: Color) -> void:
 func _install_batting_helmet(actor: Node3D, batting_side: String) -> void:
 	var root := Node3D.new()
 	root.name = "BattingHelmet"
-	_sphere(root, "HelmetDome", 0.184, 0.235, Vector3(0.0, 0.055, 0.012), "primary", 24, 12)
-	_box(root, "HelmetRear", Vector3(0.285, 0.125, 0.060), Vector3(0.0, -0.030, 0.105), "primary_dark", Vector3(8.0, 0.0, 0.0))
-	_box(root, "HelmetBrim", Vector3(0.270, 0.026, 0.145), Vector3(0.0, 0.015, -0.142), "primary_dark", Vector3(-6.0, 0.0, 0.0))
+	_sphere(root, "HelmetDome", 0.105, 0.135, Vector3(0.0, 0.030, 0.007), "primary", 24, 12)
+	_box(root, "HelmetRear", Vector3(0.155, 0.068, 0.034), Vector3(0.0, -0.016, 0.058), "primary_dark", Vector3(8.0, 0.0, 0.0))
+	_box(root, "HelmetBrim", Vector3(0.150, 0.015, 0.082), Vector3(0.0, 0.008, -0.080), "primary_dark", Vector3(-6.0, 0.0, 0.0))
 	var ear_sign := 1.0 if batting_side.to_lower().begins_with("r") else -1.0
-	_box(root, "HelmetEarFlap", Vector3(0.060, 0.138, 0.116), Vector3(ear_sign * 0.145, -0.055, 0.020), "primary", Vector3.ZERO)
-	_box(root, "HelmetEarPad", Vector3(0.067, 0.070, 0.058), Vector3(ear_sign * 0.148, -0.055, -0.025), "padding", Vector3.ZERO)
-	_box(root, "HelmetStripe", Vector3(0.027, 0.028, 0.245), Vector3(0.0, 0.115, 0.012), "accent", Vector3.ZERO)
-	_install(actor, root, "head", Transform3D(Basis.IDENTITY, Vector3(0.0, 1.820, 0.0)))
+	_box(root, "HelmetEarFlap", Vector3(0.034, 0.076, 0.064), Vector3(ear_sign * 0.082, -0.030, 0.011), "primary", Vector3.ZERO)
+	_box(root, "HelmetEarPad", Vector3(0.037, 0.038, 0.032), Vector3(ear_sign * 0.084, -0.030, -0.014), "padding", Vector3.ZERO)
+	_box(root, "HelmetStripe", Vector3(0.015, 0.016, 0.135), Vector3(0.0, 0.063, 0.007), "accent", Vector3.ZERO)
+	_install(actor, root, "head", Transform3D(Basis.IDENTITY, Vector3(0.0, 1.766, 0.0)))
 
 
 func _install_catcher_gear(actor: Node3D) -> void:
-	var mask := _mask("CatcherMask", "metal", "primary_dark", 0.155, 0.265)
-	_install(actor, mask, "head", Transform3D(Basis.IDENTITY, Vector3(0.0, 1.715, -0.205)))
+	var mask := _mask("CatcherMask", "metal", "primary_dark", 0.085, 0.150)
+	_install(actor, mask, "head", Transform3D(Basis.IDENTITY, Vector3(0.0, 1.700, -0.150)))
 
 	var chest := Node3D.new()
 	chest.name = "CatcherChestProtector"
@@ -180,8 +247,8 @@ func _install_shin_guard(actor: Node3D, side: String, x: float) -> void:
 
 
 func _install_umpire_gear(actor: Node3D) -> void:
-	var mask := _mask("UmpireMask", "metal", "umpire", 0.166, 0.280)
-	_install(actor, mask, "head", Transform3D(Basis.IDENTITY, Vector3(0.0, 1.710, -0.215)))
+	var mask := _mask("UmpireMask", "metal", "umpire", 0.090, 0.158)
+	_install(actor, mask, "head", Transform3D(Basis.IDENTITY, Vector3(0.0, 1.700, -0.155)))
 
 	var chest := Node3D.new()
 	chest.name = "UmpireProtector"
@@ -210,33 +277,132 @@ func _mask(piece_name: String, bar_material: String, pad_material: String, half_
 
 
 func _install_identity(actor: Node3D) -> void:
-	var mark := _label("TeamMark", _mark, 104, 0.00095, _accent, _primary.darkened(0.55), 18)
-	_install(actor, mark, "chest", Transform3D(Basis.IDENTITY, Vector3(0.105, 1.365, -0.270)))
-
-	var number_text := str(_number)
-	var number_front := _label("JerseyNumberFront", number_text, 86, 0.00082, _secondary, _primary.darkened(0.55), 16)
-	_install(actor, number_front, "chest", Transform3D(Basis.IDENTITY, Vector3(-0.105, 1.305, -0.270)))
-
-	var back_basis := Basis.from_euler(Vector3(0.0, PI, 0.0))
-	var number_back := _label("JerseyNumberBack", number_text, 126, 0.00105, _secondary, _primary.darkened(0.58), 18)
-	_install(actor, number_back, "chest", Transform3D(back_basis, Vector3(0.0, 1.345, 0.175)))
+	for piece_name in IDENTITY_LABEL_NAMES:
+		var piece := MeshInstance3D.new()
+		piece.name = piece_name
+		_apply_identity_visual(piece, IDENTITY_SPECS[piece_name] as Dictionary)
+		_install(actor, piece, "chest", Transform3D.IDENTITY)
 
 
-func _label(name: String, text: String, font_size: int, pixel_size: float, color: Color, outline: Color, outline_size: int) -> Label3D:
-	var label := Label3D.new()
-	label.name = name
-	label.text = text
-	label.font_size = font_size
-	label.pixel_size = pixel_size
-	label.modulate = color
-	label.outline_modulate = outline
-	label.outline_size = outline_size
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.double_sided = true
-	label.alpha_cut = Label3D.ALPHA_CUT_DISCARD
-	label.alpha_scissor_threshold = 0.34
-	return label
+func _refresh_identity() -> void:
+	for piece_name in IDENTITY_LABEL_NAMES:
+		var piece := _pieces.get(piece_name) as MeshInstance3D
+		if is_instance_valid(piece):
+			_apply_identity_visual(piece, IDENTITY_SPECS[piece_name] as Dictionary)
+
+
+func _identity_text(kind: String) -> String:
+	return _mark if kind == "mark" else str(_number)
+
+
+## Rebuilds the piece's tackle-twill mesh in place so bone attachment and
+## handedness correction survive every identity or palette change.
+func _apply_identity_visual(piece: MeshInstance3D, spec: Dictionary) -> void:
+	var text := _identity_text(String(spec["kind"]))
+	piece.mesh = _twill_mesh(text, spec)
+	piece.set_meta("identity_text", text)
+
+
+## Builds stitched two-layer tackle-twill lettering as real geometry: a
+## contrasting border layer under a raised fill layer, both extruded from the
+## authored block glyph outlines, wrapped around the torso barrel, and shaded
+## with the knit fabric normal map. Reads exactly like sewn-on pro uniform
+## numbers instead of rendered text.
+func _twill_mesh(text: String, spec: Dictionary) -> ArrayMesh:
+	var cap_height := float(spec["cap_height"])
+	var center: Vector2 = spec["center"]
+	var standoff := float(spec["standoff"])
+	var side := float(spec["side"])
+	var forward := float(spec["forward"])
+	var scale := cap_height / GLYPH_EM_HEIGHT
+	var glyphs: Array = []
+	for index in range(text.length()):
+		var glyph: Array = BLOCK_GLYPHS.get(text[index], []) as Array
+		if not glyph.is_empty():
+			glyphs.append(glyph)
+	var total_em := glyphs.size() * GLYPH_EM_WIDTH + maxi(0, glyphs.size() - 1) * GLYPH_EM_GAP
+	var mesh := ArrayMesh.new()
+	# Umpires intentionally carry an empty team mark. Leave that attachment as
+	# an empty mesh instead of asking ArrayMesh to material an absent surface.
+	if glyphs.is_empty():
+		return mesh
+	for layer in [
+		{"expand": TWILL_BORDER_EM, "top": TWILL_BORDER_HEIGHT, "color": _secondary},
+		{"expand": 0.0, "top": TWILL_FILL_HEIGHT, "color": _primary},
+	]:
+		var tool := SurfaceTool.new()
+		tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+		for glyph_index in range(glyphs.size()):
+			var origin_em := -total_em * 0.5 + glyph_index * (GLYPH_EM_WIDTH + GLYPH_EM_GAP)
+			for quad in glyphs[glyph_index]:
+				var corners := _quad_corners(quad as Array, float(layer["expand"]))
+				var top_ring: Array[Vector3] = []
+				var base_ring: Array[Vector3] = []
+				for corner_value in corners:
+					var corner: Vector2 = corner_value
+					var lx := (origin_em + corner.x) * scale
+					var ly := (corner.y - GLYPH_EM_HEIGHT * 0.5) * scale
+					top_ring.append(_wrap_point(lx, ly, float(layer["top"]), center, standoff, side, forward))
+					base_ring.append(_wrap_point(lx, ly, 0.0004, center, standoff, side, forward))
+				_add_quad(tool, top_ring[0], top_ring[1], top_ring[2], top_ring[3])
+				for edge in range(4):
+					var next_edge := (edge + 1) % 4
+					_add_quad(tool, base_ring[edge], base_ring[next_edge], top_ring[next_edge], top_ring[edge])
+		tool.generate_normals()
+		tool.commit(mesh)
+		var material := StandardMaterial3D.new()
+		material.resource_name = "Equipment_Twill"
+		material.albedo_color = layer["color"]
+		material.roughness = 0.82
+		material.normal_enabled = true
+		material.normal_texture = KNIT_NORMAL_MAP
+		material.normal_scale = 0.5
+		material.uv1_triplanar = true
+		material.uv1_scale = Vector3(30.0, 30.0, 30.0)
+		mesh.surface_set_material(mesh.get_surface_count() - 1, material)
+	return mesh
+
+
+## Curves a local lettering point around the torso: em-x advance runs toward
+## the viewer's right for the piece's facing, and depth follows the measured
+## elliptical chest/back cross-section (half-width ``side``) offset a few
+## millimetres outward, so the applique hugs the cloth across its full span.
+func _wrap_point(lx: float, ly: float, height: float, center: Vector2, standoff: float, side: float, forward: float) -> Vector3:
+	var wx := center.x + forward * lx
+	var ratio := clampf(1.0 - (wx * wx) / (side * side), 0.12, 1.0)
+	return Vector3(wx, center.y + ly, forward * (standoff + height) * sqrt(ratio))
+
+
+func _quad_corners(quad: Array, expand: float) -> Array:
+	var corners: Array = []
+	if quad.size() == 2:
+		var lo: Vector2 = quad[0]
+		var hi: Vector2 = quad[1]
+		corners = [Vector2(lo.x, lo.y), Vector2(hi.x, lo.y), Vector2(hi.x, hi.y), Vector2(lo.x, hi.y)]
+	else:
+		corners = quad.duplicate()
+	var area := 0.0
+	for index in range(corners.size()):
+		var a: Vector2 = corners[index]
+		var b: Vector2 = corners[(index + 1) % corners.size()]
+		area += a.x * b.y - b.x * a.y
+	if area < 0.0:
+		corners.reverse()
+	if expand > 0.0:
+		var centroid := Vector2.ZERO
+		for corner in corners:
+			centroid += corner
+		centroid /= corners.size()
+		for index in range(corners.size()):
+			var offset: Vector2 = corners[index] - centroid
+			corners[index] = corners[index] + Vector2(signf(offset.x), signf(offset.y)) * expand
+	return corners
+
+
+func _add_quad(tool: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> void:
+	# Godot front faces wind clockwise.
+	for vertex in [a, c, b, a, d, c]:
+		tool.add_vertex(vertex)
 
 
 func _install(actor: Node3D, node: Node3D, socket_name: String, actor_transform: Transform3D) -> void:

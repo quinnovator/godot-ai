@@ -31,6 +31,22 @@ const ParkGeometry = preload("res://core/fielding/park_geometry.gd")
 const FT_H := ParkGeometry.HORIZONTAL_WORLD_PER_FOOT
 const FT_V := ParkGeometry.VERTICAL_WORLD_PER_FOOT
 
+# Plate-local dimensions use the vertical (true-foot) scale. The field depth is
+# compressed for presentation, but players, the baseball, and the rulebook zone
+# remain human-scale at home plate.
+const PLATE_WORLD_PER_FOOT := FT_V
+const STRIKE_ZONE_HALF_WIDTH_FT := 17.0 / 24.0
+const STRIKE_ZONE_BOTTOM_FT := 1.5
+const STRIKE_ZONE_TOP_FT := 3.5
+const PITCH_PLANE_Z_OFFSET := -0.55
+
+const MODE_INTRO := "intro"
+const MODE_PITCHING := "pitching"
+const MODE_FIELDING := "fielding"
+const MODE_BATTING := "batting"
+const MODE_DUGOUT := "dugout"
+const GAMEPLAY_MODES := [MODE_PITCHING, MODE_FIELDING, MODE_BATTING]
+
 ## When set, the broadcast camera is parented into that SubViewport so the
 ## 3D world renders at the fixed logical resolution while this director node
 ## keeps authoring motion in the main scene tree.
@@ -39,7 +55,7 @@ const FT_V := ParkGeometry.VERTICAL_WORLD_PER_FOOT
 ## plate cameras snap position and shake in world increments derived from
 ## this so pixels never crawl at subpixel offsets. Must match the
 ## WorldViewport height.
-@export var logical_vertical_pixels := 360
+@export var logical_vertical_pixels := 720
 
 # --- Camera juice (matches PixCameraJuiceComponent) ---------------------------
 const TRAUMA_DECAY := 3.4
@@ -51,7 +67,7 @@ const CONTACT_FADE_SEC := 0.12
 const HITSTOP_SCALE := 0.08
 
 var camera: Camera3D
-var mode := "intro"
+var mode := MODE_INTRO
 var target_node: Node3D
 var desired_position := Vector3(19, 12, 31)
 var desired_target := Vector3(0, 2.5, 3)
@@ -59,13 +75,14 @@ var _look_target := Vector3(0, 2.5, 3)
 var _shake_strength := 0.0
 var _intro_time := 0.0
 var _anim_time := 0.0
-var _field_snap := false
+var _snap_requested := false
 
 var _trauma := 0.0
 var _flash_time := 0.0
 var _hitstop_frames := 0
 var _flash_layer: CanvasLayer
 var _flash_rect: ColorRect
+var _broadcast_fill: DirectionalLight3D
 
 
 func _ready() -> void:
@@ -80,6 +97,17 @@ func _ready() -> void:
 		render_viewport.add_child(camera)
 	else:
 		add_child(camera)
+	# A restrained camera-axis fill preserves faces, gloves, and jersey numbers
+	# against the bright field and waterfront. It carries no shadows and never
+	# replaces the stadium key; it only restores the readable value hierarchy
+	# expected from a real broadcast lens.
+	_broadcast_fill = DirectionalLight3D.new()
+	_broadcast_fill.name = "BroadcastFill"
+	_broadcast_fill.light_color = Color("ffe6c2")
+	_broadcast_fill.light_energy = 0.18
+	_broadcast_fill.light_cull_mask = BallplayerActor.CHARACTER_RENDER_LAYER
+	_broadcast_fill.shadow_enabled = false
+	add_child(_broadcast_fill)
 	global_position = desired_position
 	look_at(desired_target, Vector3.UP)
 	_build_flash()
@@ -90,43 +118,87 @@ func set_mode(next_mode: String, focus: Node3D = null) -> void:
 	mode = next_mode
 	target_node = focus
 	match mode:
-		"intro":
+		MODE_INTRO:
+			_broadcast_fill.light_energy = 0.16
 			camera.projection = Camera3D.PROJECTION_PERSPECTIVE
 			desired_position = Vector3(19, 12, 31)
 			desired_target = Vector3(0, 2.5, 2)
 			camera.fov = 45.0
-		"batting", "pitching":
-			# UE ships a single CineCameraActor "BroadcastCam" and uses it for
-			# both halves: a center-field TV lens looking back at the plate. We
-			# keep both mode strings (main.gd drives them per half) but resolve
-			# to the same perspective vantage.
-			#
-			# FRAMING (v2, tightened per live review): a real CF broadcast is a
-			# long telephoto - it compresses depth so the pitcher's back sits big
-			# in the lower-centre foreground while the batter/catcher/umpire/plate
-			# read clearly just above screen centre, at similar scale. On this
-			# compressed stage moving the camera closer instead just balloons the
-			# near pitcher, so the tighten is done with FOV, not distance: FOV 8
-			# makes the batter/catcher group ~2.5x larger than the old FOV 16.
-			# Low + near-level (subtle up-tilt feel), a hair to the 3B side (-X);
-			# aim sits at group torso height so the mound clears the bottom HUD
-			# band (~100 px of 720 p) and the plate group lands just above centre.
+		MODE_PITCHING:
+			# Long center-field broadcast lens, just to the third-base side.
+			_broadcast_fill.light_energy = 0.44
 			camera.projection = Camera3D.PROJECTION_PERSPECTIVE
 			camera.fov = 8.0
-			desired_position = Vector3(-3.2, 1.9, -28.0)
+			# The first-base-side offset places the plate group on the left and the
+			# pitcher on the right, matching the approved gameplay composition.
+			desired_position = Vector3(3.2, 1.9, -28.0)
 			desired_target = Vector3(0.0, 2.0, 16.5)
-		"field":
+		MODE_BATTING:
+			_broadcast_fill.light_energy = 0.28
+			# Competitive zone-hitting view from the clear backstop corridor. The
+			# physical rulebook zone stays large in the lower center while the
+			# elevated look point keeps the pitcher's full delivery in frame. Its
+			# size comes from projection, not an independently enlarged HUD rectangle.
+			camera.projection = Camera3D.PROJECTION_PERSPECTIVE
+			camera.fov = 15.0
+			desired_position = Vector3(0.0, 2.4, 27.0)
+			desired_target = plate_location_world(0.0, 4.15)
+		MODE_FIELDING:
+			_broadcast_fill.light_energy = 0.18
 			# UE PlayCam: overhead live-play sky cam, driven by the follow law
 			# below every frame. Fixed FOV 52 and a fixed -58 deg downward pitch.
 			camera.projection = Camera3D.PROJECTION_PERSPECTIVE
 			camera.fov = 52.0
-			_field_snap = true
 			_drive_playcam()
-		"dugout":
+		MODE_DUGOUT:
+			_broadcast_fill.light_energy = 0.22
 			camera.projection = Camera3D.PROJECTION_PERSPECTIVE
 			desired_position = Vector3(-25, 5.5, 18)
 			desired_target = Vector3(0, 2.0, 5)
 			camera.fov = 44.0
+		_:
+			push_warning("Unknown Pixiball camera mode: %s" % mode)
+			return
+	if mode in GAMEPLAY_MODES:
+		_snap_requested = true
+		_apply_requested_cut()
+
+
+func plate_location_world(lateral_ft: float, height_ft: float) -> Vector3:
+	return C.HOME_PLATE + Vector3(
+		lateral_ft * PLATE_WORLD_PER_FOOT,
+		height_ft * PLATE_WORLD_PER_FOOT,
+		PITCH_PLANE_Z_OFFSET
+	)
+
+
+func projected_strike_zone() -> Rect2:
+	if not is_instance_valid(camera) or not camera.is_inside_tree():
+		return Rect2()
+	var corners := [
+		plate_location_world(-STRIKE_ZONE_HALF_WIDTH_FT, STRIKE_ZONE_TOP_FT),
+		plate_location_world(STRIKE_ZONE_HALF_WIDTH_FT, STRIKE_ZONE_TOP_FT),
+		plate_location_world(-STRIKE_ZONE_HALF_WIDTH_FT, STRIKE_ZONE_BOTTOM_FT),
+		plate_location_world(STRIKE_ZONE_HALF_WIDTH_FT, STRIKE_ZONE_BOTTOM_FT),
+	]
+	var minimum := Vector2(INF, INF)
+	var maximum := Vector2(-INF, -INF)
+	for corner in corners:
+		if camera.is_position_behind(corner):
+			return Rect2()
+		var screen_point := camera.unproject_position(corner)
+		minimum = minimum.min(screen_point)
+		maximum = maximum.max(screen_point)
+	return Rect2(minimum, maximum - minimum)
+
+
+func plate_lateral_screen_sign() -> float:
+	if not is_instance_valid(camera) or not camera.is_inside_tree():
+		return 1.0
+	var center_screen := camera.unproject_position(plate_location_world(0.0, 2.5))
+	var positive_screen := camera.unproject_position(plate_location_world(1.0, 2.5))
+	var delta_x := positive_screen.x - center_screen.x
+	return signf(delta_x) if not is_zero_approx(delta_x) else 1.0
 
 
 func shake(strength := 0.3) -> void:
@@ -146,16 +218,14 @@ func _process(delta: float) -> void:
 	_intro_time += delta
 	_anim_time += delta
 
-	if mode == "intro":
+	if mode == MODE_INTRO:
 		var angle := _intro_time * 0.055
 		desired_position = Vector3(19.0 + sin(angle) * 5.0, 12.0 + sin(angle * 2.0), 31.0 - cos(angle) * 4.0)
-	elif mode == "field" and is_instance_valid(target_node):
+	elif mode == MODE_FIELDING and is_instance_valid(target_node):
 		_drive_playcam()
 
-	if mode == "field" and _field_snap:
-		global_position = desired_position
-		_look_target = desired_target
-		_field_snap = false
+	if _snap_requested:
+		_apply_requested_cut()
 	else:
 		# UE ease: K = 1 - exp(-dt * 4.5).
 		global_position = global_position.lerp(desired_position, 1.0 - exp(-4.5 * delta))
@@ -165,6 +235,14 @@ func _process(delta: float) -> void:
 	look_at(_look_target, Vector3.UP)
 	_update_hitstop()
 	_update_flash(delta)
+	_sync_render_camera()
+
+
+func _apply_requested_cut() -> void:
+	global_position = desired_position
+	_look_target = desired_target
+	_snap_requested = false
+	look_at(_look_target, Vector3.UP)
 	_sync_render_camera()
 
 

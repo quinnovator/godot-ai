@@ -58,11 +58,10 @@ var _report: Dictionary = {}
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# Geist Pixel: Display (Square) as the default face for every label; numeric
-	# readouts opt into the Score (Grid) face below. Kept local to the panel so
-	# it stays a self-contained, drop-in widget.
+	# Match the Unreal report hierarchy: readable body telemetry by default,
+	# with score digits promoted separately below.
 	var panel_theme := Theme.new()
-	panel_theme.set_font("font", "Label", S.FONT_DISPLAY)
+	panel_theme.set_font("font", "Label", S.FONT_BODY)
 	theme = panel_theme
 	_stage1_rows = _collect_probability_rows(_stage1_box, STAGE1_FIELDS.keys())
 	_contact_rows = _collect_probability_rows(_contact_box, CONTACT_FIELDS.keys())
@@ -73,7 +72,7 @@ func _ready() -> void:
 	hide()
 
 
-## Route numeric readouts through the Score (Grid) face for crisp pixel digits.
+## Route numeric readouts through the reference score face.
 func _apply_digit_faces() -> void:
 	for label in [_velocity_label, _erv_label]:
 		label.add_theme_font_override("font", S.FONT_SCORE)

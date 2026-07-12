@@ -1,22 +1,42 @@
 # Pixiball production ballplayer
 
-This is an original, deterministic, rigged character asset for Pixiball. Its
-continuous multi-weight anatomy paints every uniform accent -- belt and buckle,
-button placket, raglan shoulder yoke, jersey side panels, sleeve cuff piping,
-leg piping, knee folds, sock stripes, and bat grip wraps -- directly onto
-deforming chain faces. Deltoid/bicep/elbow/forearm and knee/calf/ankle
-landmarks are authored into the ring radii, the pants tuck inside the jersey
-hem with shared hips weighting so the midriff can never open, and the hands
-are sculpted chains with knuckle and finger-scallop profiles: a half-open
-glove hand plus a throwing-hand fist that wraps the resting bat handle. A
-graphic four-value face, a lobed baseball mitt with a recessed pocket and one
-open web bridge, sculpted one-piece cleats with bold laces and chunky studs,
-and a curved tapered cap brim complete the premium hybrid pixel-art
-silhouette. No
-Unreal mesh or sprite geometry is used by this rebuilt character asset, it does
-not attempt a real-player likeness, and it contains no third-party character
-geometry. The wider game does retain authorized data and reference textures
-from the user's original project; see
+This is a deterministic, rigged character asset for Pixiball. The version 12
+delivery reaches for the highest realism available from open assets: the
+head is the professionally sculpted realistic animation head from Blender
+Studio's CC0 "Human Base Meshes" bundle (vendored as
+`source/cc0_head_base.blend`), registered onto the rig's eye targets,
+rigidly weighted to the head bone, and completed with the bundle's layered
+sclera/iris eye parts, added pupils, and brow chains raycast-anchored to the
+sculpted brow ridge. Its cut neck rim hides under an undershirt mock-collar
+exactly where a real compression shirt sits. Proportions are naturalistic
+(about 7.7 heads at a ~1.88 m nominal height) and all materials are
+physically based (subsurface-weighted skin, layered glossy eyes, double-knit
+cloth, oiled leather, lacquered maple, brushed steel). In-engine,
+`BallplayerActor` mirrors those families with a Burley/GGX shader that
+layers real CC0 photogrammetry micro-surface maps (cotton jersey knit,
+leather grain, wood figure from Poly Haven, sampled triplanar -- see
+`assets/textures/surface/LICENSES.md`) plus procedural pore/strand detail
+and a warm fresnel scatter approximation on skin.
+
+The continuous multi-weight anatomy authors musculature and wardrobe
+directly into the deforming ring surfaces: deltoid/bicep/tricep/forearm
+bellies, pectoral plates and a spinal groove under the fitted jersey, a
+classic home uniform (white body, team-piped button placket, red raglan
+sleeves and side panels, belt with loops and buckle, striped team stirrups),
+team wristbands, and cloth that drapes over muscle with authored clearance
+so skin never pokes through garments. The pants tuck inside the jersey hem
+with shared hips weighting so the midriff can never open, and the hands are
+sculpted chains with knuckle and finger-scallop profiles: a half-open glove
+hand plus a throwing-hand fist that wraps the resting bat handle. A lobed
+baseball mitt with a recessed pocket and one open web bridge, sculpted
+cleats, and a structured six-panel cap with a curved tapered brim and small
+embroidered monogram complete the figure. The rig keeps the individually
+reviewed biomechanical beats and frame-baked quaternion clips from version
+9, and the head/neck joints were re-seated anatomically without touching any
+limb IK. No Unreal mesh or sprite geometry is used by this rebuilt character
+asset, it does not attempt a real-player likeness, and it contains no
+third-party character, scan, or texture data. The wider game does retain
+authorized data and reference textures from the user's original project; see
 [Asset provenance](../../../docs/ASSET_PROVENANCE.md).
 
 The GLB is the runtime source of truth. The `.blend` remains beside it under the
@@ -27,7 +47,8 @@ gameplay/art contract.
 
 ## Rebuild
 
-Install or select Blender 4.5 LTS, then run from the repository root:
+Install or select Blender 5.x (the promoted receipt records Blender 5.1.2), then
+run from the repository root:
 
 ```sh
 uv run --project agent godot-agent \
@@ -63,6 +84,15 @@ change:
 The renderer uses a fixed three-point studio, camera/lens, action frames, color
 management, and equipment visibility. It writes individual PNGs plus
 `qa_receipt.json`; it never saves changes back to the production `.blend`.
+
+The pitching QA set covers balance, hand break, stride, plant, late cock,
+release, extension, follow-through, and finish. Its telemetry rejects an early
+velocity peak, excessive or unrecovered root motion, unstable lead-foot plant,
+missing deceleration, and discontinuous gather rotations. The promoted v11
+receipt measures release at frame 28, 25.485 m/s authored hand speed, 0.230 m
+root excursion, 0.000 m end offset, and 0.010306 m planted-foot drift
+(identical to v9: the redesigns are visual only and leave the limb rig and
+authored clips untouched).
 
 ## Instantiate
 
@@ -137,6 +167,21 @@ The base asset stays role-neutral. `characters/equipment/ballplayer_equipment.ts
 adds batting helmets, catcher/umpire protection, team marks, and jersey numbers
 as bone-attached, per-instance pieces. This preserves the GLB contract and lets
 future agents replace one equipment family without rebuilding the athlete.
+Numbers and marks are stitched tackle-twill geometry, not rendered text:
+authored varsity block glyph outlines extruded into a raised fill layer over
+a contrasting border layer, curved around the measured torso and shaded with
+the knit fabric normal map. Their basis is corrected after every handedness
+change, preventing negative-scale mirroring; the back number spans roughly
+22 cm of character height and remains the dominant uniform read from the
+pitching camera.
+
+For an in-engine look (cel shader plus glyph identity, which Blender QA
+renders cannot show), run the capture harness without `--headless`:
+
+```sh
+bin/godot.windows.editor.dev.x86_64.console.exe --path games/pixiball \
+  --script res://tools/capture_ballplayer_review.gd -- --output-dir /tmp/review
+```
 
 ## Validation
 

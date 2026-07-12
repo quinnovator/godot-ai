@@ -97,18 +97,43 @@ it returns the normal live-play commit packet without mutating the match.
 ### Production characters and equipment
 
 The primary athlete is `assets/models/ballplayer/ballplayer.glb`, built with
-Blender 4.5 LTS. It contains a 31-bone armature, eight continuously skinned
-logical meshes, 10,022 source vertices, 10,540 polygons, and nine native clips:
+Blender 5.1.2. Asset version 12 combines the procedurally sculpted athlete
+body with the professionally sculpted CC0 head (and layered eyes) from
+Blender Studio's Human Base Meshes bundle, fitted onto the rig by the
+deterministic recipe: a 31-bone armature, eight continuously skinned logical
+meshes, roughly 84k exported vertices and 157k triangles, naturalistic
+7.7-heads proportions at a ~1.88 m nominal height, and nine native clips:
 `idle`, `run`, `pitch`, `swing`, `catch`, `field_ready`, `field_throw`,
 `celebrate`, and `slide`. Ball-release, bat-contact, glove-contact,
-celebration-peak, and base-contact markers are part of the animation contract.
+celebration-peak, and base-contact markers are part of the animation
+contract. In-engine, the surface shader layers CC0 Poly Haven
+photogrammetry micro-detail (jersey knit, leather grain, wood figure,
+sampled triplanar) over Burley/GGX response, and the world composite now
+renders at 1920x1080 with near-lossless color so the realistic character
+survives presentation.
+
+The mound delivery is a frame-reviewed, right-handed 45-frame sequence with
+hemisphere-corrected quaternion tracks: set, lift, hand break, stride, plant,
+late cock, release, extension, deceleration, and balanced recovery. The release
+is the authored hand-speed peak, the planted foot remains stable, and the root
+returns to its idle origin before the runtime blend. The head is an anatomical
+loft with sculpted bone structure and fully modeled features -- layered wet
+eyeballs under skin lids, brows, nose with nostrils, lips, and ears -- so the
+expression remains calm and lifelike through the delivery.
 
 `characters/ballplayer_actor.tscn` is the stable gameplay facade. It adds
-per-instance body variation, handedness, team palettes, sockets, animation
-aliases, and a procedural voxel fallback used only when the imported production
-asset fails validation. Modular bone-attached equipment supplies batting
-helmets; catcher and umpire protection; team marks; and one- or two-digit jersey
-numbers without rebuilding the base athlete.
+per-instance body variation, handedness, team palettes, a physically based
+surface shader layering procedural pore/weave/grain/strand micro-detail and
+a warm skin-scatter approximation over Burley/GGX response, sockets,
+animation aliases, and a procedural voxel fallback used only when the
+imported production asset fails validation. Modular bone-attached equipment
+supplies batting helmets; catcher and umpire protection; team marks; and
+one- or two-digit jersey numbers without rebuilding the base athlete. Front
+and back numbers are stitched tackle-twill geometry: authored varsity block
+glyphs extruded as a raised fill layer over a contrasting border layer,
+wrapped to the torso's measured curvature and shaded with the knit fabric
+normal map, with a handedness correction so they remain sharp and readable
+instead of mirroring when the model changes batting or throwing side.
 
 See [Ballplayer asset](assets/models/ballplayer/README.md) and
 [Equipment architecture](characters/equipment/README.md) for the exact runtime
@@ -122,6 +147,14 @@ toon materials, broadcast cameras, particles, synthesized audio, and a
 screen-space pixel-composite shader. Legacy Unreal sprite sheets are retained as
 authorized reference assets, but the production ballplayers do not render from
 those sheets.
+
+The stadium seats 1,184 deterministic articulated spectators across both side
+stands and the plate section. Individuals vary in height, build, skin, hair,
+shirt, head direction, arm pose, and cap choice, then receive staggered sway,
+breathing, cheer timing, and reaction affinity. The plate crowd is divided into
+real seating blocks around an open harbor overlook rather than doubled with a
+sprite wall. Semantic play outcomes drive individual crowd, LED, and bell
+responses with a bounded decay instead of synchronizing every fan.
 
 ### DualSense and portable haptics
 
@@ -205,7 +238,7 @@ bin/godot.macos.editor.dev.arm64 --headless --path games/pixiball \
   --script res://core/tests/test_sim_golden_compatibility.gd
 ```
 
-## Blender 4.5 production pipeline
+## Blender 5 production pipeline
 
 The editable `.blend`, deterministic Python recipe, exported GLB, asset
 contract, and SHA-256 build manifest live together under
@@ -237,6 +270,14 @@ For independent VLM/modeling-agent candidates, the batch example assigns each
 job unique GLB, `.blend`, receipt, and log paths and can run four Blender workers
 in parallel. See [Parallel modeling](tools/blender/README.md). Candidates remain
 isolated until an agent explicitly validates and promotes one.
+
+For a repeatable rear-camera presentation check, launch Endless Pitch directly
+and optionally leave the ready pose on screen before autoplay begins:
+
+```sh
+bin/godot.windows.editor.dev.x86_64.console.exe --path games/pixiball -- \
+  --autoplay --scenario=endless --autoplay-delay=4.0
+```
 
 ## Validation
 

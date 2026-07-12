@@ -13,6 +13,8 @@ is a finish, not a substitute for modeled or painted detail.
   uniform, equipment, and action-pose target.
 - `references/pixiball-environment-sheet-v1.png` is the stadium density,
   harbor depth, material, wear, and prop target.
+- `references/pixiball-pitcher-delivery-sheet-v2.png` is the sequential
+  right-handed pitching-mechanics, stable-face, and readable-number target.
 - `baseline/` preserves the pre-pass title, day/night gameplay views, and the
   fixed ballplayer QA poses used for visual comparisons.
 
@@ -47,13 +49,37 @@ socket, gameplay geometry, and mood contracts.
 
 - Athletic, stylized proportions with readable shoulders, ribcage, pelvis,
   elbows, knees, calves, hands, and feet.
-- Expressive brow, eye, nose, jaw, ear, hair, and mouth planes that survive the
-  gameplay camera; no generic sphere head.
+- The head is the professionally sculpted CC0 realistic animation head from
+  Blender Studio's Human Base Meshes bundle, registered onto the rig's eye
+  targets, with its layered sclera/iris eyes, added pupils, and brow chains
+  anchored to the sculpted ridge. Its neck rim hides under the undershirt
+  mock-collar. No generic sphere head, no decal faces, and no floating
+  feature boxes that flash or separate during turns.
 - Continuous deformation at every major joint with enough topology to hold
   pitching, batting, catching, sliding, and running silhouettes.
-- Authored jersey collar, placket, piping, sleeve cuffs, cloth folds, belt
-  loops, socks, cleat laces/studs, cap seams, glove webbing/stitching, and bat
-  grip. Details should form readable clusters rather than texture noise.
+- Pitching must preserve a stable head and gaze, pelvis-before-shoulders
+  sequencing, controlled stride and plant, release over the front side,
+  cross-body deceleration, and a recoverable finish. Frame-baked quaternion
+  interpolation is the default for hero actions; Euler branch flips are not.
+- Faces remain calm during exertion: a closed mouth, restrained brow
+  movement, and no expression morphing between keys. Avoid exposed teeth and
+  face intersections.
+- Surfaces are physically based: subsurface-weighted skin with a warm
+  fresnel scatter approximation, polyester double-knit weave, oiled leather
+  grain, lacquered maple, and brushed steel, layered as procedural
+  micro-detail over Burley/GGX response. Proportions are naturalistic
+  (roughly 7.7 heads at a 1.89 m nominal height) with muscle bellies and
+  cloth drape authored into the deforming ring surfaces at subdivision
+  density.
+- Authored jersey collar, team-piped button placket, raglan sleeves, belt
+  and loops, striped team stirrup socks, wristbands, cleat laces/studs, cap
+  seams and embroidered monogram, glove webbing, and bat grip. Cloth must
+  drape over musculature with clearance; skin never pokes through garments.
+- Identity renders as high-resolution screen-printed athletic lettering
+  (vector font, smooth filtering, team-dark keyline). Back numbers must be
+  the dominant uniform identifier at mound-camera scale, remain
+  single-sided, and correct negative-scale handedness so the glyphs are
+  never mirrored.
 - Keep the 31-bone armature, nine native actions, marker frames, semantic
   sockets, eight logical mesh categories, team material slots, handedness, and
   grounded bounds intact unless a contract and its tests are deliberately
@@ -70,6 +96,9 @@ socket, gameplay geometry, and mood contracts.
 - Replace repeated block crowds and skyline boxes with clustered silhouettes,
   stepped seating, aisles, rails, canopies, bunting, pennants, dugout detail,
   boats, cranes, pier furniture, and landmark shapes.
+- Crowd motion must be per-person and phase-staggered: quiet breathing and sway,
+  localized anticipation, outcome-scaled cheering, and a natural decay. Fans
+  should not move in lockstep or leave large visually empty seating bands.
 - Day is clear and buoyant, golden is warm and cinematic, and night uses cool
   ambient fill plus motivated floodlights. Mood changes must affect sky,
   environment, fixtures, emissive props, and character grounding together.

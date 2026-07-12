@@ -33,6 +33,7 @@
     },
     { "assert": { "path": "phase", "equals": "live_play" } },
     { "assert": { "path": "presentation.live_play.active", "equals": true } },
+    { "assert": { "path": "presentation.camera_mode", "equals": "fielding" } },
     { "assert": { "path": "presentation.live_play.phase", "in": ["flight", "rolling", "possession", "throw"] } },
     { "assert": { "path": "presentation.live_play.ball_physics.mode", "exists": true } },
     { "assert": { "path": "presentation.live_play.controlled_fielder", "exists": true } },

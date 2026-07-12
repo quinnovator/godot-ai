@@ -25,6 +25,7 @@ const OVERTHROW_SKIP_FPS := 28.0
 const PICKUP_SEC := 0.28
 const DEAD_HOLD_SEC := 0.5
 const MAX_PLAY_SEC := 30.0
+const VISUAL_CONTACT_BLEND_SEC := 0.08
 const BASE_TOUCH_WORLD := 0.72
 const TAG_RADIUS_WORLD := 0.92
 const COVER_RADIUS_WORLD := 1.4
@@ -42,6 +43,7 @@ var start_position := Vector3.ZERO
 var landing_position := Vector3.ZERO
 var ball_position := Vector3.ZERO
 var ball_velocity := Vector3.ZERO
+var _visual_launch_offset := Vector3.ZERO
 var elapsed := 0.0
 var hang_time := 1.5
 var landed := false
@@ -128,9 +130,11 @@ func begin(
 	hang_time = maxf(BattedBallPhysics.BALL_DT, float(_ball_prediction.get("hang_time_sec", 0.0)))
 	ball_velocity = _field_velocity_to_world(_ball_state)
 	ball_position = start_position
+	var visual_contact: Variant = context.get("visual_contact_world", start_position)
+	_visual_launch_offset = (visual_contact as Vector3) - start_position if visual_contact is Vector3 else Vector3.ZERO
 	if is_instance_valid(ball):
 		ball.call("set_active", true)
-		ball.call("set_ball_position", ball_position)
+		ball.call("set_ball_position", _visual_ball_position())
 	_cache_fielder_home()
 	_build_runners()
 	_select_best_fielder()
@@ -151,6 +155,7 @@ func reset() -> void:
 	landing_position = Vector3.ZERO
 	ball_position = Vector3.ZERO
 	ball_velocity = Vector3.ZERO
+	_visual_launch_offset = Vector3.ZERO
 	elapsed = 0.0
 	hang_time = 0.0
 	landed = false
@@ -388,13 +393,18 @@ func _update_ball(delta: float) -> void:
 		if _ball_classification == "home_run":
 			ball_position = _field_state_to_world(_ball_state)
 			if is_instance_valid(ball):
-				ball.call("set_ball_position", ball_position)
+				ball.call("set_ball_position", _visual_ball_position())
 			_home_run()
 			return
 	ball_position = _field_state_to_world(_ball_state)
 	ball_velocity = _field_velocity_to_world(_ball_state)
 	if is_instance_valid(ball):
-		ball.call("set_ball_position", ball_position)
+		ball.call("set_ball_position", _visual_ball_position())
+
+
+func _visual_ball_position() -> Vector3:
+	var remaining := 1.0 - clampf(elapsed / VISUAL_CONTACT_BLEND_SEC, 0.0, 1.0)
+	return ball_position + _visual_launch_offset * remaining
 
 
 func _update_fielders(delta: float) -> void:

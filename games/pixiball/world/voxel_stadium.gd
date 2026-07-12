@@ -13,26 +13,67 @@ const PIXEL_GRASS_SHADER = preload("res://world/shaders/pixel_grass.gdshader")
 const CROWD_TILE_WORLD := 6.5
 const CROWD_ROW_WORLD := 0.82
 
+# Side-bowl spectators are real low-poly geometry rather than edge-on sprite
+# cards. All pieces are batched by mesh, then colored and posed per instance.
+const SPECTATOR_ROWS_PER_TIER := 4
+const SPECTATOR_SEATS_PER_ROW := 42
+const PLATE_SPECTATOR_ROWS := 5
+const PLATE_SPECTATOR_SEATS_PER_ROW := 68
+const PLATE_SPECTATOR_SCALE := 0.80
+const CROWD_MOTION_STEP := 1.0 / 12.0
+const SPECTATOR_SHIRTS := [
+	Color("ef665b"), Color("41b8a6"), Color("f2bd4f"), Color("4f75b8"),
+	Color("f3eee0"), Color("6c8d55"), Color("c65c83"), Color("536273"),
+]
+const SPECTATOR_SKINS := [
+	Color("f0c29a"), Color("dda06b"), Color("bd7747"),
+	Color("955735"), Color("704027"), Color("4b2a20"),
+]
+const SPECTATOR_HAIR := [
+	Color("17191c"), Color("30231e"), Color("4a3023"),
+	Color("75482d"), Color("b1793f"), Color("8d8a82"),
+]
+
+# Presentation-only responses. Gameplay sends a semantic outcome and the
+# stadium owns its crowd/LED/bell choreography; none of this state is read by
+# the deterministic simulation.
+const CROWD_REACTIONS := {
+	"ball": {"seconds": 0.55, "strength": 0.16, "led": "BALL"},
+	"called_strike": {"seconds": 0.85, "strength": 0.32, "led": "STRIKE"},
+	"swinging_strike": {"seconds": 0.95, "strength": 0.40, "led": "STRIKE"},
+	"strikeout": {"seconds": 1.75, "strength": 0.82, "led": "K"},
+	"walk": {"seconds": 1.15, "strength": 0.42, "led": "WALK"},
+	"foul": {"seconds": 0.70, "strength": 0.24, "led": "FOUL"},
+	"single": {"seconds": 1.35, "strength": 0.55, "led": "SINGLE"},
+	"double": {"seconds": 1.80, "strength": 0.72, "led": "DOUBLE"},
+	"triple": {"seconds": 2.25, "strength": 0.88, "led": "TRIPLE"},
+	"home_run": {"seconds": 3.20, "strength": 1.00, "led": "HOMERUN", "bell": true},
+	"ground_out": {"seconds": 1.00, "strength": 0.34, "led": "OUT"},
+	"fly_out": {"seconds": 1.00, "strength": 0.34, "led": "OUT"},
+	"fielders_choice": {"seconds": 1.05, "strength": 0.38, "led": "OUT"},
+	"out": {"seconds": 1.00, "strength": 0.34, "led": "OUT"},
+}
+
 ## Single auditable table for every mood-driven value: environment, sun, fog,
 ## the pixel-grass shader palette, lamp emission, and local light energies.
 const MOODS := {
 	"day": {
 		"background": Color("4f88ad"),
-		"ambient_color": Color("b9cfdd"),
-		"ambient_energy": 0.30,
+		"ambient_color": Color("c2d6df"),
+		"ambient_energy": 0.42,
 		"sun_color": Color("fff0cf"),
-		"sun_energy": 0.98,
+		"sun_energy": 0.82,
 		"fog_color": Color("aec2d4"),
-		"fog_energy": 0.18,
-		"fog_density": 0.0014,
-		"grass_a": Color("6b8c46"),
-		"grass_b": Color("597539"),
-		"grass_far": Color("44603e"),
+		"fog_energy": 0.14,
+		"fog_density": 0.0011,
+		"grass_a": Color("4f914a"),
+		"grass_b": Color("3f7f3d"),
+		"grass_far": Color("315f3b"),
 		"lamp_color": Color("fff3c0"),
-		"lamp_energy": 0.25,
+		"lamp_energy": 0.06,
 		"spot_energy": 0.0,
 		"fill_energy": 0.0,
-		"wash_energy": 0.0,
+		"wash_energy": 0.28,
 		"sun_rotation": Vector3(-58.0, -22.0, 0.0),
 		"sky_top": Color("2f6ea8"),
 		"sky_horizon": Color("b8d6ea"),
@@ -41,14 +82,18 @@ const MOODS := {
 		"sky_energy": 1.0,
 		"harbor_tint": Color("cfe0ea"),
 		"scorestrip_energy": 0.6,
-		"grass_tex_mix": 0.30,
+		"grass_tex_mix": 0.18,
+		"glow_intensity": 0.10,
+		"glow_bloom": 0.02,
+		"tonemap_exposure": 0.92,
+		"crowd_tint": Color("edf4f2"),
 	},
 	"golden": {
 		"background": Color("482340"),
 		"ambient_color": Color("cf9166"),
-		"ambient_energy": 0.34,
+		"ambient_energy": 0.40,
 		"sun_color": Color("ffb060"),
-		"sun_energy": 0.72,
+		"sun_energy": 0.76,
 		"fog_color": Color("c79363"),
 		"fog_energy": 0.16,
 		"fog_density": 0.0015,
@@ -56,10 +101,10 @@ const MOODS := {
 		"grass_b": Color("646d34"),
 		"grass_far": Color("4b5433"),
 		"lamp_color": Color("fff0b8"),
-		"lamp_energy": 2.2,
-		"spot_energy": 0.7,
-		"fill_energy": 0.35,
-		"wash_energy": 0.45,
+		"lamp_energy": 0.42,
+		"spot_energy": 0.55,
+		"fill_energy": 0.25,
+		"wash_energy": 0.38,
 		# Flagship rig: low ~19deg sun swung in from the 1B (+x) side so shadows
 		# rake toward 3B, matching the baked UE "PP_Golden" look.
 		"sun_rotation": Vector3(-19.0, 55.0, 0.0),
@@ -70,14 +115,18 @@ const MOODS := {
 		"sky_energy": 1.0,
 		"harbor_tint": Color("ffffff"),
 		"scorestrip_energy": 1.4,
-		"grass_tex_mix": 0.35,
+		"grass_tex_mix": 0.24,
+		"glow_intensity": 0.16,
+		"glow_bloom": 0.03,
+		"tonemap_exposure": 0.90,
+		"crowd_tint": Color("ffd3a0"),
 	},
 	"night": {
 		"background": Color("081226"),
 		"ambient_color": Color("3d4f85"),
-		"ambient_energy": 0.50,
+		"ambient_energy": 0.54,
 		"sun_color": Color("8fa6d6"),
-		"sun_energy": 0.34,
+		"sun_energy": 0.30,
 		"fog_color": Color("16223d"),
 		"fog_energy": 0.14,
 		"fog_density": 0.0022,
@@ -85,10 +134,10 @@ const MOODS := {
 		"grass_b": Color("2a4132"),
 		"grass_far": Color("1c2c2c"),
 		"lamp_color": Color("ffedb0"),
-		"lamp_energy": 6.5,
-		"spot_energy": 3.2,
-		"fill_energy": 1.45,
-		"wash_energy": 2.3,
+		"lamp_energy": 0.92,
+		"spot_energy": 2.35,
+		"fill_energy": 1.10,
+		"wash_energy": 1.65,
 		# Floodlit park: cool, low fill from the sky/moon and the towers carry
 		# the scene (see spot/fill/wash energies above).
 		"sun_rotation": Vector3(-46.0, -16.0, 0.0),
@@ -99,7 +148,11 @@ const MOODS := {
 		"sky_energy": 0.6,
 		"harbor_tint": Color("2a3350"),
 		"scorestrip_energy": 2.6,
-		"grass_tex_mix": 0.30,
+		"grass_tex_mix": 0.20,
+		"glow_intensity": 0.24,
+		"glow_bloom": 0.04,
+		"tonemap_exposure": 0.92,
+		"crowd_tint": Color("9aadd5"),
 	},
 }
 
@@ -115,15 +168,25 @@ var _fill_spots: Array[SpotLight3D] = []
 var _wash_lights: Array[OmniLight3D] = []
 var _sky_material: ProceduralSkyMaterial
 var _harbor_material: StandardMaterial3D
+var _home_harbor_material: StandardMaterial3D
 var _scorestrip_material: StandardMaterial3D
+var _spectator_materials: Array[Dictionary] = []
+var _animated_spectator_batches: Array[Dictionary] = []
 
 # --- Animated dressing state (all driven from _process) ---
 var _anim_time := 0.0
-# Textured crowd strips: seeded idle A/B flip + shared excited pop.
+# Textured crowd strips: seeded idle/excited flips. The low-poly spectators use
+# the same reaction envelope but retain deterministic per-person phase.
 var _crowd_strips: Array[Dictionary] = []
 var _crowd_calm: Array[Texture2D] = []
 var _crowd_excited: Array[Texture2D] = []
 var _crowd_excited_timer := 0.0
+var _crowd_reaction_duration := 0.0
+var _crowd_reaction_strength := 0.0
+var _crowd_reaction_serial := 0
+var _crowd_motion_accumulator := 0.0
+var _crowd_motion_tick := 0
+var _crowd_motion_sample := Vector3.ZERO
 # One shared LED material rings the bowl; result flashes swap its emission map.
 var _led_material: StandardMaterial3D
 var _led_idle_texture: Texture2D
@@ -158,12 +221,54 @@ func _process(delta: float) -> void:
 	_animate_bell(delta)
 
 
-## Pop the crowd to its excited (x0/x1) flip for `seconds` (strikeout ~1.5s,
-## home run ~2.5s). Safe no-op if the excited textures failed to load.
-func set_crowd_excited(seconds: float) -> void:
-	if _crowd_excited.is_empty():
+## Start or extend a presentation-only audience response. This animates the
+## low-poly MultiMesh fans even when the legacy crowd textures are unavailable.
+func set_crowd_excited(seconds: float, strength := 1.0) -> void:
+	var requested_seconds := maxf(seconds, 0.0)
+	if requested_seconds <= 0.0:
 		return
-	_crowd_excited_timer = maxf(_crowd_excited_timer, seconds)
+	_crowd_excited_timer = maxf(_crowd_excited_timer, requested_seconds)
+	_crowd_reaction_duration = maxf(_crowd_reaction_duration, _crowd_excited_timer)
+	_crowd_reaction_strength = maxf(_crowd_reaction_strength, clampf(strength, 0.0, 1.0))
+	_crowd_reaction_serial += 1
+	_update_spectator_motion()
+
+
+## One semantic entry point for gameplay presentation. It deliberately owns all
+## stadium dressing so call sites cannot desynchronize crowd, ribbon, and bell.
+func react_to_play(outcome: String) -> void:
+	var normalized := outcome.strip_edges().to_lower().replace(" ", "_")
+	var reaction: Dictionary = CROWD_REACTIONS.get(normalized, {})
+	if reaction.is_empty():
+		return
+	set_crowd_excited(float(reaction.seconds), float(reaction.strength))
+	flash_led(String(reaction.led))
+	if bool(reaction.get("bell", false)):
+		swing_bell()
+
+
+## Small read-only presentation snapshot used by focused tests and visual QA.
+func crowd_state() -> Dictionary:
+	var section_counts := {}
+	for path in ["SpectatorCrowdLeft", "SpectatorCrowdRight", "HomeBackstop/SpectatorCrowdPlate"]:
+		var section := get_node_or_null(path)
+		if section != null:
+			section_counts[path] = int(section.get_meta("spectator_count", 0))
+	return {
+		"sections": section_counts,
+		"total_spectators": int(section_counts.values().reduce(func(total: int, value: Variant) -> int: return total + int(value), 0)),
+		"animated_batches": _animated_spectator_batches.size(),
+		"strip_count": _crowd_strips.size(),
+		"reaction_timer": _crowd_excited_timer,
+		"reaction_duration": _crowd_reaction_duration,
+		"reaction_strength": _crowd_reaction_strength,
+		"reaction_level": _crowd_reaction_level(),
+		"reaction_serial": _crowd_reaction_serial,
+		"motion_tick": _crowd_motion_tick,
+		"motion_sample": _crowd_motion_sample,
+		"led_timer": _led_flash_timer,
+		"bell_timer": _bell_timer,
+	}
 
 
 ## Flash the LED ribbon with a result texture (K/WALK/BALL/STRIKE/FOUL/OUT/
@@ -209,6 +314,9 @@ func _apply_mood() -> void:
 		env.fog_light_color = settings.fog_color
 		env.fog_light_energy = settings.fog_energy
 		env.fog_density = settings.fog_density
+		env.glow_intensity = settings.glow_intensity
+		env.glow_bloom = settings.glow_bloom
+		env.tonemap_exposure = settings.tonemap_exposure
 	if _sky_material != null:
 		_sky_material.sky_top_color = settings.sky_top
 		_sky_material.sky_horizon_color = settings.sky_horizon
@@ -222,6 +330,8 @@ func _apply_mood() -> void:
 		_sun.rotation_degrees = settings.sun_rotation
 	if _harbor_material != null:
 		_harbor_material.albedo_color = settings.harbor_tint
+	if _home_harbor_material != null:
+		_home_harbor_material.albedo_color = (settings.harbor_tint as Color).darkened(0.34)
 	if _grass_material != null:
 		_grass_material.set_shader_parameter("color_a", settings.grass_a)
 		_grass_material.set_shader_parameter("color_b", settings.grass_b)
@@ -231,6 +341,15 @@ func _apply_mood() -> void:
 		_grass_material.set_shader_parameter("grass_tex_mix", float(settings.grass_tex_mix) if grass_tex != null else 0.0)
 	if _scorestrip_material != null:
 		_scorestrip_material.emission_energy_multiplier = settings.scorestrip_energy
+	for entry in _spectator_materials:
+		var spectator_material: StandardMaterial3D = entry.material
+		var tint_strength := float(entry.tint_strength)
+		var value_scale := float(entry.get("value_scale", 1.0))
+		var crowd_color: Color = Color.WHITE.lerp(settings.crowd_tint, tint_strength)
+		crowd_color.r *= value_scale
+		crowd_color.g *= value_scale
+		crowd_color.b *= value_scale
+		spectator_material.albedo_color = crowd_color
 	_refresh_crowd_textures()
 	if _lamp_material != null:
 		_lamp_material.emission = settings.lamp_color
@@ -271,6 +390,16 @@ func _build_environment() -> void:
 	env.glow_enabled = true
 	env.glow_intensity = 0.34
 	env.glow_bloom = 0.06
+	# Forward+ ambient occlusion supplies the contact depth that primitive stands
+	# and batched spectators otherwise lack. Compatibility safely ignores this.
+	env.ssao_enabled = RenderingServer.get_current_rendering_method() != "gl_compatibility"
+	env.ssao_radius = 0.72
+	env.ssao_intensity = 1.55
+	env.ssao_power = 1.25
+	env.ssao_detail = 0.9
+	env.ssao_horizon = 0.08
+	env.ssao_sharpness = 0.78
+	env.ssao_light_affect = 0.22
 	env.fog_enabled = true
 	env.fog_light_color = Color("bfd4e5")
 	env.fog_light_energy = 0.22
@@ -300,6 +429,29 @@ func _build_harbor_backdrop() -> void:
 	backdrop.position = Vector3(0.0, 30.0, -116.0)
 	backdrop.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(backdrop)
+
+	# The center-field pitching lens looks back toward home plate. A second face
+	# of the same authored harbor panorama turns the plate grandstand into a
+	# waterfront terrace instead of a full-frame wall of spectators. The low
+	# backstop and 3D crowd hide the image's dark lower apron; water, skyline,
+	# and sky remain as quiet negative space behind the live battery.
+	_home_harbor_material = material.duplicate(true) as StandardMaterial3D
+	# This face is viewed from the opposite side of the outfield panorama. Flip
+	# V explicitly so the upper opening shows sky/city instead of sampling the
+	# source image's dark lower field apron.
+	_home_harbor_material.uv1_scale = Vector3(1.0, -1.0, 1.0)
+	# Bias the narrow overlook toward the working-city half of the panorama so
+	# cranes and lit buildings, not an anonymous patch of open water, sit behind
+	# the catcher and batter.
+	_home_harbor_material.uv1_offset = Vector3(0.18, 1.0, 0.0)
+	_textured_quad(
+		"HomeHarborBackdrop",
+		Vector2(112.0, 63.0),
+		Vector3(0.0, 2.0, 72.0),
+		Vector3(0.0, 0.0, -1.0),
+		_home_harbor_material,
+		self,
+	)
 
 
 func _build_lighting() -> void:
@@ -658,17 +810,297 @@ func _build_ballpark() -> void:
 
 
 func _build_crowd_side(side: float) -> void:
-	# Textured crowd strips laid along the existing stand tiers (multiple rows
-	# per tier) so the bowl reads dense. Each strip animates on its own seeded
-	# idle A/B flip; excitement is a shared pop handled in _animate_crowd.
+	var root := Node3D.new()
+	root.name = "SpectatorCrowdLeft" if side < 0.0 else "SpectatorCrowdRight"
+	add_child(root)
+	var batches := {
+		"torsos": [],
+		"necks": [],
+		"heads": [],
+		"hair": [],
+		"caps": [],
+		"cap_brims": [],
+		"upper_arms": [],
+		"forearms": [],
+		"eyes": [],
+		"mouths": [],
+	}
+	var spectator_count := 0
+	var layout_min := Vector3(INF, INF, INF)
+	var layout_max := Vector3(-INF, -INF, -INF)
+	var min_face_clearance := INF
+	var layout_samples: Array[Dictionary] = []
 	for tier in range(3):
-		var stand_y := 1.2 + float(tier) * 1.8
-		for crowd_row in range(2):
-			var x := side * (29.0 + float(tier) * 4.0 + float(crowd_row) * 0.7)
-			var y := stand_y + 1.5 + float(crowd_row) * 2.0
-			for seg in range(4):
-				var z := (14.0 - float(tier) * 4.0) - float(seg) * 11.0
-				_add_crowd_strip(Vector2(10.5, 1.95), Vector3(x, y, z), Vector3(-side, 0.0, 0.2), side * 0.045)
+		var stand_center := Vector3(side * (34.0 + float(tier) * 4.0), 1.2 + float(tier) * 1.8, -9.0 - float(tier) * 4.0)
+		var stand_roll := side * 0.045
+		for crowd_row in range(SPECTATOR_ROWS_PER_TIER):
+			# Follow the rotated top plane and step backward/up through the stand.
+			# The old first row sat exactly on the stand's vertical face; every new
+			# origin is above the top surface with an explicit clearance.
+			var x := side * (29.7 + float(tier) * 4.0 + float(crowd_row) * 1.32)
+			var local_x := x - stand_center.x
+			var surface_y := stand_center.y + sin(stand_roll) * local_x + cos(stand_roll) * 1.1
+			var base_y := surface_y + 0.06 + float(crowd_row) * 0.08
+			var z_min := stand_center.z - 25.0
+			var z_max := stand_center.z + 25.0
+			for seat in range(SPECTATOR_SEATS_PER_ROW):
+				# Regular gaps read as aisles and prevent an undifferentiated wall.
+				if posmod(seat + crowd_row * 3 + tier * 5, 11) == 0:
+					continue
+				var seed := (100000 if side > 0.0 else 0) + tier * 10000 + crowd_row * 1000 + seat
+				var z_lerp := (float(seat) + 0.5) / float(SPECTATOR_SEATS_PER_ROW)
+				var stagger := 0.42 if crowd_row % 2 == 1 else 0.0
+				var jitter := (_hash01(seed * 17 + 9) - 0.5) * 0.18
+				var z := clampf(lerpf(z_min, z_max, z_lerp) + stagger + jitter, z_min + 0.35, z_max - 0.35)
+				var base := Vector3(x, base_y, z)
+				var face_direction := Vector3(0.0, base.y, 8.0) - base
+				face_direction.y = 0.0
+				var facing := Basis.looking_at(face_direction.normalized(), Vector3.UP)
+				var depth := float(tier * SPECTATOR_ROWS_PER_TIER + crowd_row) / float(3 * SPECTATOR_ROWS_PER_TIER - 1)
+				var shirt: Color = SPECTATOR_SHIRTS[int(_hash01(seed * 5 + 1) * float(SPECTATOR_SHIRTS.size())) % SPECTATOR_SHIRTS.size()]
+				var skin: Color = SPECTATOR_SKINS[int(_hash01(seed * 7 + 3) * float(SPECTATOR_SKINS.size())) % SPECTATOR_SKINS.size()]
+				shirt = shirt.lerp(Color("39465c"), depth * 0.16)
+				skin = skin.darkened(depth * 0.07)
+				_append_spectator(batches, base, facing, shirt, skin, seed)
+				layout_min = layout_min.min(base)
+				layout_max = layout_max.max(base)
+				min_face_clearance = minf(min_face_clearance, absf(absf(base.x) - (29.0 + float(tier) * 4.0)))
+				if layout_samples.size() < 8:
+					layout_samples.append({"base": base, "shirt": shirt, "skin": skin, "seed": seed})
+				spectator_count += 1
+	root.set_meta("spectator_count", spectator_count)
+	root.set_meta("layout_bounds", AABB(layout_min, layout_max - layout_min))
+	root.set_meta("minimum_face_clearance", min_face_clearance)
+	root.set_meta("layout_samples", layout_samples)
+	_build_spectator_batches(root, batches)
+
+
+func _append_spectator(batches: Dictionary, base: Vector3, facing: Basis, shirt: Color, skin: Color, seed: int, size_scale := 1.0) -> void:
+	var height_scale := 0.90 + _hash01(seed * 13 + 7) * 0.20
+	var body_yaw := (_hash01(seed * 67 + 17) - 0.5) * 0.15
+	var head_yaw := body_yaw + (_hash01(seed * 71 + 19) - 0.5) * 0.32
+	var body_facing := facing * Basis(Vector3.UP, body_yaw)
+	var head_facing := facing * Basis(Vector3.UP, head_yaw)
+	var body_scale := Basis.from_scale(Vector3(
+		(0.86 + _hash01(seed * 19 + 5) * 0.22) * size_scale,
+		height_scale * size_scale,
+		(0.90 + _hash01(seed * 23 + 11) * 0.16) * size_scale
+	))
+	var torso_basis := body_facing * body_scale
+	var head_scale := 0.92 + _hash01(seed * 29 + 13) * 0.14
+	var head_basis := head_facing * Basis.from_scale(Vector3(
+		head_scale * (0.94 + _hash01(seed * 73 + 23) * 0.12) * size_scale,
+		head_scale * (0.96 + _hash01(seed * 79 + 29) * 0.10) * size_scale,
+		head_scale * size_scale
+	))
+	(batches.torsos as Array).append({"transform": Transform3D(torso_basis, base + body_facing * (Vector3(0.0, 0.34, 0.0) * size_scale)), "color": shirt, "seed": seed})
+	(batches.necks as Array).append({"transform": Transform3D(body_facing * Basis.from_scale(Vector3(size_scale, height_scale * size_scale, size_scale)), base + body_facing * (Vector3(0.0, 0.61, 0.0) * size_scale)), "color": skin, "seed": seed})
+	(batches.heads as Array).append({"transform": Transform3D(head_basis, base + head_facing * (Vector3(0.0, 0.77, -0.01) * size_scale)), "color": skin, "seed": seed})
+	var hair: Color = SPECTATOR_HAIR[int(_hash01(seed * 41 + 23) * float(SPECTATOR_HAIR.size())) % SPECTATOR_HAIR.size()]
+	var hair_basis := head_facing * Basis.from_scale(Vector3(head_scale * size_scale, head_scale * 0.46 * size_scale, head_scale * size_scale))
+	(batches.hair as Array).append({"transform": Transform3D(hair_basis, base + head_facing * (Vector3(0.0, 0.845, -0.014) * size_scale)), "color": hair, "seed": seed})
+	if _hash01(seed * 83 + 31) < 0.30:
+		var cap_color := shirt.lerp(SPECTATOR_SHIRTS[(seed + 3) % SPECTATOR_SHIRTS.size()], 0.42)
+		var cap_basis := head_facing * Basis.from_scale(Vector3(head_scale * size_scale, head_scale * size_scale, head_scale * size_scale))
+		(batches.caps as Array).append({"transform": Transform3D(cap_basis, base + head_facing * (Vector3(0.0, 0.895, -0.012) * size_scale)), "color": cap_color, "seed": seed})
+		(batches.cap_brims as Array).append({"transform": Transform3D(head_facing * Basis.from_scale(Vector3.ONE * size_scale), base + head_facing * (Vector3(0.0, 0.875, -0.118) * size_scale)), "color": cap_color.darkened(0.12), "seed": seed})
+
+	# Most spectators sit or converse at idle; a smaller visible minority keeps
+	# one or both arms raised. This leaves semantic play reactions somewhere to
+	# go instead of making every ordinary pitch look like a celebration.
+	var pose_roll := _hash01(seed * 31 + 17)
+	var pose := 0
+	if pose_roll >= 0.45 and pose_roll < 0.63:
+		pose = 4
+	elif pose_roll >= 0.63 and pose_roll < 0.78:
+		pose = 5
+	elif pose_roll >= 0.78 and pose_roll < 0.84:
+		pose = 1
+	elif pose_roll >= 0.84 and pose_roll < 0.90:
+		pose = 2
+	elif pose_roll >= 0.90 and pose_roll < 0.96:
+		pose = 3
+	elif pose_roll >= 0.96:
+		pose = 6
+	var left_shoulder := Vector3(-0.18, 0.49, -0.005)
+	var right_shoulder := Vector3(0.18, 0.49, -0.005)
+	var left_elbow := Vector3(-0.21, 0.35, -0.01)
+	var right_elbow := Vector3(0.21, 0.35, -0.01)
+	var left_hand := Vector3(-0.15, 0.21, -0.035)
+	var right_hand := Vector3(0.15, 0.21, -0.035)
+	if pose == 1:
+		left_elbow = Vector3(-0.25, 0.65, -0.01)
+		left_hand = Vector3(-0.15, 0.84, -0.025)
+	elif pose == 2:
+		right_elbow = Vector3(0.25, 0.65, -0.01)
+		right_hand = Vector3(0.15, 0.84, -0.025)
+	elif pose == 3:
+		left_elbow = Vector3(-0.26, 0.64, -0.01)
+		right_elbow = Vector3(0.26, 0.64, -0.01)
+		left_hand = Vector3(-0.34, 0.82, -0.025)
+		right_hand = Vector3(0.34, 0.82, -0.025)
+	elif pose == 4:
+		left_elbow = Vector3(-0.23, 0.49, -0.015)
+		right_elbow = Vector3(0.23, 0.49, -0.015)
+		left_hand = Vector3(-0.045, 0.62, -0.08)
+		right_hand = Vector3(0.045, 0.62, -0.08)
+	elif pose == 5:
+		left_elbow = Vector3(-0.24, 0.35, -0.015)
+		right_elbow = Vector3(0.24, 0.35, -0.015)
+		left_hand = Vector3(-0.07, 0.25, -0.08)
+		right_hand = Vector3(0.07, 0.25, -0.08)
+	elif pose == 6:
+		left_elbow = Vector3(-0.29, 0.62, -0.015)
+		left_hand = Vector3(-0.36, 0.79, -0.035)
+	var sleeve := shirt.darkened(0.06)
+	left_shoulder *= size_scale
+	right_shoulder *= size_scale
+	left_elbow *= size_scale
+	right_elbow *= size_scale
+	left_hand *= size_scale
+	right_hand *= size_scale
+	(batches.upper_arms as Array).append({"transform": _limb_transform(base, body_facing, left_shoulder, left_elbow, size_scale), "color": sleeve, "seed": seed})
+	(batches.upper_arms as Array).append({"transform": _limb_transform(base, body_facing, right_shoulder, right_elbow, size_scale), "color": sleeve, "seed": seed})
+	(batches.forearms as Array).append({"transform": _limb_transform(base, body_facing, left_elbow, left_hand, size_scale), "color": skin, "seed": seed})
+	(batches.forearms as Array).append({"transform": _limb_transform(base, body_facing, right_elbow, right_hand, size_scale), "color": skin, "seed": seed})
+
+	var face_color := Color("17202b")
+	for eye_x in [-0.043, 0.043]:
+		(batches.eyes as Array).append({"transform": Transform3D(head_facing * Basis.from_scale(Vector3.ONE * size_scale), base + head_facing * (Vector3(eye_x, 0.79, -0.128) * size_scale)), "color": face_color, "seed": seed})
+	var expression_angle: float = [-0.12, 0.0, 0.12][int(_hash01(seed * 37 + 19) * 3.0) % 3]
+	var mouth_basis := head_facing * Basis(Vector3(0.0, 0.0, 1.0), expression_angle) * Basis.from_scale(Vector3.ONE * size_scale)
+	(batches.mouths as Array).append({"transform": Transform3D(mouth_basis, base + head_facing * (Vector3(0.0, 0.735, -0.132) * size_scale)), "color": face_color, "seed": seed})
+
+
+func _limb_transform(base: Vector3, facing: Basis, from: Vector3, to: Vector3, thickness_scale := 1.0) -> Transform3D:
+	var delta := to - from
+	var direction := delta.normalized()
+	var dot := clampf(Vector3.UP.dot(direction), -1.0, 1.0)
+	var rotation := Basis.IDENTITY
+	if dot < 0.9999:
+		var axis := Vector3.UP.cross(direction)
+		if axis.length_squared() < 0.0001:
+			axis = Vector3.RIGHT
+		rotation = Basis(axis.normalized(), acos(dot))
+	var segment_scale := Basis.from_scale(Vector3(thickness_scale, delta.length() / 0.24, thickness_scale))
+	return Transform3D(facing * rotation * segment_scale, base + facing * ((from + to) * 0.5))
+
+
+func _build_spectator_batches(root: Node3D, batches: Dictionary, value_scale := 1.0) -> void:
+	var torso_mesh := CylinderMesh.new()
+	torso_mesh.top_radius = 0.20
+	torso_mesh.bottom_radius = 0.15
+	torso_mesh.height = 0.46
+	torso_mesh.radial_segments = 6
+	torso_mesh.rings = 1
+	_add_spectator_batch(root, "Torsos", torso_mesh, batches.torsos, 0.88, 0.35, true, value_scale)
+
+	var neck_mesh := CylinderMesh.new()
+	neck_mesh.top_radius = 0.055
+	neck_mesh.bottom_radius = 0.065
+	neck_mesh.height = 0.11
+	neck_mesh.radial_segments = 6
+	neck_mesh.rings = 1
+	_add_spectator_batch(root, "Necks", neck_mesh, batches.necks, 0.86, 0.22, true, value_scale)
+
+	var head_mesh := SphereMesh.new()
+	head_mesh.radius = 0.12
+	head_mesh.height = 0.24
+	head_mesh.radial_segments = 8
+	head_mesh.rings = 4
+	_add_spectator_batch(root, "Heads", head_mesh, batches.heads, 0.84, 0.22, true, value_scale)
+
+	var hair_mesh := SphereMesh.new()
+	hair_mesh.radius = 0.125
+	hair_mesh.height = 0.25
+	hair_mesh.radial_segments = 8
+	hair_mesh.rings = 4
+	_add_spectator_batch(root, "Hair", hair_mesh, batches.hair, 0.92, 0.12, true, value_scale)
+
+	var cap_mesh := CylinderMesh.new()
+	cap_mesh.top_radius = 0.128
+	cap_mesh.bottom_radius = 0.132
+	cap_mesh.height = 0.078
+	cap_mesh.radial_segments = 8
+	cap_mesh.rings = 1
+	_add_spectator_batch(root, "Caps", cap_mesh, batches.caps, 0.86, 0.22, true, value_scale)
+
+	var brim_mesh := BoxMesh.new()
+	brim_mesh.size = Vector3(0.17, 0.025, 0.11)
+	_add_spectator_batch(root, "CapBrims", brim_mesh, batches.cap_brims, 0.88, 0.22, true, value_scale)
+
+	var arm_mesh := CapsuleMesh.new()
+	arm_mesh.radius = 0.038
+	arm_mesh.height = 0.24
+	arm_mesh.radial_segments = 6
+	arm_mesh.rings = 2
+	_add_spectator_batch(root, "UpperArms", arm_mesh, batches.upper_arms, 0.88, 0.32, true, value_scale)
+	_add_spectator_batch(root, "Forearms", arm_mesh, batches.forearms, 0.86, 0.22, true, value_scale)
+
+	var eye_mesh := BoxMesh.new()
+	eye_mesh.size = Vector3(0.022, 0.018, 0.014)
+	_add_spectator_batch(root, "Eyes", eye_mesh, batches.eyes, 0.72, 0.08, false, value_scale)
+
+	var mouth_mesh := BoxMesh.new()
+	mouth_mesh.size = Vector3(0.052, 0.011, 0.014)
+	_add_spectator_batch(root, "Mouths", mouth_mesh, batches.mouths, 0.76, 0.08, false, value_scale)
+	root.set_meta("part_counts", {
+		"Caps": (batches.caps as Array).size(),
+		"CapBrims": (batches.cap_brims as Array).size(),
+	})
+
+
+func _add_spectator_batch(root: Node3D, label: String, mesh: PrimitiveMesh, instances: Array, roughness: float, tint_strength: float, cast_shadow: bool, value_scale := 1.0) -> void:
+	var material := StandardMaterial3D.new()
+	material.resource_name = "Spectator%s" % label
+	material.vertex_color_use_as_albedo = true
+	material.albedo_color = Color(value_scale, value_scale, value_scale)
+	material.roughness = roughness
+	material.metallic = 0.0
+	mesh.material = material
+	_spectator_materials.append({"material": material, "tint_strength": tint_strength, "value_scale": value_scale})
+
+	var multimesh := MultiMesh.new()
+	multimesh.mesh = mesh
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.use_colors = true
+	multimesh.use_custom_data = true
+	multimesh.instance_count = instances.size()
+	var rest_transforms: Array = []
+	var motion_data: Array = []
+	for index in range(instances.size()):
+		var entry: Dictionary = instances[index]
+		var rest: Transform3D = entry.transform
+		var seed := int(entry.get("seed", index))
+		# RGBA = idle phase, speed, amplitude, and reaction affinity. The values
+		# remain deterministic and inspectable even though the actual transforms
+		# are stepped at 12 Hz to avoid per-frame work for thousands of fans.
+		var custom := Color(
+			_hash01(seed * 43 + 5),
+			0.55 + _hash01(seed * 47 + 7) * 0.45,
+			0.55 + _hash01(seed * 53 + 11) * 0.45,
+			0.18 + _hash01(seed * 59 + 13) * 0.82
+		)
+		rest_transforms.append(rest)
+		motion_data.append(custom)
+		multimesh.set_instance_transform(index, rest)
+		multimesh.set_instance_color(index, entry.color)
+		multimesh.set_instance_custom_data(index, custom)
+
+	var batch := MultiMeshInstance3D.new()
+	batch.name = label
+	batch.multimesh = multimesh
+	batch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if cast_shadow else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Dummy/headless rendering does not round-trip MultiMesh custom buffers, so a
+	# bounded metadata mirror keeps determinism auditable in CI.
+	batch.set_meta("motion_samples", motion_data.slice(0, mini(16, motion_data.size())))
+	root.add_child(batch)
+	_animated_spectator_batches.append({
+		"multimesh": multimesh,
+		"rest_transforms": rest_transforms,
+		"motion_data": motion_data,
+		"part": label,
+	})
 
 
 func _build_plate_crowd() -> void:
@@ -681,36 +1113,121 @@ func _build_plate_crowd() -> void:
 	var root := get_node("HomeBackstop")
 	var half_w := 18.5
 	var y := 1.95
-	var z := 31.6
+	# Put real spectators well behind the knee wall. The telephoto pitching lens
+	# otherwise renders them almost as large as the battery and turns five rows
+	# into a flat wall. Extra depth lets individual silhouettes and the harbor
+	# panorama coexist in the same frame.
+	var z := 38.6
+	var spectator_root := Node3D.new()
+	spectator_root.name = "SpectatorCrowdPlate"
+	root.add_child(spectator_root)
+	var spectator_batches := {
+		"torsos": [],
+		"necks": [],
+		"heads": [],
+		"hair": [],
+		"caps": [],
+		"cap_brims": [],
+		"upper_arms": [],
+		"forearms": [],
+		"eyes": [],
+		"mouths": [],
+	}
+	var spectator_count := 0
+	var layout_min := Vector3(INF, INF, INF)
+	var layout_max := Vector3(-INF, -INF, -INF)
+	var layout_samples: Array[Dictionary] = []
 	# Lower bowl: three seated rows rising back, dark seat-gap line under each.
 	# The rake is deliberately shallow (rise < row depth) so the whole bowl stays
 	# short enough to leave sky above the roofline in the CF broadcast framing.
 	for r in range(3):
-		_add_crowd_row(y, z, half_w, 4)
+		var row_layout := _append_plate_spectator_row(spectator_batches, y, z, half_w, r)
+		spectator_count += int(row_layout.count)
+		layout_min = layout_min.min(row_layout.minimum)
+		layout_max = layout_max.max(row_layout.maximum)
+		for sample in row_layout.samples:
+			if layout_samples.size() < 8:
+				layout_samples.append(sample)
 		_box("SeatGapLo%d" % r, Vector3(half_w * 2.0, 0.1, 0.14), Vector3(0.0, y - 0.5, z - 0.03), Color("333c57"), root)
 		y += 0.78
 		z += 0.85
-	# Structural fascia + brick suite band with lit suite windows.
-	_box("BowlFasciaLo", Vector3(half_w * 2.0 + 2.0, 0.45, 0.5), Vector3(0.0, y - 0.05, z), Color("333c57"), root)
-	var suite := _box("SuiteBand", Vector3(half_w * 2.0 + 2.0, 1.1, 1.2), Vector3(0.0, y + 0.65, z + 0.35), Color("9a6a52"), root)
-	suite.material_override = _mood_material("brick", Color("9a6a52"), 0.94, Vector3(9.0, 2.0, 2.0))
-	suite.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Split the fascia and suite into two wings. The open center is the park's
+	# signature harbor overlook and gives the battery a calm background value.
+	var overlook_half_width := 4.3
+	var wing_width := half_w - overlook_half_width + 1.0
+	for side_value in [-1.0, 1.0]:
+		var side: float = side_value
+		var wing_x := side * (overlook_half_width + wing_width * 0.5)
+		_box("BowlFasciaLoL" if side < 0.0 else "BowlFasciaLoR", Vector3(wing_width, 0.45, 0.5), Vector3(wing_x, y - 0.05, z), Color("333c57"), root)
+		var suite := _box("SuiteBandL" if side < 0.0 else "SuiteBandR", Vector3(wing_width, 1.1, 1.2), Vector3(wing_x, y + 0.65, z + 0.35), Color("9a6a52"), root)
+		suite.material_override = _mood_material("brick", Color("9a6a52"), 0.94, Vector3(4.0, 2.0, 2.0))
+		suite.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	for k in range(9):
-		var win := _box("SuiteWindow%d" % k, Vector3(2.4, 0.55, 0.2), Vector3(-16.0 + float(k) * 4.0, y + 0.68, z - 0.28), Color("cfe6ff"), root)
-		win.material_override = _get_lamp_material()
-		win.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var window_x := -16.0 + float(k) * 4.0
+		if absf(window_x) < overlook_half_width + 1.0:
+			continue
+		_suite_window("SuiteWindow%d" % k, Vector3(window_x, y + 0.68, z - 0.28), root)
 	y += 1.5
 	z += 1.3
-	# Upper tier: two seated rows.
+	# Upper tier: two more real 3D rows, not just texture fill. Sharing the same
+	# MultiMesh batches keeps the foreground bowl dense without per-fan nodes.
 	for r in range(2):
-		_add_crowd_row(y, z, half_w - 1.0, 4)
+		var upper_layout := _append_plate_spectator_row(spectator_batches, y, z, half_w - 1.0, r + 3)
+		spectator_count += int(upper_layout.count)
+		layout_min = layout_min.min(upper_layout.minimum)
+		layout_max = layout_max.max(upper_layout.maximum)
+		for sample in upper_layout.samples:
+			if layout_samples.size() < 12:
+				layout_samples.append(sample)
 		_box("SeatGapUp%d" % r, Vector3((half_w - 1.0) * 2.0, 0.1, 0.14), Vector3(0.0, y - 0.5, z - 0.03), Color("333c57"), root)
 		y += 0.78
 		z += 0.85
-	# Roof ring caps the bowl with a downward fascia lip; nothing sits above it so
-	# a sky sliver is always visible over the plate grandstand.
-	_box("PressRoof", Vector3(half_w * 2.0 + 5.0, 0.45, 3.4), Vector3(0.0, y + 0.35, z + 0.7), Color("1f3a33"), root)
-	_box("PressFascia", Vector3(half_w * 2.0 + 5.0, 0.7, 0.3), Vector3(0.0, y, z - 1.0), Color("172a3a"), root)
+	# Roof wings cap the seating blocks without bridging across the harbor view.
+	# The previous full-width slab read as a black rectangle from center field.
+	for side_value in [-1.0, 1.0]:
+		var side: float = side_value
+		var roof_width := half_w - overlook_half_width + 2.5
+		_box("PressRoofL" if side < 0.0 else "PressRoofR", Vector3(roof_width, 0.45, 3.4), Vector3(side * (overlook_half_width + roof_width * 0.5), y + 0.35, z + 0.7), Color("1f3a33"), root)
+		var fascia_width := half_w - overlook_half_width + 2.5
+		_box("PressFasciaL" if side < 0.0 else "PressFasciaR", Vector3(fascia_width, 0.7, 0.3), Vector3(side * (overlook_half_width + fascia_width * 0.5), y, z - 1.0), Color("172a3a"), root)
+	spectator_root.set_meta("spectator_count", spectator_count)
+	spectator_root.set_meta("row_count", PLATE_SPECTATOR_ROWS)
+	spectator_root.set_meta("strip_recess", 0.0)
+	spectator_root.set_meta("layout_bounds", AABB(layout_min, layout_max - layout_min))
+	spectator_root.set_meta("layout_samples", layout_samples)
+	_build_spectator_batches(spectator_root, spectator_batches, 0.70)
+
+
+func _append_plate_spectator_row(batches: Dictionary, y: float, z: float, half_width: float, row: int) -> Dictionary:
+	var seat_count := PLATE_SPECTATOR_SEATS_PER_ROW
+	var minimum := Vector3(INF, INF, INF)
+	var maximum := Vector3(-INF, -INF, -INF)
+	var samples: Array[Dictionary] = []
+	var count := 0
+	var facing := Basis.looking_at(Vector3(0.0, 0.0, -1.0), Vector3.UP)
+	for seat in range(seat_count):
+		# Side aisles and a broad central overlook turn the rows into seating
+		# blocks. The open middle preserves the harbor behind the live battery.
+		if seat in [14, 15, 52, 53] or seat in range(29, 39):
+			continue
+		var seed := 300000 + row * 1000 + seat
+		var step := (half_width * 2.0) / float(seat_count)
+		var stagger := step * 0.5 if row % 2 == 1 else 0.0
+		var jitter := (_hash01(seed * 17 + 9) - 0.5) * 0.08
+		var x := clampf(-half_width + step * (float(seat) + 0.5) + stagger + jitter, -half_width + 0.24, half_width - 0.24)
+		var base := Vector3(x, y - 0.42, z - 0.20)
+		var depth := float(row) / 3.0
+		var shirt: Color = SPECTATOR_SHIRTS[int(_hash01(seed * 5 + 1) * float(SPECTATOR_SHIRTS.size())) % SPECTATOR_SHIRTS.size()]
+		var skin: Color = SPECTATOR_SKINS[int(_hash01(seed * 7 + 3) * float(SPECTATOR_SKINS.size())) % SPECTATOR_SKINS.size()]
+		shirt = shirt.lerp(Color("39465c"), depth * 0.10)
+		skin = skin.darkened(depth * 0.04)
+		_append_spectator(batches, base, facing, shirt, skin, seed, PLATE_SPECTATOR_SCALE)
+		minimum = minimum.min(base)
+		maximum = maximum.max(base)
+		if samples.size() < 3:
+			samples.append({"base": base, "shirt": shirt, "skin": skin, "seed": seed})
+		count += 1
+	return {"count": count, "minimum": minimum, "maximum": maximum, "samples": samples}
 
 
 func _add_crowd_row(y: float, z: float, half_width: float, seg_count: int) -> void:
@@ -726,7 +1243,18 @@ func _add_crowd_strip(size: Vector2, at: Vector3, face_dir: Vector3, roll: float
 	# One seeded, self-animating crowd quad. Deterministic per index so the bowl
 	# is identical every build; textures are seated by _refresh_crowd_textures.
 	var seed := _crowd_strips.size()
-	var mat := _flat_texture_material(null, true, true)
+	var mat := _flat_texture_material(null, false, true)
+	# Crowd quads are viewed at steep, changing angles in PlayCam. Mipmapped
+	# anisotropic sampling plus blended alpha lets distant fans converge into
+	# color clusters instead of re-thresholding them into red/white sparkles.
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_DEPTH_PRE_PASS
+	mat.alpha_antialiasing_mode = BaseMaterial3D.ALPHA_ANTIALIASING_OFF
+	# This is only a recessed density bed behind the articulated 3D fans. A low
+	# alpha preserves dark seat gaps and aisle breaks so the audience reads as
+	# people instead of a second crowd texture painted through their bodies.
+	mat.albedo_color = Color(0.56, 0.60, 0.67, 0.18)
+	mat.roughness = 1.0
 	# Tile the strip so fans stay life-size: more, smaller fans on bigger quads
 	# (fixes the ~30 ft giant-fan read), and multiple stacked seated rows appear
 	# on taller strips.
@@ -773,15 +1301,32 @@ func _crowd_texture_named(suffix: String) -> Texture2D:
 	return load(path) as Texture2D if ResourceLoader.exists(path) else null
 
 
-func _animate_crowd(_delta: float) -> void:
+func _animate_crowd(delta: float) -> void:
+	if _crowd_excited_timer > 0.0:
+		_crowd_excited_timer = maxf(_crowd_excited_timer - delta, 0.0)
+		if _crowd_excited_timer <= 0.0:
+			_crowd_reaction_duration = 0.0
+			_crowd_reaction_strength = 0.0
+
+	# Thousands of connected body pieces update in batches at a stable 12 Hz.
+	# Their wave is sampled from absolute animation time, so frame partitioning
+	# cannot synchronize or drift individual fans.
+	_crowd_motion_accumulator += maxf(delta, 0.0)
+	if _crowd_motion_accumulator >= CROWD_MOTION_STEP:
+		var elapsed_steps := maxi(1, int(floor(_crowd_motion_accumulator / CROWD_MOTION_STEP)))
+		_crowd_motion_accumulator -= float(elapsed_steps) * CROWD_MOTION_STEP
+		_crowd_motion_tick += elapsed_steps
+		_update_spectator_motion()
+
 	if _crowd_strips.is_empty():
 		return
 	if _crowd_excited_timer > 0.0 and not _crowd_excited.is_empty():
-		_crowd_excited_timer -= _delta
-		var frame := int(_anim_time / 0.21) % _crowd_excited.size()
-		var tex: Texture2D = _crowd_excited[frame]
 		for strip in _crowd_strips:
-			(strip.material as StandardMaterial3D).albedo_texture = tex
+			# Excited cards retain their personal phase rather than flipping as one
+			# disorienting stadium-wide sheet.
+			var local_time := _anim_time + float(strip.phase) * 0.19
+			var frame := int(local_time / 0.21) % _crowd_excited.size()
+			(strip.material as StandardMaterial3D).albedo_texture = _crowd_excited[frame]
 		return
 	if _crowd_calm.is_empty():
 		return
@@ -791,6 +1336,54 @@ func _animate_crowd(_delta: float) -> void:
 		var state := int(t / half) % 2
 		var idx: int = int(strip.frame_a) if state == 0 else int(strip.frame_b)
 		(strip.material as StandardMaterial3D).albedo_texture = _crowd_calm[idx % _crowd_calm.size()]
+
+
+func _crowd_reaction_level() -> float:
+	if _crowd_excited_timer <= 0.0 or _crowd_reaction_duration <= 0.0:
+		return 0.0
+	var remaining := clampf(_crowd_excited_timer / _crowd_reaction_duration, 0.0, 1.0)
+	# Smooth decay prevents the audience from snapping back to seated idle.
+	var eased := remaining * remaining * (3.0 - 2.0 * remaining)
+	return _crowd_reaction_strength * eased
+
+
+func _update_spectator_motion() -> void:
+	var reaction := _crowd_reaction_level()
+	var captured_sample := false
+	for batch_value in _animated_spectator_batches:
+		var batch: Dictionary = batch_value
+		var multimesh: MultiMesh = batch.multimesh
+		if multimesh == null:
+			continue
+		var rest_transforms: Array = batch.rest_transforms
+		var motion_data: Array = batch.motion_data
+		var part := String(batch.part)
+		var count := mini(multimesh.instance_count, mini(rest_transforms.size(), motion_data.size()))
+		for index in range(count):
+			var rest: Transform3D = rest_transforms[index]
+			var motion: Color = motion_data[index]
+			var phase := motion.r * TAU
+			var idle_rate := lerpf(0.15, 0.27, motion.g)
+			var idle_wave := sin(phase + _anim_time * TAU * idle_rate)
+			var side_wave := cos(phase * 0.73 + _anim_time * TAU * idle_rate * 0.61)
+			var cheer_wave := maxf(0.0, sin(phase + _anim_time * TAU * (1.75 + motion.g * 0.65)))
+			# Affinity deliberately spans quiet observers through exuberant jumpers.
+			# A semantic reaction is therefore visible as many individual choices,
+			# not a synchronized vertical sheet.
+			var response := reaction * motion.a
+			var jumpiness := clampf((motion.a - 0.35) / 0.65, 0.0, 1.0)
+			var lift := idle_wave * 0.007 * motion.b + response * (0.012 + cheer_wave * lerpf(0.035, 0.125, jumpiness))
+			if part in ["UpperArms", "Forearms"]:
+				lift += response * cheer_wave * (0.032 if part == "UpperArms" else 0.050)
+			var sway := side_wave * 0.008 * motion.b + response * sin(phase * 1.37 + _anim_time * TAU * 1.2) * lerpf(0.014, 0.034, jumpiness)
+			var lean := idle_wave * 0.007 + response * (cheer_wave - 0.35) * lerpf(0.012, 0.032, jumpiness)
+			if not captured_sample:
+				_crowd_motion_sample = Vector3(sway, lift, lean)
+				captured_sample = true
+			var animated := rest
+			animated.origin += Vector3(sway, lift, 0.0)
+			animated.basis = rest.basis * Basis(Vector3.FORWARD, lean)
+			multimesh.set_instance_transform(index, animated)
 
 
 func _build_led_ring() -> void:
@@ -1061,15 +1654,14 @@ func _build_home_backstop() -> void:
 
 	# Tricolor bunting hangs proud of the field-facing wall faces: swags over
 	# each central concourse opening plus three per flank knee wall.
-	var bunting_palette := [Color("d9504d"), Color("f3ede0"), Color("3f5f9e")]
 	var slot := 0
 	for k in range(7):
-		_box("Bunting%02d" % slot, Vector3(2.7, 0.7, 0.16), Vector3((float(k) - 3.0) * 4.4, 0.95, 29.72), bunting_palette[slot % 3], root)
+		_bunting("Bunting%02d" % slot, Vector3((float(k) - 3.0) * 4.4, 0.95, 29.72), 2.7, 0.70, root)
 		slot += 1
 	for side_value in [-1.0, 1.0]:
 		var side: float = side_value
 		for k in range(3):
-			_box("Bunting%02d" % slot, Vector3(2.6, 0.65, 0.16), Vector3(side * (14.5 + 4.0 * float(k)), 0.85, 23.95), bunting_palette[slot % 3], root)
+			_bunting("Bunting%02d" % slot, Vector3(side * (14.5 + 4.0 * float(k)), 0.85, 23.95), 2.6, 0.65, root)
 			slot += 1
 
 	# Stepped home-stand silhouettes with a canopy on each flank.
@@ -1100,6 +1692,70 @@ func _get_lamp_material() -> StandardMaterial3D:
 		_lamp_material.emission = Color("fff3c0")
 		_lamp_material.emission_energy_multiplier = 0.25
 	return _lamp_material
+
+
+func _suite_window(label: String, at: Vector3, parent: Node) -> Node3D:
+	var root := Node3D.new()
+	root.name = label
+	root.position = at
+	parent.add_child(root)
+	var frame := _box("Frame", Vector3(2.4, 0.55, 0.18), Vector3.ZERO, Color("172536"), root)
+	frame.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var pane_material := StandardMaterial3D.new()
+	pane_material.albedo_color = Color("78909a")
+	pane_material.roughness = 0.52
+	pane_material.emission_enabled = true
+	pane_material.emission = Color("9fb6ae")
+	pane_material.emission_energy_multiplier = 0.10
+	for pane_index in range(3):
+		var pane := _box(
+			"Pane%d" % pane_index,
+			Vector3(0.62, 0.34, 0.07),
+			Vector3(-0.74 + float(pane_index) * 0.74, 0.0, -0.115),
+			Color("78909a"),
+			root,
+		)
+		pane.material_override = pane_material
+		pane.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return root
+
+
+func _bunting(label: String, at: Vector3, width: float, height: float, parent: Node) -> MeshInstance3D:
+	# Faceted half-round patriotic bunting: a red outer scallop, cream middle,
+	# and navy gathered center. Twelve segments retain deliberate pixel planes
+	# while removing the blank rectangular-panel read of the old placeholders.
+	var mesh := ImmediateMesh.new()
+	var bands := [
+		{"outer": 1.0, "inner": 0.70, "color": Color("c94f4b")},
+		{"outer": 0.70, "inner": 0.40, "color": Color("eee4cf")},
+		{"outer": 0.40, "inner": 0.0, "color": Color("354f80")},
+	]
+	var segments := 12
+	for band_value in bands:
+		var band: Dictionary = band_value
+		var material := StandardMaterial3D.new()
+		material.albedo_color = band.color
+		material.roughness = 0.88
+		material.cull_mode = BaseMaterial3D.CULL_DISABLED
+		mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES, material)
+		for segment in range(segments):
+			var a0 := lerpf(PI, TAU, float(segment) / float(segments))
+			var a1 := lerpf(PI, TAU, float(segment + 1) / float(segments))
+			var outer0 := Vector3(cos(a0) * width * 0.5 * float(band.outer), height * 0.5 + sin(a0) * height * float(band.outer), 0.0)
+			var outer1 := Vector3(cos(a1) * width * 0.5 * float(band.outer), height * 0.5 + sin(a1) * height * float(band.outer), 0.0)
+			var inner0 := Vector3(cos(a0) * width * 0.5 * float(band.inner), height * 0.5 + sin(a0) * height * float(band.inner), -0.006)
+			var inner1 := Vector3(cos(a1) * width * 0.5 * float(band.inner), height * 0.5 + sin(a1) * height * float(band.inner), -0.006)
+			for vertex in [outer0, outer1, inner1, outer0, inner1, inner0]:
+				mesh.surface_set_normal(Vector3(0.0, 0.0, -1.0))
+				mesh.surface_add_vertex(vertex)
+		mesh.surface_end()
+	var instance := MeshInstance3D.new()
+	instance.name = label
+	instance.mesh = mesh
+	instance.position = at
+	instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(instance)
+	return instance
 
 
 func _beam_between(label: String, a: Vector3, b: Vector3, width: float, height: float, color: Color) -> MeshInstance3D:

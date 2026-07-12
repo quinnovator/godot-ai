@@ -14,6 +14,10 @@ func _init() -> void:
 	assert(session.has_node("Systems/HapticDirector"))
 	assert(session.has_node("PixiballHUD"))
 	assert(session.has_node("PitchIntelLayer/PitchIntelPanel"))
-	print("PIXIBALL_SCENE_CONTRACT_OK nodes=9")
+	var world_viewport := session.get_node("PixelComposite/WorldView/WorldViewport") as SubViewport
+	assert(world_viewport.size == Vector2i(1920, 1080))
+	var camera_director = session.get_node("Presentation/CameraDirector")
+	assert(camera_director.logical_vertical_pixels == 1080)
+	print("PIXIBALL_SCENE_CONTRACT_OK nodes=9 world=1920x1080")
 	session.free()
 	quit(0)

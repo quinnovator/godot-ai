@@ -5,6 +5,8 @@ const C = preload("res://gameplay/game_constants.gd")
 const StrikeZone = preload("res://ui/strike_zone.gd")
 const PitcherDisplay = preload("res://gameplay/pitcher_display.gd")
 const S = preload("res://ui/pixiball_style.gd")
+const LANDING_PITCHER_SHEET := preload("res://content/legacy/sprites/pitcher_home_day.png")
+const LANDING_BATTER_SHEET := preload("res://content/legacy/sprites/batter_home_day.png")
 
 # UE palette (spec 2a), routed through the shared style module so the shell and
 # Pitch Intel share one source of truth. Legacy names are remapped to their UE
@@ -13,6 +15,7 @@ const INK := S.INK             # borders / frames / the "black"
 const DEEP_INK := S.SCOREBOARD # HUD panel inner surface
 const PAPER := S.CHALK         # primary "white" text
 const CHALK := S.STEEL         # secondary label text
+const STEEL := S.STEEL
 const GOLD := S.GOLD
 const TEAL := S.TEAL
 const RED := S.STITCH
@@ -34,8 +37,9 @@ var game_layer: Control
 
 var landing_cards: Array[PanelContainer] = []
 var landing_card_titles: Array[Label] = []
+var landing_card_ctas: Array[PanelContainer] = []
+var landing_stat_lines: Array[Label] = []
 var landing_prompt: Label
-var landing_stats: Label
 var pitcher_cards: Array[PanelContainer] = []
 var pitcher_card_labels: Array[Label] = []
 var pitcher_detail_name: Label
@@ -60,6 +64,7 @@ var final_action_labels: Array[Label] = []
 
 var score_label: Label
 var inning_label: Label
+var pitcher_label: Label
 var count_label: Label
 var outs_label: Label
 var out_lamps: Array[Panel] = []
@@ -69,16 +74,18 @@ var result_panel: PanelContainer
 var result_label: Label
 var detail_label: Label
 var help_label: Label
-var pitch_row: HBoxContainer
-var pitch_cards: Array[PanelContainer] = []
+var help_panel: PanelContainer
+var pitch_row: Control
+var pitch_cards: Array[Panel] = []
 var pitch_labels: Array[Label] = []
 var title_matchup_label: Label
 var strike_zone: PixiballStrikeZone
 var identity_label: Label
+var identity_detail_label: Label
 var field_meter: ProgressBar
 var event_feed: VBoxContainer
 var event_feed_back: PanelContainer
-var stamina_panel: PanelContainer
+var _pitch_selector_active := false
 var stamina_label: Label
 var stamina_bar: ProgressBar
 
@@ -88,6 +95,7 @@ var _banner_tween: Tween
 var _blink_time := 0.0
 var _final_focus := 0
 var _stamina_gassed := false
+var _batting_layout := false
 
 
 func _ready() -> void:
@@ -153,23 +161,34 @@ func _build_gradient_band(layer_node: Control, at: Vector2, dimensions: Vector2,
 
 
 func _build_hero_title(layer_node: Control, text: String, at: Vector2) -> void:
-	# Chunky hard drop-shadow (not ghosting). GeistPixel-Line is an outline/hollow
-	# face — stacking three copies of it interleaves strokes and reads as glitchy
-	# red/gold ghosting, so the hero uses the SOLID Square face. Tight offsets,
-	# solid gold face on top of near-opaque ink/stitch shadow copies (farthest
-	# first) give one clean layered drop-shadow.
+	# Exact Unreal hero treatment: gold Pixelify Sans over stitch and ink copies.
 	var stack := [
-		{"offset": Vector2(8, 8), "color": Color(S.INK, 0.6)},
-		{"offset": Vector2(4, 4), "color": Color(S.STITCH, 0.9)},
+		{"offset": Vector2(12, 12), "color": Color(S.INK, 0.6)},
+		{"offset": Vector2(6, 6), "color": Color(S.STITCH, 0.9)},
 		{"offset": Vector2(0, 0), "color": S.GOLD},
 	]
-	var hero_font := S.tracked(S.FONT_DISPLAY, 4)
+	var hero_font := S.tracked(S.FONT_HERO, 3)
 	for spec in stack:
 		var copy := _label(text, 84, spec.color)
 		copy.add_theme_font_override("font", hero_font)
 		copy.position = at + spec.offset
-		copy.size = Vector2(700, 100)
+		copy.size = Vector2(560, 108)
+		copy.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		layer_node.add_child(copy)
+
+
+func _build_landing_mascot(layer_node: Control, sheet: Texture2D, region: Rect2, at: Vector2, dimensions: Vector2, flip := false) -> void:
+	var frame := AtlasTexture.new()
+	frame.atlas = sheet
+	frame.region = region
+	var mascot := Sprite2D.new()
+	mascot.texture = frame
+	var fit := minf(dimensions.x / region.size.x, dimensions.y / region.size.y)
+	mascot.position = at + dimensions * 0.5
+	mascot.scale = Vector2(fit, fit)
+	mascot.flip_h = flip
+	mascot.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	layer_node.add_child(mascot)
 
 
 func _build_landing() -> void:
@@ -177,8 +196,8 @@ func _build_landing() -> void:
 	landing_layer.name = "Landing"
 	landing_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	title_layer.add_child(landing_layer)
-	# UE landing: 3-band hard gradient (Ink 52% / Night 26% / GrassDeep 22%),
-	# three stacked fills with no blend (spec 3j).
+	# UE landing: three hard color bands, a centered mascot/title lockup, two
+	# 380px mode cards, and the blinking insert-coin footer.
 	_build_gradient_band(landing_layer, Vector2(0, 0), Vector2(1280, 375), S.INK)
 	_build_gradient_band(landing_layer, Vector2(0, 375), Vector2(1280, 187), S.NIGHT)
 	_build_gradient_band(landing_layer, Vector2(0, 562), Vector2(1280, 158), S.GRASS_DEEP)
@@ -193,44 +212,81 @@ func _build_landing() -> void:
 	gold_rail.size = Vector2(1280, 3)
 	gold_rail.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	landing_layer.add_child(gold_rail)
-	var eyebrow := _placed_label(landing_layer, "GODOT AI ORIGINAL  /  HARBOR LEAGUE", 17, GOLD, Vector2(72, 43), Vector2(760, 28))
-	eyebrow.add_theme_constant_override("outline_size", 5)
-	eyebrow.add_theme_color_override("font_outline_color", DEEP_INK)
-	# Triple-stacked hero "PIXIBALL" using the Line hero face: ink@0.6 (+12),
-	# stitch@0.9 (+6), gold on top (spec 3j).
-	_build_hero_title(landing_layer, "PIXIBALL", Vector2(68, 64))
-	_placed_label(landing_layer, "PAINT THE BLACK. OWN THE HARBOR.", 22, TEAL, Vector2(75, 162), Vector2(680, 36))
-	landing_stats = _placed_label(landing_layer, "BEST ENDLESS  0 K     •     VERSUS  0–0", 18, CHALK, Vector2(740, 78), Vector2(465, 38))
-	landing_stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_build_landing_mascot(landing_layer, LANDING_PITCHER_SHEET, Rect2(0, 0, 448, 912), Vector2(270, 47), Vector2(92, 132))
+	_build_hero_title(landing_layer, "PIXIBALL", Vector2(360, 49))
+	_build_landing_mascot(landing_layer, LANDING_BATTER_SHEET, Rect2(0, 0, 960, 1020), Vector2(922, 49), Vector2(104, 130), true)
+	var tagline := _placed_label(landing_layer, "ARCADE BASEBALL — SEASON '26", 18, STEEL, Vector2(380, 157), Vector2(520, 32))
+	tagline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tagline.add_theme_font_override("font", S.FONT_DISPLAY)
 
 	var specs := [
-		{"title": "ENDLESS PITCH", "kicker": "ONE ARM. THREE RUNS.", "copy": "Choose a starter and survive as long as command,\nsequencing and tunneling can carry you.", "color": GOLD},
-		{"title": "VERSUS", "kicker": "FULL HARBOR SHOWDOWN", "copy": "Pick clubs, set the stakes, then pitch, hit, field\nand manage a complete 3 / 6 / 9 inning game.", "color": TEAL},
+		{
+			"badge": "SOLO",
+			"badge_fill": GOLD,
+			"badge_text": INK,
+			"title": "ENDLESS PITCH",
+			"copy": "One arm, infinite batters. Paint the corners and stack Ks — three runs allowed ends the run.",
+			"cta": "TAKE THE MOUND",
+		},
+		{
+			"badge": "2P / CPU",
+			"badge_fill": STITCH,
+			"badge_text": PAPER,
+			"title": "VERSUS",
+			"copy": "Pick your club and battle a rival nine. Full counts, full innings, walk-off glory.",
+			"cta": "CHOOSE CLUBS",
+		},
 	]
 	for index in range(2):
 		var spec: Dictionary = specs[index]
 		var card := PanelContainer.new()
-		card.position = Vector2(72 + index * 574, 235)
-		card.size = Vector2(535, 255)
+		card.position = Vector2(246 + index * 408, 218)
+		card.size = Vector2(380, 286)
+		card.add_theme_stylebox_override("panel", S.panel(S.SCOREBOARD, INK, S.BORDER_PANEL, S.SHADOW_HERO, 22, 18))
 		card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		landing_layer.add_child(card)
 		var stack := VBoxContainer.new()
-		stack.add_theme_constant_override("separation", 10)
+		stack.add_theme_constant_override("separation", 9)
 		card.add_child(stack)
-		var number := _label("0%d" % (index + 1), 16, Color(spec.color, 0.8))
-		stack.add_child(number)
+		var badge := _label(String(spec.badge), 12, spec.badge_text)
+		badge.custom_minimum_size = Vector2(84, 25)
+		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		badge.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		badge.add_theme_stylebox_override("normal", S.panel(spec.badge_fill, INK, S.BORDER_FRAME, S.SHADOW_SMALL, 8, 2))
+		stack.add_child(badge)
 		var title := _label(String(spec.title), 34, PAPER)
+		title.add_theme_font_override("font", S.tracked(S.FONT_DISPLAY, 2))
 		stack.add_child(title)
 		landing_card_titles.append(title)
-		stack.add_child(_label(String(spec.kicker), 14, spec.color))
-		var copy := _label(String(spec.copy), 17, CHALK)
-		copy.add_theme_constant_override("line_spacing", 6)
+		var copy := _body_label(String(spec.copy), 14, STEEL)
+		copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		copy.custom_minimum_size.y = 50
+		copy.add_theme_constant_override("line_spacing", 4)
 		stack.add_child(copy)
-		stack.add_child(_label("CONFIRM  →", 16, spec.color))
+		var stat := _score_label("BEST RUN 0 K" if index == 0 else "RECORD 0–0", 22, GOLD)
+		stack.add_child(stat)
+		landing_stat_lines.append(stat)
+		var cta := PanelContainer.new()
+		cta.custom_minimum_size = Vector2(0, 42)
+		cta.add_theme_stylebox_override("panel", S.panel(NIGHT2, INK, S.BORDER_PANEL, S.SHADOW_PANEL, 14, 7))
+		var cta_label := _label(String(spec.cta), 14, PAPER)
+		cta_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cta_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		cta.add_child(cta_label)
+		stack.add_child(cta)
+		landing_card_ctas.append(cta)
 		landing_cards.append(card)
-	landing_prompt = _placed_label(landing_layer, "INSERT COIN  —  PRESS START", 22, GOLD, Vector2(390, 548), Vector2(500, 45))
+	landing_prompt = _score_label("INSERT COIN — PRESS START", 24, TEAL)
+	landing_prompt.position = Vector2(390, 543)
+	landing_prompt.size = Vector2(500, 42)
 	landing_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_placed_label(landing_layer, "D-PAD / WASD  SELECT     •     A / ENTER / SPACE  CONFIRM", 14, Color(CHALK, 0.84), Vector2(285, 630), Vector2(710, 34)).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	landing_layer.add_child(landing_prompt)
+	var hint := _body_label("STICK/D-PAD MOVE · A/START CONFIRM", 12, STEEL)
+	hint.position = Vector2(390, 590)
+	hint.size = Vector2(500, 30)
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	landing_layer.add_child(hint)
 
 
 func _build_pitcher_select() -> void:
@@ -441,103 +497,122 @@ func _build_game_hud() -> void:
 	game_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(game_layer)
 
-	var top_bar := PanelContainer.new()
-	top_bar.position = Vector2(24, 20)
-	top_bar.size = Vector2(700, 92)
-	top_bar.add_theme_stylebox_override("panel", _style(Color(0.03, 0.055, 0.105, 0.94), TEAL, 2, 9))
-	game_layer.add_child(top_bar)
+	# Compact Unreal scoreboard: score/inning, active arm, large count, outs,
+	# bases, and phase all live in one scan path at the top-left edge.
+	var scoreboard := PanelContainer.new()
+	scoreboard.name = "Scoreboard"
+	scoreboard.position = Vector2(16, 16)
+	scoreboard.size = Vector2(330, 200)
+	scoreboard.add_theme_stylebox_override("panel", S.panel(S.SCOREBOARD, INK, S.BORDER_PANEL, S.SHADOW_PANEL, 16, 12))
+	game_layer.add_child(scoreboard)
+	var scoreboard_stack := VBoxContainer.new()
+	scoreboard_stack.add_theme_constant_override("separation", 7)
+	scoreboard.add_child(scoreboard_stack)
+
 	var score_row := HBoxContainer.new()
-	score_row.add_theme_constant_override("separation", 20)
-	top_bar.add_child(score_row)
-	var brand := _label("PXL", 25, TEAL)
-	brand.custom_minimum_size.x = 58
-	brand.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	score_row.add_child(brand)
-	score_label = _score_label("FOX  0     PUL  0", 26, PAPER)
-	score_label.custom_minimum_size.x = 245
-	score_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	score_row.add_theme_constant_override("separation", 8)
+	scoreboard_stack.add_child(score_row)
+	score_label = _score_label("FOX  0  —  PUL  0", 26, GOLD)
+	score_label.custom_minimum_size.x = 218
+	score_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	score_row.add_child(score_label)
-	inning_label = _label("▲ 1ST", 19, GOLD)
-	inning_label.custom_minimum_size.x = 85
-	inning_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	inning_label = _label("▲ 1ST", 14, PAPER)
+	inning_label.custom_minimum_size.x = 60
+	inning_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	inning_label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	score_row.add_child(inning_label)
+	pitcher_label = _label("STARTER  (RHP)", 16, PAPER)
+	pitcher_label.custom_minimum_size.y = 22
+	scoreboard_stack.add_child(pitcher_label)
+
+	var stamina_row := HBoxContainer.new()
+	stamina_row.add_theme_constant_override("separation", 9)
+	scoreboard_stack.add_child(stamina_row)
+	stamina_bar = ProgressBar.new()
+	stamina_bar.custom_minimum_size = Vector2(162, 16)
+	stamina_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	stamina_bar.min_value = 0
+	stamina_bar.max_value = 1
+	stamina_bar.value = 1
+	stamina_bar.show_percentage = false
+	stamina_row.add_child(stamina_bar)
+	stamina_label = _label("ARM 100%  FRESH", 12, GRASS)
+	stamina_label.custom_minimum_size.x = 112
+	stamina_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	stamina_row.add_child(stamina_label)
+	set_stamina(1.0)
+
+	var count_row := HBoxContainer.new()
+	count_row.add_theme_constant_override("separation", 9)
+	count_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	scoreboard_stack.add_child(count_row)
 	count_label = _score_label("0–0", 56, PAPER)
-	count_label.custom_minimum_size.x = 96
+	count_label.custom_minimum_size.x = 88
 	count_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	score_row.add_child(count_label)
-	var outs_group := HBoxContainer.new()
-	outs_group.add_theme_constant_override("separation", 6)
-	outs_group.alignment = BoxContainer.ALIGNMENT_CENTER
-	score_row.add_child(outs_group)
-	outs_label = _label("OUTS", 14, CHALK)
+	count_row.add_child(count_label)
+	outs_label = _label("OUTS", 11, STEEL)
 	outs_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	outs_group.add_child(outs_label)
-	for _i in range(2):
+	count_row.add_child(outs_label)
+	var outs_group := HBoxContainer.new()
+	outs_group.add_theme_constant_override("separation", 4)
+	outs_group.alignment = BoxContainer.ALIGNMENT_CENTER
+	count_row.add_child(outs_group)
+	for _i in range(3):
 		var lamp := Panel.new()
-		lamp.custom_minimum_size = Vector2(16, 16)
+		lamp.custom_minimum_size = Vector2(11, 11)
 		lamp.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		lamp.add_theme_stylebox_override("panel", _style(SHADOW_BLUE, INK, 2, 0))
 		outs_group.add_child(lamp)
 		out_lamps.append(lamp)
 
 	var diamond := Control.new()
-	diamond.custom_minimum_size = Vector2(82, 70)
-	score_row.add_child(diamond)
-	for pos in [Vector2(42, 6), Vector2(64, 29), Vector2(42, 52)]:
+	diamond.custom_minimum_size = Vector2(50, 38)
+	count_row.add_child(diamond)
+	for pos in [Vector2(20, 2), Vector2(8, 17), Vector2(32, 17)]:
 		var base := Panel.new()
 		base.position = pos
-		base.size = Vector2(17, 17)
-		base.rotation = PI / 4.0
-		base.pivot_offset = Vector2(8.5, 8.5)
-		base.add_theme_stylebox_override("panel", _style(SHADOW_BLUE, SLATE, 1, 2))
+		base.size = Vector2(11, 11)
+		base.add_theme_stylebox_override("panel", _style(SHADOW_BLUE, SLATE, 1, 0))
 		diamond.add_child(base)
 		bases.append(base)
 
-	var phase_panel := PanelContainer.new()
-	phase_panel.position = Vector2(24, 124)
-	phase_panel.size = Vector2(375, 48)
-	phase_panel.add_theme_stylebox_override("panel", _style(Color(0.03, 0.055, 0.105, 0.9), Color(0.3, 0.5, 0.7, 0.45), 1, 7))
-	game_layer.add_child(phase_panel)
-	phase_label = _label("AT BAT", 17, CHALK)
-	phase_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	phase_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	phase_panel.add_child(phase_label)
+	phase_label = _body_label("AT BAT", 13, STEEL)
+	phase_label.custom_minimum_size.y = 20
+	scoreboard_stack.add_child(phase_label)
 
-	stamina_panel = PanelContainer.new()
-	stamina_panel.position = Vector2(411, 124)
-	stamina_panel.size = Vector2(313, 48)
-	stamina_panel.add_theme_stylebox_override("panel", _style(Color(0.03, 0.055, 0.105, 0.9), Color(TEAL, 0.5), 1, 7))
-	game_layer.add_child(stamina_panel)
-	var stamina_stack := HBoxContainer.new()
-	stamina_stack.add_theme_constant_override("separation", 10)
-	stamina_panel.add_child(stamina_stack)
-	stamina_label = _label("ARM 100%", 13, TEAL)
-	stamina_label.custom_minimum_size.x = 86
-	stamina_stack.add_child(stamina_label)
-	stamina_bar = ProgressBar.new()
-	stamina_bar.custom_minimum_size = Vector2(185, 20)
-	stamina_bar.min_value = 0
-	stamina_bar.max_value = 1
-	stamina_bar.value = 1
-	stamina_bar.show_percentage = false
-	stamina_stack.add_child(stamina_bar)
-	set_stamina(1.0)
-
-	identity_label = _placed_label(game_layer, "", 16, PAPER, Vector2(25, 184), Vector2(500, 35))
-	identity_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.75))
-	identity_label.add_theme_constant_override("shadow_offset_x", 2)
-	identity_label.add_theme_constant_override("shadow_offset_y", 2)
+	# The separate right-edge batter card mirrors SPixBatterCard and leaves a
+	# stable slot beneath it for the delayed pitch report.
+	var batter_card := PanelContainer.new()
+	batter_card.name = "BatterCard"
+	batter_card.position = Vector2(964, 16)
+	batter_card.size = Vector2(300, 108)
+	batter_card.add_theme_stylebox_override("panel", S.panel(S.SCOREBOARD, INK, S.BORDER_PANEL, S.SHADOW_PANEL, 16, 11))
+	game_layer.add_child(batter_card)
+	var batter_stack := VBoxContainer.new()
+	batter_stack.alignment = BoxContainer.ALIGNMENT_END
+	batter_stack.add_theme_constant_override("separation", 5)
+	batter_card.add_child(batter_stack)
+	identity_label = _label("BATTER", 20, PAPER)
+	identity_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	batter_stack.add_child(identity_label)
+	identity_detail_label = _body_label("", 13, STEEL)
+	identity_detail_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	identity_detail_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	identity_detail_label.custom_minimum_size.y = 42
+	batter_stack.add_child(identity_detail_label)
 
 	strike_zone = StrikeZone.new()
-	strike_zone.position = Vector2(1030, 165)
-	strike_zone.size = Vector2(220, 220)
+	# Replaced with the camera-projected rulebook rectangle as soon as gameplay
+	# selects a view. This fallback only prevents a one-frame zero-sized draw.
+	strike_zone.position = Vector2(600, 330)
+	strike_zone.size = Vector2(80, 110)
 	game_layer.add_child(strike_zone)
 
 	result_panel = PanelContainer.new()
-	result_panel.position = Vector2(430, 170)
-	result_panel.size = Vector2(420, 118)
+	result_panel.position = Vector2(460, 118)
+	result_panel.size = Vector2(360, 102)
 	result_panel.modulate.a = 0.0
-	result_panel.add_theme_stylebox_override("panel", _style(Color(0.025, 0.05, 0.1, 0.96), GOLD, 3, 10))
+	result_panel.add_theme_stylebox_override("panel", S.panel(S.SCOREBOARD, GOLD, S.BORDER_PANEL, S.SHADOW_HERO, 18, 10))
 	game_layer.add_child(result_panel)
 	var result_stack := VBoxContainer.new()
 	result_stack.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -545,50 +620,68 @@ func _build_game_hud() -> void:
 	result_label = _label("PLAY BALL", 34, GOLD)
 	result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	result_stack.add_child(result_label)
-	detail_label = _label("", 16, CHALK)
+	detail_label = _body_label("", 14, STEEL)
 	detail_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	result_stack.add_child(detail_label)
 
-	pitch_row = HBoxContainer.new()
-	pitch_row.position = Vector2(24, 620)
-	pitch_row.size = Vector2(795, 76)
-	pitch_row.add_theme_constant_override("separation", 8)
+	# Five keyboard/controller slots use the same face-button lattice as the
+	# Unreal pitch selector. Text stays upright over the rotated tile frames.
+	pitch_row = Control.new()
+	pitch_row.name = "PitchDiamond"
+	pitch_row.position = Vector2(970, 344)
+	pitch_row.size = Vector2(250, 286)
 	game_layer.add_child(pitch_row)
+	var tile_centers := [
+		Vector2(94, 191),
+		Vector2(145, 140),
+		Vector2(43, 140),
+		Vector2(94, 89),
+		Vector2(145, 38),
+	]
 	for i in range(C.PITCHES.size()):
-		var card := PanelContainer.new()
-		card.custom_minimum_size = Vector2(151, 62)
-		card.add_theme_stylebox_override("panel", _style(Color(0.03, 0.055, 0.105, 0.92), C.PITCHES[i]["color"], 2, 7))
-		var card_label := _label("%d  %s" % [i + 1, C.PITCHES[i]["name"]], 12, PAPER)
+		var tile := Panel.new()
+		tile.position = tile_centers[i] - Vector2(36, 36)
+		tile.size = Vector2(72, 72)
+		tile.pivot_offset = Vector2(36, 36)
+		tile.rotation = PI / 4.0
+		tile.add_theme_stylebox_override("panel", _style(S.SCOREBOARD, C.PITCHES[i]["color"], 3, 0))
+		pitch_row.add_child(tile)
+		pitch_cards.append(tile)
+		var card_label := _label("%d\n%s" % [i + 1, String(C.PITCHES[i]["id"]).to_upper()], 12, PAPER)
+		card_label.position = tile_centers[i] - Vector2(34, 28)
+		card_label.size = Vector2(68, 56)
 		card_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		card_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		card.add_child(card_label)
-		pitch_row.add_child(card)
-		pitch_cards.append(card)
+		pitch_row.add_child(card_label)
 		pitch_labels.append(card_label)
 
-	help_label = _placed_label(game_layer, "", 16, PAPER, Vector2(815, 635), Vector2(435, 55))
-	help_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	help_panel = PanelContainer.new()
+	help_panel.position = Vector2(340, 658)
+	help_panel.size = Vector2(600, 46)
+	help_panel.visible = false
+	help_panel.add_theme_stylebox_override("panel", S.panel(Color(S.SCOREBOARD, 0.92), INK, S.BORDER_PANEL, S.SHADOW_PANEL, 14, 7))
+	game_layer.add_child(help_panel)
+	help_label = _body_label("", 13, PAPER)
+	help_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	help_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	help_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
-	help_label.add_theme_constant_override("shadow_offset_x", 2)
-	help_label.add_theme_constant_override("shadow_offset_y", 2)
+	help_panel.add_child(help_label)
 
 	field_meter = ProgressBar.new()
-	field_meter.position = Vector2(465, 580)
-	field_meter.size = Vector2(350, 24)
+	field_meter.position = Vector2(465, 615)
+	field_meter.size = Vector2(350, 22)
 	field_meter.min_value = 0
 	field_meter.max_value = 1
 	field_meter.show_percentage = false
 	field_meter.visible = false
-	field_meter.add_theme_stylebox_override("background", _style(INK, PAPER, 2, 4))
-	field_meter.add_theme_stylebox_override("fill", _style(TEAL, Color("a7ffe9"), 1, 4))
+	field_meter.add_theme_stylebox_override("background", _style(INK, PAPER, 2, 0))
+	field_meter.add_theme_stylebox_override("fill", _style(TEAL, Color("a7ffe9"), 1, 0))
 	game_layer.add_child(field_meter)
 
 	event_feed_back = PanelContainer.new()
 	event_feed_back.position = Vector2(995, 398)
 	event_feed_back.size = Vector2(265, 180)
 	event_feed_back.visible = false
-	event_feed_back.add_theme_stylebox_override("panel", _style(Color(0.03, 0.055, 0.105, 0.76), Color(0.3, 0.5, 0.7, 0.4), 1, 7))
+	event_feed_back.add_theme_stylebox_override("panel", S.panel(Color(S.SCOREBOARD, 0.82), INK, S.BORDER_FRAME, 0, 12, 8))
 	game_layer.add_child(event_feed_back)
 	event_feed = VBoxContainer.new()
 	event_feed.position = Vector2(1010, 420)
@@ -596,19 +689,16 @@ func _build_game_hud() -> void:
 	event_feed.alignment = BoxContainer.ALIGNMENT_END
 	game_layer.add_child(event_feed)
 
-
 func show_landing(stats: Dictionary, focus: int) -> void:
 	_show_shell_layer(landing_layer)
-	landing_prompt.text = "INSERT COIN  —  %s" % ("ENDLESS" if focus == 0 else "VERSUS")
-	landing_stats.text = "BEST ENDLESS  %d K     •     VERSUS  %d–%d" % [
-		int(stats.get("best_endless_strikeouts", 0)),
-		int(stats.get("versus_wins", 0)),
-		int(stats.get("versus_losses", 0)),
-	]
+	landing_prompt.text = "INSERT COIN — PRESS START"
+	landing_stat_lines[0].text = "BEST RUN %d K" % int(stats.get("best_endless_strikeouts", 0))
+	landing_stat_lines[1].text = "RECORD %d–%d" % [int(stats.get("versus_wins", 0)), int(stats.get("versus_losses", 0))]
 	for index in range(landing_cards.size()):
 		var active := index == focus
-		landing_cards[index].add_theme_stylebox_override("panel", _style(Color(0.03, 0.055, 0.105, 0.96), GOLD if active else SHADOW_BLUE, 4 if active else 2, 11))
-		landing_card_titles[index].add_theme_color_override("font_color", GOLD if active else PAPER)
+		landing_cards[index].add_theme_stylebox_override("panel", S.panel(S.SCOREBOARD, GOLD if active else INK, S.BORDER_PANEL, S.SHADOW_HERO, 22, 18))
+		landing_card_titles[index].add_theme_color_override("font_color", PAPER)
+		landing_card_ctas[index].add_theme_stylebox_override("panel", S.panel(STITCH if active else NIGHT2, INK, S.BORDER_PANEL, S.SHADOW_PANEL, 14, 7))
 
 
 func show_pitcher_select(pitchers: Array[Dictionary], index: int) -> void:
@@ -735,18 +825,22 @@ func set_arsenal(pitches: Array) -> void:
 	for index in range(pitch_labels.size()):
 		if index >= pitches.size():
 			pitch_cards[index].visible = false
+			pitch_labels[index].visible = false
 			continue
 		pitch_cards[index].visible = true
 		var pitch: Dictionary = pitches[index]
-		pitch_labels[index].text = "%d  %s" % [index + 1, String(pitch.get("name", pitch.get("code", "PITCH"))).to_upper()]
+		pitch_labels[index].visible = true
+		pitch_labels[index].text = "%d\n%s" % [index + 1, String(pitch.get("code", pitch.get("name", "--"))).to_upper()]
 
 
 func update_state(state: Dictionary) -> void:
 	var away_score := int(state.get("away_score", 0))
 	var home_score := int(state.get("home_score", 0))
-	score_label.text = "%s  %d     %s  %d" % [String(_away_team.get("abbr", "AWY")), away_score, String(_home_team.get("abbr", "HME")), home_score]
+	score_label.text = "%s %d  —  %d %s" % [String(_away_team.get("abbr", "AWY")), away_score, home_score, String(_home_team.get("abbr", "HME"))]
 	var half_mark := "▲" if bool(state.get("top", true)) else "▼"
 	inning_label.text = "%s %s" % [half_mark, _ordinal(int(state.get("inning", 1)))]
+	var throws := String(state.get("pitcher_throws", "R")).left(1).to_upper()
+	pitcher_label.text = "%s  (%sHP)" % [String(state.get("pitcher_name", "STARTER")).to_upper(), throws]
 	count_label.text = "%d–%d" % [int(state.get("balls", 0)), int(state.get("strikes", 0))]
 	var outs := int(state.get("outs", 0))
 	for i in range(out_lamps.size()):
@@ -778,11 +872,36 @@ func set_stamina(value: float, status: String = "") -> void:
 
 
 func set_identity(text: String) -> void:
-	identity_label.text = text
+	var parts := text.split("•")
+	identity_label.text = parts[0].strip_edges() if not parts.is_empty() else text
+	var details: Array[String] = []
+	for index in range(1, parts.size()):
+		details.append(parts[index].strip_edges())
+	identity_detail_label.text = " · ".join(details)
 
 
 func set_help(text: String) -> void:
 	help_label.text = text
+	help_panel.visible = not text.is_empty()
+
+
+func set_batting_layout(enabled: bool) -> void:
+	_batting_layout = enabled
+	if enabled:
+		pitch_row.visible = false
+	strike_zone.queue_redraw()
+
+
+func set_strike_zone_rect(screen_rect: Rect2) -> void:
+	if screen_rect.size.x <= 1.0 or screen_rect.size.y <= 1.0:
+		return
+	strike_zone.position = screen_rect.position
+	strike_zone.size = screen_rect.size
+	strike_zone.queue_redraw()
+
+
+func set_strike_zone_lateral_sign(value: float) -> void:
+	strike_zone.set_lateral_screen_sign(value)
 
 
 func set_aim(value: Vector2, accent := TEAL) -> void:
@@ -799,7 +918,9 @@ func set_strike_zone_visible(visible: bool) -> void:
 
 
 func set_pitch_selector(visible: bool, selected := -1) -> void:
-	pitch_row.visible = visible
+	_pitch_selector_active = visible and not _batting_layout
+	pitch_row.visible = visible and not _batting_layout
+	_sync_event_feed_visibility()
 	for i in range(pitch_cards.size()):
 		var color: Color = C.PITCHES[i]["color"]
 		pitch_cards[i].modulate = Color.WHITE if i == selected else Color(0.72, 0.76, 0.82, 0.82)
@@ -830,7 +951,6 @@ func banner(title: String, detail := "", accent := GOLD, hold := 1.25) -> void:
 
 
 func push_event(text: String, color := CHALK) -> void:
-	event_feed_back.visible = true
 	var line := _label(text.to_upper(), 13, color)
 	line.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	event_feed.add_child(line)
@@ -839,6 +959,7 @@ func push_event(text: String, color := CHALK) -> void:
 		event_feed.remove_child(oldest)
 		oldest.free()
 	_layout_event_feed()
+	_sync_event_feed_visibility()
 	var tween := create_tween()
 	line.modulate.a = 0.0
 	tween.tween_property(line, "modulate:a", 1.0, 0.12)
@@ -850,17 +971,22 @@ func remove_event(text: String) -> void:
 		if child is Label and String((child as Label).text).to_upper() == normalized:
 			event_feed.remove_child(child)
 			child.free()
-	if event_feed.get_child_count() == 0:
-		event_feed_back.visible = false
-	else:
+	if event_feed.get_child_count() > 0:
 		_layout_event_feed()
+	_sync_event_feed_visibility()
 
 
 func clear_events() -> void:
 	for child in event_feed.get_children():
 		event_feed.remove_child(child)
 		child.free()
-	event_feed_back.visible = false
+	_sync_event_feed_visibility()
+
+
+func _sync_event_feed_visibility() -> void:
+	var show := event_feed.get_child_count() > 0 and not _pitch_selector_active
+	event_feed_back.visible = show
+	event_feed.visible = show
 
 
 func _layout_event_feed() -> void:
@@ -932,6 +1058,12 @@ func _label(text: String, size: int, color: Color) -> Label:
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.add_theme_font_size_override("font_size", size)
 	label.add_theme_color_override("font_color", color)
+	return label
+
+
+func _body_label(text: String, size: int, color: Color) -> Label:
+	var label := _label(text, size, color)
+	label.add_theme_font_override("font", S.FONT_BODY)
 	return label
 
 

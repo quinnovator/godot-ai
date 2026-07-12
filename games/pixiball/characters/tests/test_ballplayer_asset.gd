@@ -75,6 +75,9 @@ func _run() -> void:
 				var animation := player.get_animation(action)
 				_expect(animation.get_track_count() >= 22, "action %s has too few skeletal tracks" % action)
 				_expect(animation.length >= 0.75, "action %s is unexpectedly short" % action)
+				if action == "pitch":
+					_expect(animation.length >= 1.40, "pitch no longer contains the full authored delivery")
+					_expect(_max_track_key_count(animation) >= 18, "pitch lost its frame-reviewed biomechanical beats")
 				action_signatures[action] = _animation_signature(animation)
 		if action_signatures.size() == REQUIRED_ACTIONS.size():
 			_expect(action_signatures.field_throw != action_signatures.pitch, "field_throw duplicates the mound delivery")
@@ -112,7 +115,7 @@ func _run() -> void:
 	_expect(has_bounds, "model did not produce bounds")
 	if has_bounds:
 		_expect(bounds.position.y >= -0.01 and bounds.position.y <= 0.02, "feet are not grounded: %s" % bounds)
-		_expect(bounds.size.y >= 1.95 and bounds.size.y <= 2.05, "model height is outside contract: %s" % bounds.size.y)
+		_expect(bounds.size.y >= 1.84 and bounds.size.y <= 1.94, "model height is outside contract: %s" % bounds.size.y)
 		_expect(bounds.size.x >= 1.05 and bounds.size.x <= 1.30, "rest silhouette width is outside contract: %s" % bounds.size.x)
 		_expect(absf(bounds.position.z) > bounds.end.z, "model does not face canonical -Z: %s" % bounds)
 
@@ -147,6 +150,7 @@ func _run() -> void:
 		_expect(is_instance_valid(bat) and bat.visible, "batter did not enable imported bat")
 		_expect(is_instance_valid(glove) and not glove.visible, "batter did not hide imported glove")
 		_expect(_active_material_color(actor_meshes, "TEAM_Primary").is_equal_approx(Color("813348")), "primary team material override failed")
+		_expect(_procedural_surface_count(actor_meshes) > 0, "actor did not install UV-independent production materials")
 
 		var started: Array[String] = []
 		var markers: Array[String] = []
@@ -156,10 +160,13 @@ func _run() -> void:
 		_expect(actor.get_current_action() == "pitch", "pitch did not become current action")
 		var imported_player := _first_animation_player(actor)
 		_expect(imported_player != null, "actor lost its imported AnimationPlayer")
-		if imported_player != null:
-			imported_player.advance(0.90)
-			actor._physics_process(0.90)
 		_expect("pitch" in started, "actor did not emit action_started")
+		if imported_player != null:
+			imported_player.advance(0.82)
+			actor._physics_process(0.82)
+			_expect(not "pitch:ball_release" in markers, "pitch marker fired before the authored release frame")
+			imported_player.advance(0.08)
+			actor._physics_process(0.08)
 		_expect("pitch:ball_release" in markers, "actor did not emit imported pitch marker")
 
 		var rigged_root := actor.get_node_or_null("RiggedBallplayer") as Node3D
@@ -256,9 +263,33 @@ func _active_material_color(meshes: Array[MeshInstance3D], wanted: String) -> Co
 			continue
 		for surface in range(mesh_instance.mesh.get_surface_count()):
 			var material := mesh_instance.get_active_material(surface)
-			if material != null and material.resource_name == wanted and material is BaseMaterial3D:
+			if material == null or material.resource_name != wanted:
+				continue
+			if material is ShaderMaterial:
+				var color: Variant = (material as ShaderMaterial).get_shader_parameter("base_color")
+				if color is Color:
+					return color
+			elif material is BaseMaterial3D:
 				return (material as BaseMaterial3D).albedo_color
 	return Color.TRANSPARENT
+
+
+func _procedural_surface_count(meshes: Array[MeshInstance3D]) -> int:
+	var count := 0
+	for mesh_instance in meshes:
+		if mesh_instance.mesh == null:
+			continue
+		for surface in range(mesh_instance.mesh.get_surface_count()):
+			if mesh_instance.get_active_material(surface) is ShaderMaterial:
+				count += 1
+	return count
+
+
+func _max_track_key_count(animation: Animation) -> int:
+	var result := 0
+	for track in range(animation.get_track_count()):
+		result = maxi(result, animation.track_get_key_count(track))
+	return result
 
 
 func _count_blended_vertices(mesh: Mesh, surface: int) -> int:

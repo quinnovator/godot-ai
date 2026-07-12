@@ -1,138 +1,1200 @@
 {
-  "blend": "/Users/jack/dev/godot-ai/games/pixiball/assets/models/ballplayer/source/ballplayer.blend",
+  "blend": "C:\\Users\\quinn\\Documents\\godot-ai\\games\\pixiball\\assets\\models\\ballplayer\\source\\ballplayer.blend",
   "renders": [
     {
       "name": "rest_front",
       "action": null,
       "frame": 1,
       "target_z": 1.03,
-      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/rest_front.png"
+      "path": "C:\\Users\\quinn\\Documents\\godot-ai\\games\\pixiball\\docs\\art_direction\\after\\ballplayer\\rest_front.png"
     },
     {
       "name": "rest_three_quarter",
       "action": null,
       "frame": 1,
       "target_z": 1.03,
-      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/rest_three_quarter.png"
+      "path": "C:\\Users\\quinn\\Documents\\godot-ai\\games\\pixiball\\docs\\art_direction\\after\\ballplayer\\rest_three_quarter.png"
     },
     {
       "name": "field_ready_set",
       "action": "field_ready",
       "frame": 8,
       "target_z": 1.03,
-      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/field_ready_set.png"
+      "path": "C:\\Users\\quinn\\Documents\\godot-ai\\games\\pixiball\\docs\\art_direction\\after\\ballplayer\\field_ready_set.png"
     },
     {
       "name": "pitch_balance",
       "action": "pitch",
-      "frame": 14,
+      "frame": 16,
       "target_z": 1.03,
-      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/pitch_balance.png"
+      "path": "C:\\Users\\quinn\\Documents\\godot-ai\\games\\pixiball\\docs\\art_direction\\after\\ballplayer\\pitch_balance.png"
+    },
+    {
+      "name": "pitch_hand_break",
+      "action": "pitch",
+      "frame": 19,
+      "target_z": 1.03,
+      "path": "C:\\Users\\quinn\\Documents\\godot-ai\\games\\pixiball\\docs\\art_direction\\after\\ballplayer\\pitch_hand_break.png"
+    },
+    {
+      "name": "pitch_stride",
+      "action": "pitch",
+      "frame": 22,
+      "target_z": 1.03,
+      "path": "C:\\Users\\quinn\\Documents\\godot-ai\\games\\pixiball\\docs\\art_direction\\after\\ballplayer\\pitch_stride.png"
+    },
+    {
+      "name": "pitch_plant",
+      "action": "pitch",
+      "frame": 24,
+      "target_z": 1.03,
+      "path": "C:\\Users\\quinn\\Documents\\godot-ai\\games\\pixiball\\docs\\art_direction\\after\\ballplayer\\pitch_plant.png"
+    },
+    {
+      "name": "pitch_late_cock",
+      "action": "pitch",
+      "frame": 26,
+      "target_z": 1.03,
+      "path": "C:\\Users\\quinn\\Documents\\godot-ai\\games\\pixiball\\docs\\art_direction\\after\\ballplayer\\pitch_late_cock.png"
     },
     {
       "name": "pitch_release",
       "action": "pitch",
-      "frame": 24,
+      "frame": 28,
       "target_z": 1.03,
-      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/pitch_release.png"
+      "path": "C:\\Users\\quinn\\Documents\\godot-ai\\games\\pixiball\\docs\\art_direction\\after\\ballplayer\\pitch_release.png"
+    },
+    {
+      "name": "pitch_extension",
+      "action": "pitch",
+      "frame": 29,
+      "target_z": 1.03,
+      "path": "C:\\Users\\quinn\\Documents\\godot-ai\\games\\pixiball\\docs\\art_direction\\after\\ballplayer\\pitch_extension.png"
     },
     {
       "name": "pitch_follow_through",
       "action": "pitch",
-      "frame": 31,
+      "frame": 34,
       "target_z": 1.03,
-      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/pitch_follow_through.png"
+      "path": "C:\\Users\\quinn\\Documents\\godot-ai\\games\\pixiball\\docs\\art_direction\\after\\ballplayer\\pitch_follow_through.png"
+    },
+    {
+      "name": "pitch_finish",
+      "action": "pitch",
+      "frame": 45,
+      "target_z": 1.03,
+      "path": "C:\\Users\\quinn\\Documents\\godot-ai\\games\\pixiball\\docs\\art_direction\\after\\ballplayer\\pitch_finish.png"
     },
     {
       "name": "field_throw_transfer",
       "action": "field_throw",
       "frame": 11,
       "target_z": 1.03,
-      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/field_throw_transfer.png"
+      "path": "C:\\Users\\quinn\\Documents\\godot-ai\\games\\pixiball\\docs\\art_direction\\after\\ballplayer\\field_throw_transfer.png"
     },
     {
       "name": "field_throw_cock",
       "action": "field_throw",
       "frame": 16,
       "target_z": 1.03,
-      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/field_throw_cock.png"
+      "path": "C:\\Users\\quinn\\Documents\\godot-ai\\games\\pixiball\\docs\\art_direction\\after\\ballplayer\\field_throw_cock.png"
     },
     {
       "name": "field_throw_release",
       "action": "field_throw",
       "frame": 18,
       "target_z": 1.03,
-      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/field_throw_release.png"
+      "path": "C:\\Users\\quinn\\Documents\\godot-ai\\games\\pixiball\\docs\\art_direction\\after\\ballplayer\\field_throw_release.png"
     },
     {
       "name": "field_throw_follow_through",
       "action": "field_throw",
       "frame": 24,
       "target_z": 1.03,
-      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/field_throw_follow_through.png"
+      "path": "C:\\Users\\quinn\\Documents\\godot-ai\\games\\pixiball\\docs\\art_direction\\after\\ballplayer\\field_throw_follow_through.png"
     },
     {
       "name": "swing_load",
       "action": "swing",
       "frame": 1,
       "target_z": 1.03,
-      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/swing_load.png"
+      "path": "C:\\Users\\quinn\\Documents\\godot-ai\\games\\pixiball\\docs\\art_direction\\after\\ballplayer\\swing_load.png"
     },
     {
       "name": "swing_contact",
       "action": "swing",
       "frame": 19,
       "target_z": 1.03,
-      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/swing_contact.png"
+      "path": "C:\\Users\\quinn\\Documents\\godot-ai\\games\\pixiball\\docs\\art_direction\\after\\ballplayer\\swing_contact.png"
     },
     {
       "name": "swing_finish",
       "action": "swing",
       "frame": 25,
       "target_z": 1.03,
-      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/swing_finish.png"
+      "path": "C:\\Users\\quinn\\Documents\\godot-ai\\games\\pixiball\\docs\\art_direction\\after\\ballplayer\\swing_finish.png"
     },
     {
       "name": "catch_contact",
       "action": "catch",
       "frame": 14,
       "target_z": 1.03,
-      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/catch_contact.png"
+      "path": "C:\\Users\\quinn\\Documents\\godot-ai\\games\\pixiball\\docs\\art_direction\\after\\ballplayer\\catch_contact.png"
     },
     {
       "name": "run_stride",
       "action": "run",
       "frame": 1,
       "target_z": 1.03,
-      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/run_stride.png"
+      "path": "C:\\Users\\quinn\\Documents\\godot-ai\\games\\pixiball\\docs\\art_direction\\after\\ballplayer\\run_stride.png"
     },
     {
       "name": "celebrate_peak",
       "action": "celebrate",
       "frame": 24,
       "target_z": 1.12,
-      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/celebrate_peak.png"
+      "path": "C:\\Users\\quinn\\Documents\\godot-ai\\games\\pixiball\\docs\\art_direction\\after\\ballplayer\\celebrate_peak.png"
     },
     {
       "name": "celebrate_fist_pump",
       "action": "celebrate",
       "frame": 32,
       "target_z": 1.03,
-      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/celebrate_fist_pump.png"
+      "path": "C:\\Users\\quinn\\Documents\\godot-ai\\games\\pixiball\\docs\\art_direction\\after\\ballplayer\\celebrate_fist_pump.png"
     },
     {
       "name": "slide_entry",
       "action": "slide",
       "frame": 16,
       "target_z": 0.66,
-      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/slide_entry.png"
+      "path": "C:\\Users\\quinn\\Documents\\godot-ai\\games\\pixiball\\docs\\art_direction\\after\\ballplayer\\slide_entry.png"
     },
     {
       "name": "slide_contact",
       "action": "slide",
       "frame": 22,
       "target_z": 0.58,
-      "path": "/Users/jack/dev/godot-ai/games/pixiball/docs/art_direction/after/ballplayer/slide_contact.png"
+      "path": "C:\\Users\\quinn\\Documents\\godot-ai\\games\\pixiball\\docs\\art_direction\\after\\ballplayer\\slide_contact.png"
     }
-  ]
+  ],
+  "pitch_telemetry": {
+    "frame_start": 1,
+    "frame_end": 45,
+    "plant_frame": 24,
+    "release_frame": 28,
+    "peak_forward_frame": 28,
+    "peak_speed_frame": 28,
+    "release_speed_mps": 25.484591,
+    "release_forward_mps": 24.084945,
+    "root_excursion_m": 0.23,
+    "root_recovery_m": 0.0,
+    "max_root_step_m": 0.026115,
+    "early_peak_speed_mps": 0.217888,
+    "gather_peak_speed_mps": 4.151312,
+    "plant_drift_m": 0.010306,
+    "assertions": [
+      {
+        "name": "release_is_peak_forward_frame",
+        "passed": true,
+        "actual": 28,
+        "expected": 28
+      },
+      {
+        "name": "release_has_throwing_hand_speed",
+        "passed": true,
+        "actual": 25.484591,
+        "minimum": 12.0
+      },
+      {
+        "name": "delivery_has_controlled_drive",
+        "passed": true,
+        "actual": 0.23,
+        "minimum": 0.15,
+        "maximum": 0.35
+      },
+      {
+        "name": "lead_foot_stays_planted",
+        "passed": true,
+        "actual": 0.010306,
+        "maximum": 0.02
+      },
+      {
+        "name": "delivery_recovers_in_place",
+        "passed": true,
+        "actual": 0.0,
+        "maximum": 0.05
+      },
+      {
+        "name": "root_motion_is_continuous",
+        "passed": true,
+        "actual": 0.026115,
+        "maximum": 0.055
+      },
+      {
+        "name": "early_delivery_is_stable",
+        "passed": true,
+        "actual": 0.217888,
+        "maximum": 1.0
+      },
+      {
+        "name": "gather_acceleration_is_bounded",
+        "passed": true,
+        "actual": 4.151312,
+        "maximum": 14.016525
+      },
+      {
+        "name": "follow_through_decelerates",
+        "passed": true,
+        "actual": 6.136213,
+        "maximum": 17.839214
+      }
+    ],
+    "samples": [
+      {
+        "frame": 1,
+        "hand_m": [
+          -0.014884,
+          0.192274,
+          1.360738
+        ],
+        "hand_speed_mps": 0.0,
+        "hand_forward_mps": 0.0,
+        "root_m": [
+          0.0,
+          0.0,
+          0.02
+        ],
+        "root_forward_mps": 0.0,
+        "lead_toe_m": [
+          -0.14,
+          0.22,
+          0.075001
+        ]
+      },
+      {
+        "frame": 2,
+        "hand_m": [
+          -0.015086,
+          0.192952,
+          1.359051
+        ],
+        "hand_speed_mps": 0.054879,
+        "hand_forward_mps": 0.020343,
+        "root_m": [
+          0.0,
+          0.0,
+          0.020358
+        ],
+        "root_forward_mps": 0.0,
+        "lead_toe_m": [
+          -0.141731,
+          0.215127,
+          0.079546
+        ]
+      },
+      {
+        "frame": 3,
+        "hand_m": [
+          -0.015538,
+          0.19469,
+          1.354657
+        ],
+        "hand_speed_mps": 0.142414,
+        "hand_forward_mps": 0.052148,
+        "root_m": [
+          0.0,
+          0.0,
+          0.021355
+        ],
+        "root_forward_mps": 0.0,
+        "lead_toe_m": [
+          -0.145253,
+          0.202699,
+          0.09322
+        ]
+      },
+      {
+        "frame": 4,
+        "hand_m": [
+          -0.015998,
+          0.197034,
+          1.34854
+        ],
+        "hand_speed_mps": 0.196996,
+        "hand_forward_mps": 0.070302,
+        "root_m": [
+          0.0,
+          0.0,
+          0.02288
+        ],
+        "root_forward_mps": 0.0,
+        "lead_toe_m": [
+          -0.148616,
+          0.18575,
+          0.11644
+        ]
+      },
+      {
+        "frame": 5,
+        "hand_m": [
+          -0.016325,
+          0.199524,
+          1.341725
+        ],
+        "hand_speed_mps": 0.217888,
+        "hand_forward_mps": 0.074697,
+        "root_m": [
+          0.0,
+          0.0,
+          0.024819
+        ],
+        "root_forward_mps": 0.0,
+        "lead_toe_m": [
+          -0.150495,
+          0.166955,
+          0.149483
+        ]
+      },
+      {
+        "frame": 6,
+        "hand_m": [
+          -0.016548,
+          0.201724,
+          1.335315
+        ],
+        "hand_speed_mps": 0.203435,
+        "hand_forward_mps": 0.066022,
+        "root_m": [
+          0.0,
+          0.0,
+          0.027061
+        ],
+        "root_forward_mps": 0.0,
+        "lead_toe_m": [
+          -0.150046,
+          0.14859,
+          0.191967
+        ]
+      },
+      {
+        "frame": 7,
+        "hand_m": [
+          -0.016862,
+          0.20325,
+          1.330494
+        ],
+        "hand_speed_mps": 0.151993,
+        "hand_forward_mps": 0.04577,
+        "root_m": [
+          0.0,
+          0.0,
+          0.029492
+        ],
+        "root_forward_mps": 0.0,
+        "lead_toe_m": [
+          -0.146699,
+          0.132489,
+          0.242709
+        ]
+      },
+      {
+        "frame": 8,
+        "hand_m": [
+          -0.017538,
+          0.20377,
+          1.328519
+        ],
+        "hand_speed_mps": 0.064525,
+        "hand_forward_mps": 0.015597,
+        "root_m": [
+          0.0,
+          0.0,
+          0.032
+        ],
+        "root_forward_mps": 0.0,
+        "lead_toe_m": [
+          -0.140001,
+          0.12,
+          0.299999
+        ]
+      },
+      {
+        "frame": 9,
+        "hand_m": [
+          -0.019139,
+          0.203288,
+          1.328639
+        ],
+        "hand_speed_mps": 0.050279,
+        "hand_forward_mps": -0.014447,
+        "root_m": [
+          -0.0,
+          1e-05,
+          0.034479
+        ],
+        "root_forward_mps": 0.000293,
+        "lead_toe_m": [
+          -0.129602,
+          0.111838,
+          0.362808
+        ]
+      },
+      {
+        "frame": 10,
+        "hand_m": [
+          -0.021682,
+          0.202223,
+          1.329105
+        ],
+        "hand_speed_mps": 0.083895,
+        "hand_forward_mps": -0.031963,
+        "root_m": [
+          -0.0,
+          7.8e-05,
+          0.036854
+        ],
+        "root_forward_mps": 0.002051,
+        "lead_toe_m": [
+          -0.119169,
+          0.105866,
+          0.429432
+        ]
+      },
+      {
+        "frame": 11,
+        "hand_m": [
+          -0.024592,
+          0.200891,
+          1.329731
+        ],
+        "hand_speed_mps": 0.097824,
+        "hand_forward_mps": -0.039949,
+        "root_m": [
+          -0.0,
+          0.000264,
+          0.039053
+        ],
+        "root_forward_mps": 0.005566,
+        "lead_toe_m": [
+          -0.113031,
+          0.09968,
+          0.495943
+        ]
+      },
+      {
+        "frame": 12,
+        "hand_m": [
+          -0.027306,
+          0.199634,
+          1.330342
+        ],
+        "hand_speed_mps": 0.091601,
+        "hand_forward_mps": -0.037732,
+        "root_m": [
+          -0.0,
+          0.000625,
+          0.041009
+        ],
+        "root_forward_mps": 0.01084,
+        "lead_toe_m": [
+          -0.113126,
+          0.092427,
+          0.557314
+        ]
+      },
+      {
+        "frame": 13,
+        "hand_m": [
+          -0.029292,
+          0.198817,
+          1.330776
+        ],
+        "hand_speed_mps": 0.065709,
+        "hand_forward_mps": -0.024501,
+        "root_m": [
+          -0.0,
+          0.001221,
+          0.042651
+        ],
+        "root_forward_mps": 0.017871,
+        "lead_toe_m": [
+          -0.118666,
+          0.084868,
+          0.608792
+        ]
+      },
+      {
+        "frame": 14,
+        "hand_m": [
+          -0.030044,
+          0.198825,
+          1.330877
+        ],
+        "hand_speed_mps": 0.022769,
+        "hand_forward_mps": 0.000237,
+        "root_m": [
+          -0.0,
+          0.002109,
+          0.04391
+        ],
+        "root_forward_mps": 0.02666,
+        "lead_toe_m": [
+          -0.126937,
+          0.078862,
+          0.647256
+        ]
+      },
+      {
+        "frame": 15,
+        "hand_m": [
+          -0.029072,
+          0.200032,
+          1.330493
+        ],
+        "hand_speed_mps": 0.047907,
+        "hand_forward_mps": 0.03622,
+        "root_m": [
+          -0.0,
+          0.00335,
+          0.044716
+        ],
+        "root_forward_mps": 0.037207,
+        "lead_toe_m": [
+          -0.134805,
+          0.076582,
+          0.671316
+        ]
+      },
+      {
+        "frame": 16,
+        "hand_m": [
+          -0.025867,
+          0.202767,
+          1.329459
+        ],
+        "hand_speed_mps": 0.130152,
+        "hand_forward_mps": 0.082044,
+        "root_m": [
+          -0.0,
+          0.005,
+          0.045
+        ],
+        "root_forward_mps": 0.049512,
+        "lead_toe_m": [
+          -0.140005,
+          0.079998,
+          0.67999
+        ]
+      },
+      {
+        "frame": 17,
+        "hand_m": [
+          0.050295,
+          0.176185,
+          1.293807
+        ],
+        "hand_speed_mps": 2.645835,
+        "hand_forward_mps": -0.797467,
+        "root_m": [
+          -0.0,
+          0.008544,
+          0.042883
+        ],
+        "root_forward_mps": 0.106314,
+        "lead_toe_m": [
+          -0.138208,
+          0.100026,
+          0.667864
+        ]
+      },
+      {
+        "frame": 18,
+        "hand_m": [
+          0.160395,
+          0.096474,
+          1.267877
+        ],
+        "hand_speed_mps": 4.151312,
+        "hand_forward_mps": -2.391313,
+        "root_m": [
+          -0.0,
+          0.015282,
+          0.037878
+        ],
+        "root_forward_mps": 0.202147,
+        "lead_toe_m": [
+          -0.1331,
+          0.138522,
+          0.633763
+        ]
+      },
+      {
+        "frame": 19,
+        "hand_m": [
+          0.228643,
+          0.031783,
+          1.251609
+        ],
+        "hand_speed_mps": 2.862989,
+        "hand_forward_mps": -1.940746,
+        "root_m": [
+          -0.0,
+          0.025,
+          0.032
+        ],
+        "root_forward_mps": 0.291539,
+        "lead_toe_m": [
+          -0.140001,
+          0.180001,
+          0.579992
+        ]
+      },
+      {
+        "frame": 20,
+        "hand_m": [
+          0.291505,
+          -0.038463,
+          1.233152
+        ],
+        "hand_speed_mps": 2.881662,
+        "hand_forward_mps": -2.107359,
+        "root_m": [
+          -0.0,
+          0.037672,
+          0.026774
+        ],
+        "root_forward_mps": 0.380171,
+        "lead_toe_m": [
+          -0.15857,
+          0.219496,
+          0.507804
+        ]
+      },
+      {
+        "frame": 21,
+        "hand_m": [
+          0.342962,
+          -0.115922,
+          1.269696
+        ],
+        "hand_speed_mps": 2.997478,
+        "hand_forward_mps": -2.32378,
+        "root_m": [
+          -0.0,
+          0.054032,
+          0.021753
+        ],
+        "root_forward_mps": 0.49078,
+        "lead_toe_m": [
+          -0.167188,
+          0.290837,
+          0.410517
+        ]
+      },
+      {
+        "frame": 22,
+        "hand_m": [
+          0.380217,
+          -0.161426,
+          1.353286
+        ],
+        "hand_speed_mps": 3.06617,
+        "hand_forward_mps": -1.365131,
+        "root_m": [
+          -0.0,
+          0.075,
+          0.016
+        ],
+        "root_forward_mps": 0.629048,
+        "lead_toe_m": [
+          -0.150004,
+          0.449996,
+          0.279997
+        ]
+      },
+      {
+        "frame": 23,
+        "hand_m": [
+          0.409138,
+          -0.158497,
+          1.446475
+        ],
+        "hand_speed_mps": 2.928521,
+        "hand_forward_mps": 0.087887,
+        "root_m": [
+          -0.0,
+          0.100318,
+          0.009008
+        ],
+        "root_forward_mps": 0.759534,
+        "lead_toe_m": [
+          -0.140629,
+          0.659152,
+          0.113937
+        ]
+      },
+      {
+        "frame": 24,
+        "hand_m": [
+          0.405584,
+          -0.12368,
+          1.540868
+        ],
+        "hand_speed_mps": 3.020166,
+        "hand_forward_mps": 1.044497,
+        "root_m": [
+          -0.0,
+          0.125,
+          0.002
+        ],
+        "root_forward_mps": 0.740466,
+        "lead_toe_m": [
+          -0.159816,
+          0.714421,
+          0.08367
+        ]
+      },
+      {
+        "frame": 25,
+        "hand_m": [
+          0.378059,
+          -0.038107,
+          1.639805
+        ],
+        "hand_speed_mps": 4.010232,
+        "hand_forward_mps": 2.567188,
+        "root_m": [
+          -0.0,
+          0.145,
+          -0.004
+        ],
+        "root_forward_mps": 0.6,
+        "lead_toe_m": [
+          -0.16,
+          0.719994,
+          0.07501
+        ]
+      },
+      {
+        "frame": 26,
+        "hand_m": [
+          0.336979,
+          0.04415,
+          1.723154
+        ],
+        "hand_speed_mps": 3.723013,
+        "hand_forward_mps": 2.467727,
+        "root_m": [
+          -0.0,
+          0.165,
+          -0.01
+        ],
+        "root_forward_mps": 0.6,
+        "lead_toe_m": [
+          -0.160001,
+          0.719994,
+          0.075007
+        ]
+      },
+      {
+        "frame": 27,
+        "hand_m": [
+          0.216596,
+          0.371165,
+          1.681877
+        ],
+        "hand_speed_mps": 10.527163,
+        "hand_forward_mps": 9.810449,
+        "root_m": [
+          -0.0,
+          0.19,
+          -0.016
+        ],
+        "root_forward_mps": 0.75,
+        "lead_toe_m": [
+          -0.160001,
+          0.719994,
+          0.075006
+        ]
+      },
+      {
+        "frame": 28,
+        "hand_m": [
+          0.075502,
+          1.173997,
+          1.442752
+        ],
+        "hand_speed_mps": 25.484591,
+        "hand_forward_mps": 24.084945,
+        "root_m": [
+          -0.0,
+          0.215,
+          -0.022
+        ],
+        "root_forward_mps": 0.75,
+        "lead_toe_m": [
+          -0.160001,
+          0.719995,
+          0.075004
+        ]
+      },
+      {
+        "frame": 29,
+        "hand_m": [
+          -0.019101,
+          1.220475,
+          1.289654
+        ],
+        "hand_speed_mps": 5.576186,
+        "hand_forward_mps": 1.394334,
+        "root_m": [
+          -0.0,
+          0.23,
+          -0.025
+        ],
+        "root_forward_mps": 0.45,
+        "lead_toe_m": [
+          -0.160001,
+          0.719996,
+          0.075003
+        ]
+      },
+      {
+        "frame": 30,
+        "hand_m": [
+          -0.054212,
+          1.219349,
+          1.191727
+        ],
+        "hand_speed_mps": 3.121113,
+        "hand_forward_mps": -0.033771,
+        "root_m": [
+          -0.0,
+          0.229169,
+          -0.024299
+        ],
+        "root_forward_mps": -0.024937,
+        "lead_toe_m": [
+          -0.162617,
+          0.713266,
+          0.071376
+        ]
+      },
+      {
+        "frame": 31,
+        "hand_m": [
+          -0.066006,
+          1.174989,
+          1.067863
+        ],
+        "hand_speed_mps": 3.962865,
+        "hand_forward_mps": -1.330812,
+        "root_m": [
+          -0.0,
+          0.226506,
+          -0.022377
+        ],
+        "root_forward_mps": -0.079873,
+        "lead_toe_m": [
+          -0.162834,
+          0.717718,
+          0.073681
+        ]
+      },
+      {
+        "frame": 32,
+        "hand_m": [
+          -0.139569,
+          1.05975,
+          0.973313
+        ],
+        "hand_speed_mps": 4.986784,
+        "hand_forward_mps": -3.457153,
+        "root_m": [
+          -0.0,
+          0.221759,
+          -0.019505
+        ],
+        "root_forward_mps": -0.142405,
+        "lead_toe_m": [
+          -0.161912,
+          0.72557,
+          0.077843
+        ]
+      },
+      {
+        "frame": 33,
+        "hand_m": [
+          -0.241553,
+          0.936617,
+          0.97846
+        ],
+        "hand_speed_mps": 4.798949,
+        "hand_forward_mps": -3.693983,
+        "root_m": [
+          -0.0,
+          0.214675,
+          -0.015956
+        ],
+        "root_forward_mps": -0.212532,
+        "lead_toe_m": [
+          -0.160663,
+          0.728988,
+          0.079715
+        ]
+      },
+      {
+        "frame": 34,
+        "hand_m": [
+          -0.313582,
+          0.854451,
+          1.023003
+        ],
+        "hand_speed_mps": 3.539962,
+        "hand_forward_mps": -2.465004,
+        "root_m": [
+          -0.0,
+          0.205,
+          -0.012
+        ],
+        "root_forward_mps": -0.290253,
+        "lead_toe_m": [
+          -0.160001,
+          0.719997,
+          0.075003
+        ]
+      },
+      {
+        "frame": 35,
+        "hand_m": [
+          -0.358415,
+          0.798851,
+          1.055418
+        ],
+        "hand_speed_mps": 2.353035,
+        "hand_forward_mps": -1.667982,
+        "root_m": [
+          -0.0,
+          0.19253,
+          -0.007881
+        ],
+        "root_forward_mps": -0.374107,
+        "lead_toe_m": [
+          -0.160627,
+          0.700464,
+          0.065895
+        ]
+      },
+      {
+        "frame": 36,
+        "hand_m": [
+          -0.380388,
+          0.7504,
+          1.078627
+        ],
+        "hand_speed_mps": 1.741294,
+        "hand_forward_mps": -1.453539,
+        "root_m": [
+          -0.0,
+          0.177255,
+          -0.003724
+        ],
+        "root_forward_mps": -0.458239,
+        "lead_toe_m": [
+          -0.16124,
+          0.67943,
+          0.059318
+        ]
+      },
+      {
+        "frame": 37,
+        "hand_m": [
+          -0.384543,
+          0.695583,
+          1.089366
+        ],
+        "hand_speed_mps": 1.680389,
+        "hand_forward_mps": -1.644498,
+        "root_m": [
+          -0.0,
+          0.159216,
+          0.000373
+        ],
+        "root_forward_mps": -0.541186,
+        "lead_toe_m": [
+          -0.159819,
+          0.659961,
+          0.057642
+        ]
+      },
+      {
+        "frame": 38,
+        "hand_m": [
+          -0.370145,
+          0.621796,
+          1.083775
+        ],
+        "hand_speed_mps": 2.261611,
+        "hand_forward_mps": -2.213632,
+        "root_m": [
+          -0.0,
+          0.138451,
+          0.004314
+        ],
+        "root_forward_mps": -0.622946,
+        "lead_toe_m": [
+          -0.153808,
+          0.645674,
+          0.06244
+        ]
+      },
+      {
+        "frame": 39,
+        "hand_m": [
+          -0.332378,
+          0.518131,
+          1.058268
+        ],
+        "hand_speed_mps": 3.397213,
+        "hand_forward_mps": -3.10995,
+        "root_m": [
+          -0.0,
+          0.115,
+          0.008
+        ],
+        "root_forward_mps": -0.703522,
+        "lead_toe_m": [
+          -0.14,
+          0.639998,
+          0.075004
+        ]
+      },
+      {
+        "frame": 40,
+        "hand_m": [
+          -0.261541,
+          0.393054,
+          1.008286
+        ],
+        "hand_speed_mps": 4.565526,
+        "hand_forward_mps": -3.752286,
+        "root_m": [
+          -0.0,
+          0.089273,
+          0.011338
+        ],
+        "root_forward_mps": -0.771816,
+        "lead_toe_m": [
+          -0.12418,
+          0.615915,
+          0.08046
+        ]
+      },
+      {
+        "frame": 41,
+        "hand_m": [
+          -0.145574,
+          0.267595,
+          0.934382
+        ],
+        "hand_speed_mps": 5.584377,
+        "hand_forward_mps": -3.763784,
+        "root_m": [
+          -0.0,
+          0.063158,
+          0.014246
+        ],
+        "root_forward_mps": -0.783442,
+        "lead_toe_m": [
+          -0.118764,
+          0.554894,
+          0.071435
+        ]
+      },
+      {
+        "frame": 42,
+        "hand_m": [
+          0.01375,
+          0.159366,
+          0.86554
+        ],
+        "hand_speed_mps": 6.136213,
+        "hand_forward_mps": -3.246865,
+        "root_m": [
+          -0.0,
+          0.038915,
+          0.016645
+        ],
+        "root_forward_mps": -0.727304,
+        "lead_toe_m": [
+          -0.127581,
+          0.47281,
+          0.06263
+        ]
+      },
+      {
+        "frame": 43,
+        "hand_m": [
+          0.179744,
+          0.081872,
+          0.83353
+        ],
+        "hand_speed_mps": 5.57903,
+        "hand_forward_mps": -2.324808,
+        "root_m": [
+          -0.0,
+          0.018801,
+          0.018456
+        ],
+        "root_forward_mps": -0.603401,
+        "lead_toe_m": [
+          -0.147973,
+          0.389199,
+          0.062968
+        ]
+      },
+      {
+        "frame": 44,
+        "hand_m": [
+          0.301506,
+          0.036277,
+          0.835201
+        ],
+        "hand_speed_mps": 3.900889,
+        "hand_forward_mps": -1.367867,
+        "root_m": [
+          -0.0,
+          0.005077,
+          0.019601
+        ],
+        "root_forward_mps": -0.411735,
+        "lead_toe_m": [
+          -0.169917,
+          0.325238,
+          0.070342
+        ]
+      },
+      {
+        "frame": 45,
+        "hand_m": [
+          0.346848,
+          0.020795,
+          0.841556
+        ],
+        "hand_speed_mps": 1.449967,
+        "hand_forward_mps": -0.46447,
+        "root_m": [
+          0.0,
+          0.0,
+          0.02
+        ],
+        "root_forward_mps": -0.152303,
+        "lead_toe_m": [
+          -0.18,
+          0.3,
+          0.075
+        ]
+      }
+    ]
+  }
 }

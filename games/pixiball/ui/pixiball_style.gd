@@ -3,22 +3,17 @@ extends RefCounted
 
 ## Shared UE-derived visual language for the Pixiball shell + HUD.
 ##
-## Single source of truth for the pixel-UI restyle. Replaces the two divergent
-## palettes (HUD vs Pitch Intel) and centralises the Geist Pixel font roles and
-## the flat-rect / ink-border / hard-pixel-drop-shadow chrome from the Unreal
-## original. All px values are UE 1080p reference sizes used directly as Godot
-## font sizes (the game already authors UI at 1280x720 absolute coords).
+## Single source of truth for the ported Unreal UI language. It centralises the
+## original three font roles, palette, and flat ink-frame chrome. All px values
+## are authored directly against the game's 1280x720 UI canvas.
 
-# --- Fonts (Geist Pixel family) --------------------------------------------
-# Role mapping (UE -> Geist Pixel):
-#   Display = GeistPixel-Square  (all-caps labels, names, titles, buttons, badges)
-#   Score   = GeistPixel-Grid    (numeric readouts: count, scores, velo, K totals)
-#   Body    = GeistPixel-Square   (smaller sizes; Geist Pixel is display-oriented)
-#   Hero    = GeistPixel-Line     (landing PIXIBALL flair)
-const FONT_DISPLAY := preload("res://assets/fonts/geist_pixel/GeistPixel-Square.ttf")
-const FONT_SCORE := preload("res://assets/fonts/geist_pixel/GeistPixel-Grid.ttf")
-const FONT_BODY := preload("res://assets/fonts/geist_pixel/GeistPixel-Square.ttf")
-const FONT_HERO := preload("res://assets/fonts/geist_pixel/GeistPixel-Line.ttf")
+# --- Fonts (exact Unreal roles) --------------------------------------------
+# Pixelify Sans carries display chrome, DotGothic16 keeps body copy open and
+# readable, and VT323 gives scores the reference broadcast-board cadence.
+const FONT_DISPLAY := preload("res://assets/fonts/unreal_ui/PixelifySans-Regular.ttf")
+const FONT_SCORE := preload("res://assets/fonts/unreal_ui/VT323-Regular.ttf")
+const FONT_BODY := preload("res://assets/fonts/unreal_ui/DotGothic16-Regular.ttf")
+const FONT_HERO := preload("res://assets/fonts/unreal_ui/PixelifySans-Regular.ttf")
 
 # --- UE core palette (spec 2a) ---------------------------------------------
 const INK := Color("1a1c2c")           # the "black": every border/frame + deepest shadow
@@ -56,6 +51,7 @@ const PITCH_SLOTS := [
 # --- Chrome constants (spec 3a) --------------------------------------------
 const BORDER_PANEL := 3     # thick ink border: panels, cards, buttons
 const BORDER_FRAME := 2     # thin ink frame: lamps, bars, badges
+const SHADOW_SMALL := 2     # badges and small chips
 const SHADOW_PANEL := 4     # default panel/button drop-shadow
 const SHADOW_HERO := 6      # hero panels
 
@@ -82,9 +78,8 @@ static func panel(fill: Color, border: Color, border_width := BORDER_PANEL, shad
 	return style
 
 
-## Cached theme injecting Display (Square) as the default Label font. Applied to
-## the shell + game Control roots so every code-built label inherits the pixel
-## face; numeric readouts opt into FONT_SCORE via add_theme_font_override.
+## Cached theme injecting the reference display face as the default. Body copy
+## and numeric readouts opt into their explicit roles at construction sites.
 static func ui_theme() -> Theme:
 	if _theme == null:
 		_theme = Theme.new()

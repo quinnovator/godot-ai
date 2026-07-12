@@ -13,9 +13,9 @@
 
 [sub_resource type="ShaderMaterial" id="PixelCompositeMaterial"]
 shader = ExtResource("10_pixel")
-shader_parameter/logical_size = Vector2(640, 360)
-shader_parameter/color_steps = 48.0
-shader_parameter/dither_strength = 0.35
+shader_parameter/logical_size = Vector2(1920, 1080)
+shader_parameter/color_steps = 256.0
+shader_parameter/dither_strength = 0.015
 
 [node name="Pixiball" type="Node3D" unique_id=98687748]
 script = ExtResource("1_main")
@@ -37,6 +37,7 @@ script = ExtResource("3_ball")
 [node name="CameraDirector" type="Node3D" parent="Presentation" unique_id=1147639371]
 script = ExtResource("4_camera")
 world_viewport_path = NodePath("../../PixelComposite/WorldView/WorldViewport")
+logical_vertical_pixels = 1080
 
 [node name="Systems" type="Node" parent="." unique_id=179917152]
 
@@ -62,12 +63,12 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 stretch = true
-stretch_shrink = 2
+stretch_shrink = 1
 
 [node name="WorldViewport" type="SubViewport" parent="PixelComposite/WorldView" unique_id=528346798]
 handle_input_locally = false
 msaa_3d = 2
-size = Vector2i(640, 360)
+size = Vector2i(1920, 1080)
 render_target_update_mode = 4
 
 [node name="PixiballHUD" type="CanvasLayer" parent="." unique_id=1515197848]

@@ -14,7 +14,8 @@ informational and is not required at runtime.
 | --- | --- | --- |
 | `content/data/` | `Content/Data/` | All 17 files currently compare byte-for-byte, including pitchers, batters, names, teams, choreography, metadata, jersey stamp, sprite manifest, four XGB model binaries, and golden fixtures. The Godot content catalog and pitch model consume these files. |
 | `content/legacy/field/` | `Content/RawAssets/field/` | All 58 source PNGs currently compare byte-for-byte. Godot-generated `.import` sidecars exist only in the Godot tree. The stadium uses the authorized day, golden-hour, and night surface/prop textures. |
-| `content/legacy/sprites/` | `Content/RawAssets/sprites/` | The 54 production PNG/JSON files currently compare byte-for-byte after excluding Unreal-side `_preview.png` files and Godot `.import` sidecars. They are retained as authorized reference/compatibility assets, not used as the production ballplayer renderer. |
+| `content/legacy/sprites/` | `Content/RawAssets/sprites/` | The 54 production PNG/JSON files currently compare byte-for-byte after excluding Unreal-side `_preview.png` files and Godot `.import` sidecars. The 3D game still uses the rebuilt ballplayer; the landing screen now uses one authorized frame from the pitcher and batter sheets as small pixel-art accents. |
+| `assets/fonts/unreal_ui/` | `Content/Fonts/` | Pixelify Sans, DotGothic16, and VT323 are unchanged copies of the reference UI font set and restore the exact display/body/score roles. The SIL OFL 1.1 text is included beside them. |
 
 The authorized pitcher dataset includes real pitcher names and pitch arsenals.
 The eight club identities in `teams.json` are fictional. The rebuilt production
@@ -50,23 +51,34 @@ The following are new or rebuilt assets and systems for this repository:
 - `main.tscn`, the Godot node architecture, typed semantic driver, scenario
   surface, save/menu flow, and agent-readable state.
 - The authored stadium geometry, rebuilt harbor backdrop, pixel-composite
-  shader, broadcast cameras, synthesized audio, particles, UI, and pitch-intel
-  presentation. The stadium intentionally combines rebuilt geometry with the
-  ported field texture set above.
-- `assets/models/ballplayer/ballplayer.glb`, its Blender 4.5 LTS `.blend` source,
+  shader, broadcast cameras, synthesized audio, particles, and pitch-intel
+  presentation. The UI remains a native Godot implementation but now ports the
+  Unreal Slate layout, typography, palette, and interaction states directly.
+- `assets/models/ballplayer/ballplayer.glb`, its Blender 5.1.2 `.blend` source,
   deterministic Python recipe, animations, build receipt, and QA renderer.
+  The head and layered eye meshes come from the CC0 (public domain) Blender
+  Studio "Human Base Meshes" bundle (realistic animation head), vendored as
+  `assets/models/ballplayer/source/cc0_head_base.blend` and fitted/re-weighted
+  by the recipe; the asset does not attempt a real-player likeness. All other
+  geometry is procedurally sculpted inside the recipe.
+- `assets/textures/surface/` holds CC0 Poly Haven photogrammetry detail maps
+  (cotton jersey knit, brown leather, fine-grained wood; see its
+  `LICENSES.md`), sampled triplanar as runtime micro-surface detail.
 - `characters/ballplayer_actor.tscn` and the modular helmet, catcher, umpire,
   team-mark, and jersey-number equipment layer. These assets do not use Unreal
   mesh or sprite geometry.
 - Semantic haptic composition, portable Godot rumble, and the fork's bounded
   native DualSense/DualSense Edge adaptive-trigger API.
+- `docs/art_direction/references/pixiball-pitcher-delivery-sheet-v2.png` is a
+  Codex built-in image-generation output used only as production art direction.
+  It is not a runtime texture, sprite atlas, third-party mesh, or player likeness.
 
 ## Not imported or consumed
 
 - Unreal `.uasset`, `.umap`, project configuration, build products, and editor
   plugins are not loaded by the Godot project.
-- Unreal sprite sheets are preserved under `content/legacy/sprites/`, but no
-  production GDScript or scene loads them for the current ballplayer.
+- Unreal sprite sheets are preserved under `content/legacy/sprites/`; only two
+  landing-screen mascot frames are loaded. Gameplay ballplayers remain 3D.
 - The Blender athlete does not derive geometry from an Unreal mesh or sprite
   sheet. Its fallback is the repository's procedural `VoxelBallplayer`.
 

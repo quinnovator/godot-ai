@@ -1,11 +1,15 @@
 {
   "asset": "pixiball_ballplayer",
-  "asset_version": 7,
+  "asset_version": 12,
+  "external_sources": {
+    "head": "Blender Studio 'Human Base Meshes' bundle (CC0), realistic animation head + eye parts, vendored as source/cc0_head_base.blend",
+    "surface_detail_textures": "Poly Haven CC0 photogrammetry maps under assets/textures/surface/ (see LICENSES.md)"
+  },
   "bounds_m": {
     "max": [
-      0.523663,
-      1.996,
-      0.187
+      0.5125,
+      1.8925,
+      0.1615
     ],
     "min": [
       -0.623192,
@@ -39,14 +43,11 @@
     "MAT_Leather",
     "MAT_LeatherLight",
     "MAT_Metal",
-    "MAT_Mouth",
     "MAT_Pants",
-    "MAT_PantsShadow",
     "MAT_Pupil",
     "MAT_Rubber",
     "MAT_Skin",
     "MAT_SkinLight",
-    "MAT_Sock",
     "TEAM_Accent",
     "TEAM_Primary",
     "TEAM_Secondary"
@@ -79,9 +80,10 @@
       "loop": true
     },
     "pitch": {
-      "end_frame": 37,
+      "end_frame": 45,
       "markers": {
-        "ball_release": 24
+        "ball_release": 28,
+        "stride_plant": 24
       }
     },
     "run": {
@@ -107,6 +109,10 @@
     "handedness": {
       "authored_side": "right",
       "runtime_contract": "BallplayerActor mirrors model X per action for throws, catches, field-ready, and batting side"
+    },
+    "motion": {
+      "pitch_interpolation": "hemisphere-corrected quaternion tracks baked once per source frame",
+      "pitch_root_contract": "0.23 m controlled drive with <=0.05 m end offset before idle blend"
     },
     "sockets": [
       "socket_head",
@@ -155,8 +161,8 @@
       "Bat_Skinned"
     ],
     "mesh_count": 8,
-    "polygon_count": 16576,
-    "source_vertex_count": 15940
+    "triangle_count_glb": 134240,
+    "vertex_count_glb": 74598
   },
   "visual_qa": {
     "recipe": "res://assets/blender/render_ballplayer_qa.py",
@@ -165,8 +171,14 @@
       "rest_three_quarter",
       "field_ready_set",
       "pitch_balance",
+      "pitch_hand_break",
+      "pitch_stride",
+      "pitch_plant",
+      "pitch_late_cock",
       "pitch_release",
+      "pitch_extension",
       "pitch_follow_through",
+      "pitch_finish",
       "field_throw_transfer",
       "field_throw_cock",
       "field_throw_release",

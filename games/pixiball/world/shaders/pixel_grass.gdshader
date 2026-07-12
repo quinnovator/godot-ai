@@ -57,7 +57,9 @@ void fragment() {
 	// Tint toward the shipped mood turf texture, fading with distance so the
 	// far field stays in the atmospheric color rather than a tiled sample.
 	vec3 turf = texture(grass_tex, world_xz * grass_tex_scale).rgb;
-	base = mix(base, base * turf * 1.7, grass_tex_mix * detail_fade);
+	float turf_luma = max(dot(turf, vec3(0.2126, 0.7152, 0.0722)), 0.08);
+	vec3 turf_tint = turf / turf_luma;
+	base = mix(base, base * mix(vec3(1.0), turf_tint, 0.42), grass_tex_mix * detail_fade);
 	// Atmospheric settle toward the outfield keeps the focal lane brightest.
 	base = mix(base, color_far, smoothstep(far_start, far_end, dist) * 0.45);
 	ALBEDO = base;

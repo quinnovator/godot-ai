@@ -1,5 +1,5 @@
 {
-  "blender_version": "4.5.11 LTS",
+  "blender_version": "5.1.2",
   "invocation_schema_version": 1,
   "paths": {
     "blend": "res://assets/models/ballplayer/source/ballplayer.blend",
@@ -8,8 +8,8 @@
     "script": "res://assets/blender/build_ballplayer.py"
   },
   "sha256": {
-    "blend": "dd65c9e65fe21548fec6283ef04ff84f03dac83eaebd46afaa9cbd54cc08e09e",
-    "output": "d7db59c74d3d4f77913f621040e97ddbcb7fd1606aedb6beb51d71e59c6661b2",
-    "script": "bada90b5ee9447ede181b5d1ea1dd199a24e253d70e4645a1c17700642be15cd"
+    "blend": "0001951c27b73f7beb09f17859165f067487800858f79deb19f07f03b910a8b6",
+    "output": "51afd7340bb0bdb7890c2aeef6904b7481b87c7e40de1cbbda37bf36ebc6763b",
+    "script": "41c4fba457a68143d9f958fb2443476dce5ec6662669fa9275dcab457265f3ca"
   }
 }

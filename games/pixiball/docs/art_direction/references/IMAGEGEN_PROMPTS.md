@@ -1,6 +1,6 @@
 # Image-generation prompts
 
-These three direction-only references were generated with Codex's built-in
+These four direction-only references were generated with Codex's built-in
 image-generation tool. They are not runtime textures or sprite atlases.
 
 ## Gameplay target
@@ -65,4 +65,25 @@ mild atmospheric haze. Keep the navy, sea-teal, verdigris, brick/coral, gold,
 cream, and restrained-green palette. Avoid real brands, readable signage,
 photorealism, smooth vector styling, voxel styling, blurry upscale, excessive
 noise, and watermarks.
+```
+
+## Pitcher delivery sheet v2
+
+Built-in image-generation mode: `stylized-concept`.
+
+Input references: the approved Pixiball character/style sheet and two
+diagnostic captures of the pre-v9 in-engine pitcher.
+
+```text
+Use case: stylized-concept
+Asset type: production animation pose sheet for a rigged game character
+Input images: Image 1 is the approved Pixiball character/style reference; Images 2 and 3 show the current in-engine pitcher and are diagnostic references only.
+Primary request: Create a clean, highly readable eight-pose sequential reference sheet for a RIGHT-HANDED baseball pitch delivery, redesigning the current pitcher toward the athletic friendly character in Image 1. Show exactly these sequential full-body poses, left to right: SET, LEG LIFT, HAND BREAK, STRIDE, FOOT PLANT / LATE COCK, BALL RELEASE, FOLLOW-THROUGH, BALANCED FINISH. Make the biomechanics natural and continuous: stable head and gaze toward home plate, pelvis leads before shoulders, closed front hip during lift, long controlled stride, throwing elbow at or slightly below shoulder line, forearm vertical at late cock, chest over planted front knee at release, throwing arm decelerates across the opposite thigh, back leg comes through, finish controlled and recoverable. Keep the glove arm compact and purposeful. Hands must never intersect the face, cap, torso, or each other.
+Subject: one consistent original adult athlete, teal jersey with coral sleeves and cream/gold piping, cream baseball pants, teal socks, dark cleats, teal/coral cap, brown glove on LEFT hand, baseball in RIGHT hand; athletic stylized proportions, not toy-like.
+Style/medium: premium high-density meta-pixel art comparable to the approved reference, crisp deliberate 2–4 pixel clusters, painterly pixel lighting, strong graphic planes, no smooth vector look.
+Composition/framing: landscape production sheet, all eight figures same scale and camera, three-quarter view that makes both arm path and lower-body mechanics unmistakable; neutral charcoal studio background; generous spacing; feet aligned on one ground line.
+Face: calm focused athletic expression throughout, small readable eyes, coherent brow/nose/jaw planes, closed neutral mouth; no grinning, no exposed teeth, no bulging eyes, no expression morphing across poses.
+Uniform: large centered two-digit back jersey number "17" in cream with dark outline whenever the back is visible, correctly oriented and never mirrored; number height approximately one third of the jersey back.
+Constraints: consistent identity, limb lengths, uniform, handedness, glove hand, and camera across all eight poses; clear silhouettes; anatomically plausible joints; no missing or extra fingers/limbs; no motion smear; no logos other than a simple original cap letter; no watermark.
+Avoid: creepy face, doll face, giant eyes, toy proportions, disconnected capsule limbs, twisted spine, elbow hyperextension, hands through head, mirrored jersey number, sparse detail, photorealism, voxel art, blurry upscale.
 ```

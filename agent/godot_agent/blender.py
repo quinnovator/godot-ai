@@ -376,16 +376,26 @@ def _validate_glb(path: Path) -> None:
 def _validate_blend(path: Path) -> None:
     try:
         with path.open("rb") as handle:
-            header = handle.read(12)
+            header = handle.read(17)
     except OSError as exc:
         raise BlenderBuildError("saved .blend is missing or unreadable: {0}".format(path)) from exc
-    if (
-        len(header) != 12
-        or not header.startswith(b"BLENDER")
-        or header[7:8] not in (b"_", b"-")
-        or header[8:9] not in (b"v", b"V")
-        or not header[9:12].isdigit()
-    ):
+
+    legacy_header = (
+        len(header) >= 12
+        and header.startswith(b"BLENDER")
+        and header[7:8] in (b"_", b"-")
+        and header[8:9] in (b"v", b"V")
+        and header[9:12].isdigit()
+    )
+    extended_header = (
+        len(header) >= 17
+        and header.startswith(b"BLENDER17")
+        and header[9:10] == b"-"
+        and header[10:12] == b"01"
+        and header[12:13] == b"v"
+        and header[13:17].isdigit()
+    )
+    if not (legacy_header or extended_header):
         raise BlenderBuildError("saved .blend has an invalid Blender header")
 
 

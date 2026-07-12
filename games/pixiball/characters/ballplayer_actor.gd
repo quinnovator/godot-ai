@@ -16,6 +16,8 @@ signal action_finished(action_name: String)
 const MODEL_SCENE_PATH := "res://assets/models/ballplayer/ballplayer.glb"
 const FALLBACK_SCRIPT = preload("res://characters/voxel_ballplayer.gd")
 const EQUIPMENT_SCENE = preload("res://characters/equipment/ballplayer_equipment.tscn")
+const CHARACTER_RENDER_LAYER := 1 << 1
+const BROADCAST_HEAD_SCALE := 1.08
 
 const ACTION_CLIPS := {
 	"idle": "idle",
@@ -39,8 +41,13 @@ const FALLBACK_ACTION_CLIPS := {
 }
 
 const ACTION_DURATIONS := {
-	"pitch": 1.20,
-	"swing": 0.82,
+	# Preserve the authored gather, stride, release, and balanced recovery. The
+	# old 1.20 s override compressed the release pop and made the head/arm path
+	# difficult to read from the mound camera.
+	"pitch": 1.42,
+	# A major-league swing reaches contact in roughly 0.23 seconds. The source
+	# marker is 18/28 through the clip, so 0.36 seconds total aligns that beat.
+	"swing": 0.36,
 	"catch": 0.68,
 	"field_throw": 0.86,
 	"throw": 0.86,
@@ -49,7 +56,9 @@ const ACTION_DURATIONS := {
 }
 
 const ACTION_MARKERS := {
-	"pitch": {"ball_release": 24.0 / 37.0},
+	# Blender actions begin on frame 1; normalized playback therefore uses
+	# (marker - 1) / (end - 1), not marker / end.
+	"pitch": {"ball_release": 27.0 / 44.0},
 	"swing": {"bat_contact": 19.0 / 29.0},
 	"catch": {"glove_contact": 14.0 / 25.0},
 	"field_throw": {"ball_release": 18.0 / 31.0},
@@ -93,6 +102,165 @@ const HAIR_TONES := [
 	Color("7d2e20"),
 ]
 
+## Physically based surface shader with per-family procedural micro-detail.
+## Burley diffuse and GGX specular carry the realistic light response; the
+## detail pass layers pore-scale skin variation, a triplanar cloth weave,
+## leather grain, hair strand anisotropy hints, and wood grain so close-up
+## surfaces read as material rather than smooth vinyl.  Skin additionally
+## gets a faint warm fresnel term approximating subsurface scattering.
+const SURFACE_SHADER_CODE := """
+shader_type spatial;
+render_mode diffuse_burley, specular_schlick_ggx, cull_disabled;
+
+uniform vec4 base_color : source_color = vec4(1.0);
+uniform float roughness_value : hint_range(0.0, 1.0) = 0.72;
+uniform float metallic_value : hint_range(0.0, 1.0) = 0.0;
+uniform float specular_value : hint_range(0.0, 1.0) = 0.32;
+uniform float detail_scale : hint_range(1.0, 64.0) = 10.0;
+uniform float detail_strength : hint_range(0.0, 0.12) = 0.025;
+uniform int surface_profile = 0;
+uniform float highlight_strength : hint_range(0.0, 1.0) = 0.0;
+// Real scanned micro-surface (CC0 photogrammetry maps) sampled triplanar in
+// object space, so the untextured procedural meshes still get true knit,
+// leather grain, and wood figure instead of synthetic noise alone.
+uniform bool detail_maps_enabled = false;
+uniform sampler2D detail_normal_map : hint_normal, filter_linear_mipmap, repeat_enable;
+uniform sampler2D detail_rough_map : hint_default_white, filter_linear_mipmap, repeat_enable;
+uniform float detail_map_scale = 8.0;
+uniform float detail_map_normal_strength = 0.4;
+uniform float detail_map_rough_strength = 0.25;
+
+varying vec3 model_position;
+varying vec3 model_normal;
+
+void vertex() {
+	model_position = VERTEX;
+	model_normal = NORMAL;
+}
+
+float hash31(vec3 p) {
+	return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+}
+
+float noise3(vec3 p) {
+	vec3 cell = floor(p);
+	vec3 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	float n000 = hash31(cell);
+	float n100 = hash31(cell + vec3(1.0, 0.0, 0.0));
+	float n010 = hash31(cell + vec3(0.0, 1.0, 0.0));
+	float n110 = hash31(cell + vec3(1.0, 1.0, 0.0));
+	float n001 = hash31(cell + vec3(0.0, 0.0, 1.0));
+	float n101 = hash31(cell + vec3(1.0, 0.0, 1.0));
+	float n011 = hash31(cell + vec3(0.0, 1.0, 1.0));
+	float n111 = hash31(cell + vec3(1.0, 1.0, 1.0));
+	float lower = mix(mix(n000, n100, f.x), mix(n010, n110, f.x), f.y);
+	float upper = mix(mix(n001, n101, f.x), mix(n011, n111, f.x), f.y);
+	return mix(lower, upper, f.z);
+}
+
+float weave2(vec2 p) {
+	float warp = sin(p.x * 6.2831853 * 2.0);
+	float weft = sin(p.y * 6.2831853 * 2.0);
+	return warp * weft;
+}
+
+float triplanar_weave(vec3 p, vec3 normal_value) {
+	vec3 weights = pow(abs(normal_value), vec3(5.0));
+	weights /= max(weights.x + weights.y + weights.z, 0.0001);
+	return weave2(p.yz) * weights.x + weave2(p.xz) * weights.y + weave2(p.xy) * weights.z;
+}
+
+void fragment() {
+	vec3 p = model_position * detail_scale;
+	vec3 n = normalize(model_normal);
+	float broad = noise3(p * 0.38) - 0.5;
+	float micro = noise3(p * 2.7 + vec3(7.1, 3.7, 11.9)) - 0.5;
+	float tonal = broad * detail_strength;
+	float rough_delta = micro * detail_strength * 1.7;
+	vec3 sss = vec3(0.0);
+
+	if (surface_profile == 1) {
+		// Skin: low-frequency tonal mottling, restrained pore roughness, and
+		// a faint warm fresnel standing in for subsurface scattering.
+		tonal = broad * detail_strength + micro * detail_strength * 0.22;
+		rough_delta = micro * detail_strength * 1.25;
+		float rim = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0);
+		sss = base_color.rgb * vec3(1.0, 0.42, 0.30) * rim * 0.045;
+	} else if (surface_profile == 2) {
+		// Cloth: object-space triplanar double-knit weave.
+		float weave = triplanar_weave(p, n);
+		tonal = weave * detail_strength * 0.42 + broad * detail_strength * 0.30;
+		rough_delta = abs(weave) * detail_strength * 1.8 + micro * detail_strength * 0.35;
+	} else if (surface_profile == 3) {
+		// Leather: broad mottling with finer, uneven grain.
+		float grain = noise3(p * 5.2 + vec3(2.0, 19.0, 5.0)) - 0.5;
+		tonal = broad * detail_strength * 0.75 + grain * detail_strength * 0.35;
+		rough_delta = grain * detail_strength * 1.65;
+	} else if (surface_profile == 4) {
+		// Hair: directional strand banding with a glossy break.
+		float strand = sin((model_position.y + model_position.z * 0.34) * detail_scale * 5.0);
+		tonal = strand * detail_strength * 0.30 + broad * detail_strength * 0.40;
+		rough_delta = strand * detail_strength * 1.4 + micro * detail_strength * 0.5;
+	} else if (surface_profile == 5) {
+		// Lacquered maple: long grain lines under a clear coat.
+		float grain = sin((model_position.y + broad * 0.08) * detail_scale * 7.0);
+		tonal = grain * detail_strength * 0.35 + broad * detail_strength * 0.50;
+		rough_delta = micro * detail_strength * 0.75;
+	}
+
+	if (detail_maps_enabled) {
+		vec3 uvp = model_position * detail_map_scale;
+		vec3 blend_w = pow(abs(n), vec3(4.0));
+		blend_w /= max(blend_w.x + blend_w.y + blend_w.z, 0.0001);
+		vec3 tx = texture(detail_normal_map, uvp.zy).xyz * 2.0 - 1.0;
+		vec3 ty = texture(detail_normal_map, uvp.xz).xyz * 2.0 - 1.0;
+		vec3 tz = texture(detail_normal_map, uvp.xy).xyz * 2.0 - 1.0;
+		vec3 offset =
+			vec3(0.0, tx.y, tx.x) * blend_w.x +
+			vec3(ty.x, 0.0, ty.y) * blend_w.y +
+			vec3(tz.x, tz.y, 0.0) * blend_w.z;
+		vec3 detailed = normalize(n + offset * detail_map_normal_strength);
+		NORMAL = normalize((VIEW_MATRIX * MODEL_MATRIX * vec4(detailed, 0.0)).xyz);
+		float rough_sample =
+			texture(detail_rough_map, uvp.zy).r * blend_w.x +
+			texture(detail_rough_map, uvp.xz).r * blend_w.y +
+			texture(detail_rough_map, uvp.xy).r * blend_w.z;
+		rough_delta += (rough_sample - 0.5) * detail_map_rough_strength;
+	}
+
+	ALBEDO = clamp(base_color.rgb * (1.0 + tonal), vec3(0.0), vec3(1.0));
+	ROUGHNESS = clamp(roughness_value + rough_delta, 0.05, 0.98);
+	METALLIC = metallic_value;
+	SPECULAR = specular_value;
+	EMISSION = base_color.rgb * highlight_strength * 0.30 + sss;
+}
+"""
+
+const DETAIL_MAPS := {
+	"cloth": {
+		"normal": preload("res://assets/textures/surface/cotton_jersey_nor_gl_1k.jpg"),
+		"rough": preload("res://assets/textures/surface/cotton_jersey_rough_1k.jpg"),
+		"scale": 9.0,
+		"normal_strength": 0.5,
+		"rough_strength": 0.22,
+	},
+	"leather": {
+		"normal": preload("res://assets/textures/surface/brown_leather_nor_gl_1k.jpg"),
+		"rough": preload("res://assets/textures/surface/brown_leather_rough_1k.jpg"),
+		"scale": 6.0,
+		"normal_strength": 0.55,
+		"rough_strength": 0.30,
+	},
+	"wood": {
+		"normal": preload("res://assets/textures/surface/fine_grained_wood_nor_gl_1k.jpg"),
+		"rough": preload("res://assets/textures/surface/fine_grained_wood_rough_1k.jpg"),
+		"scale": 4.0,
+		"normal_strength": 0.30,
+		"rough_strength": 0.28,
+	},
+}
+
 @export_file("*.glb") var model_scene_path := MODEL_SCENE_PATH
 @export var allow_voxel_fallback := true
 
@@ -105,6 +273,7 @@ var _skeleton: Skeleton3D
 var _animation_player: AnimationPlayer
 var _meshes: Array[MeshInstance3D] = []
 var _material_overrides: Array[Dictionary] = []
+var _surface_shader: Shader
 var _sockets: Dictionary = {}
 var _equipment: BallplayerEquipment
 var _equipment_pending := false
@@ -150,6 +319,7 @@ func configure(spec: Dictionary) -> void:
 	_ensure_visual()
 	if _using_fallback:
 		_fallback.call("configure", _spec)
+		_assign_character_render_layer(_fallback)
 		_configured = true
 		return
 
@@ -163,6 +333,7 @@ func configure(spec: Dictionary) -> void:
 		_equipment_pending = true
 	set_team_mark(_team_mark)
 	set_highlighted(_highlighted)
+	_assign_character_render_layer(self)
 	_current_action = "idle"
 	_emitted_markers.clear()
 	_play_imported_clip("idle", false)
@@ -184,6 +355,28 @@ func play_action(name: String) -> void:
 	_current_action = requested
 	_emitted_markers.clear()
 	_play_imported_clip(requested, true)
+
+
+## Holds an authored clip at one reviewed pose for broadcast staging. Gameplay
+## actions still restart normally through play_action(); no simulation state or
+## action marker is advanced while a pose is held.
+func hold_action_pose(name: String, normalized_time := 0.0) -> void:
+	var requested := name.to_lower().strip_edges()
+	if _using_fallback:
+		_fallback.call("play_action", String(FALLBACK_ACTION_CLIPS.get(requested, requested)))
+		return
+	if not ACTION_CLIPS.has(requested) or not is_instance_valid(_animation_player):
+		return
+	_apply_action_handedness(requested)
+	var clip_name := String(ACTION_CLIPS[requested])
+	if not _animation_player.has_animation(clip_name):
+		return
+	_animation_player.play(clip_name, 0.0, 1.0)
+	var animation := _animation_player.get_animation(clip_name)
+	_animation_player.seek(animation.length * clampf(normalized_time, 0.0, 1.0), true)
+	_animation_player.pause()
+	_current_action = "idle"
+	_emitted_markers.clear()
 
 
 ## Supplies world-space motion for locomotion cadence and idle/run selection.
@@ -268,12 +461,14 @@ func set_highlighted(enabled: bool) -> void:
 		_fallback.call("set_highlighted", enabled)
 		return
 	for entry in _material_overrides:
-		var value := entry.get("material") as BaseMaterial3D
-		if value == null:
-			continue
-		value.emission_enabled = enabled
-		value.emission = value.albedo_color
-		value.emission_energy_multiplier = 0.34 if enabled else 0.0
+		var value := entry.get("material") as Material
+		if value is ShaderMaterial:
+			(value as ShaderMaterial).set_shader_parameter("highlight_strength", 0.34 if enabled else 0.0)
+		elif value is BaseMaterial3D:
+			var pbr := value as BaseMaterial3D
+			pbr.emission_enabled = enabled
+			pbr.emission = pbr.albedo_color
+			pbr.emission_energy_multiplier = 0.34 if enabled else 0.0
 	if is_instance_valid(_equipment):
 		_equipment.set_highlighted(enabled)
 
@@ -349,7 +544,7 @@ func get_current_action() -> String:
 func get_generation_signature() -> String:
 	if _using_fallback:
 		return String(_fallback.call("get_generation_signature"))
-	return "rigged-v3:%s:%s:%s:%s:%s" % [
+	return "rigged-v4:%s:%s:%s:%s:%s" % [
 		int(_spec.get("seed", 1)),
 		_role,
 		_throwing_hand,
@@ -413,6 +608,9 @@ func _collect_imported_nodes(node: Node) -> void:
 
 func _install_material_overrides() -> void:
 	_material_overrides.clear()
+	if _surface_shader == null:
+		_surface_shader = Shader.new()
+		_surface_shader.code = SURFACE_SHADER_CODE
 	for mesh_instance in _meshes:
 		if mesh_instance.mesh == null:
 			continue
@@ -420,7 +618,36 @@ func _install_material_overrides() -> void:
 			var source := mesh_instance.mesh.surface_get_material(surface)
 			if source == null:
 				continue
-			var local := source.duplicate(true) as Material
+			var local: Material
+			if source is BaseMaterial3D and (source as BaseMaterial3D).albedo_texture != null:
+				# Authored pixel-art decals (face, cap mark) keep their
+				# imported nearest-filtered texture material; the cel shader
+				# path would discard the texel art.
+				local = source.duplicate(true) as Material
+			elif source is BaseMaterial3D:
+				var source_pbr := source as BaseMaterial3D
+				var procedural := ShaderMaterial.new()
+				procedural.shader = _surface_shader
+				procedural.set_shader_parameter("base_color", source_pbr.albedo_color)
+				procedural.set_shader_parameter("roughness_value", source_pbr.roughness)
+				procedural.set_shader_parameter("metallic_value", source_pbr.metallic)
+				var profile := _surface_profile(source.resource_name)
+				procedural.set_shader_parameter("specular_value", float(profile.specular))
+				procedural.set_shader_parameter("surface_profile", int(profile.profile))
+				procedural.set_shader_parameter("detail_scale", float(profile.scale))
+				procedural.set_shader_parameter("detail_strength", float(profile.strength))
+				var family := String(profile.get("maps", ""))
+				if DETAIL_MAPS.has(family):
+					var maps: Dictionary = DETAIL_MAPS[family]
+					procedural.set_shader_parameter("detail_maps_enabled", true)
+					procedural.set_shader_parameter("detail_normal_map", maps.normal)
+					procedural.set_shader_parameter("detail_rough_map", maps.rough)
+					procedural.set_shader_parameter("detail_map_scale", float(maps.scale))
+					procedural.set_shader_parameter("detail_map_normal_strength", float(maps.normal_strength))
+					procedural.set_shader_parameter("detail_map_rough_strength", float(maps.rough_strength))
+				local = procedural
+			else:
+				local = source.duplicate(true) as Material
 			local.resource_name = source.resource_name
 			local.resource_local_to_scene = true
 			mesh_instance.set_surface_override_material(surface, local)
@@ -428,6 +655,20 @@ func _install_material_overrides() -> void:
 				"name": source.resource_name,
 				"material": local,
 			})
+
+
+func _surface_profile(material_name: String) -> Dictionary:
+	if material_name in ["MAT_Skin", "MAT_SkinLight", "MAT_Lip"]:
+		return {"profile": 1, "scale": 7.0, "strength": 0.020, "specular": 0.22}
+	if material_name.begins_with("TEAM_") or material_name in ["MAT_Pants", "MAT_PantsShadow"]:
+		return {"profile": 2, "scale": 13.0, "strength": 0.022, "specular": 0.18, "maps": "cloth"}
+	if material_name.begins_with("MAT_Leather") or material_name in ["MAT_Belt", "MAT_Cleat"]:
+		return {"profile": 3, "scale": 8.0, "strength": 0.042, "specular": 0.30, "maps": "leather"}
+	if material_name.begins_with("MAT_Hair"):
+		return {"profile": 4, "scale": 11.0, "strength": 0.030, "specular": 0.20}
+	if material_name == "MAT_Bat":
+		return {"profile": 5, "scale": 7.0, "strength": 0.032, "specular": 0.36, "maps": "wood"}
+	return {"profile": 0, "scale": 9.0, "strength": 0.018, "specular": 0.26}
 
 
 func _install_sockets() -> void:
@@ -469,12 +710,20 @@ func _install_fallback(reason: String) -> void:
 
 func _apply_dimensions_and_handedness() -> void:
 	var seed := int(_spec.get("seed", 1))
-	var sampled_height := 1.70 + float(posmod(seed * 48271, 1000)) / 1000.0 * 0.21
+	# Keep roster variety without letting the telephoto mound view turn shorter
+	# power builds into toy-like, shoulder-dominant figures. The authored mesh
+	# retains its musculature; these presentation scales only tune the range of
+	# silhouettes seen during play.
+	var sampled_height := 1.76 + float(posmod(seed * 48271, 1000)) / 1000.0 * 0.18
 	var height := clampf(float(_spec.get("height", sampled_height)), 1.55, 2.05)
 	var build := String(_spec.get("build", "balanced")).to_lower()
-	var width_scale: float = {"speed": 0.93, "balanced": 1.0, "power": 1.09}.get(build, 1.0)
+	var width_scale: float = {"speed": 0.91, "balanced": 0.96, "power": 1.02}.get(build, 0.96)
 	var mirror := -1.0 if _hand_for_action("idle") == "left" else 1.0
-	_model_root.scale = Vector3(width_scale * mirror, height / 1.98, width_scale)
+	# 1.89 m is the authored nominal height of the realistic v11 asset.
+	_model_root.scale = Vector3(width_scale * mirror, height / 1.89, width_scale)
+	var head_index := _skeleton.find_bone("head") if is_instance_valid(_skeleton) else -1
+	if head_index >= 0:
+		_skeleton.set_bone_pose_scale(head_index, Vector3.ONE * BROADCAST_HEAD_SCALE)
 
 
 func _apply_equipment_visibility() -> void:
@@ -497,7 +746,16 @@ func _configure_modular_equipment() -> void:
 		_equipment.name = "Equipment"
 		add_child(_equipment)
 	_equipment.configure(self, _spec, _primary_color, _secondary_color, _accent_color)
+	_equipment.sync_identity_orientation()
+	_assign_character_render_layer(_equipment)
 	_equipment_pending = false
+
+
+func _assign_character_render_layer(node: Node) -> void:
+	if node is VisualInstance3D:
+		(node as VisualInstance3D).layers = CHARACTER_RENDER_LAYER
+	for child in node.get_children():
+		_assign_character_render_layer(child)
 
 
 func _apply_character_palette() -> void:
@@ -517,9 +775,11 @@ func _apply_material_color(material_name: String, color: Color) -> void:
 	for entry in _material_overrides:
 		if String(entry.get("name", "")) != material_name:
 			continue
-		var value := entry.get("material") as BaseMaterial3D
-		if value != null:
-			value.albedo_color = color
+		var value := entry.get("material") as Material
+		if value is ShaderMaterial:
+			(value as ShaderMaterial).set_shader_parameter("base_color", color)
+		elif value is BaseMaterial3D:
+			(value as BaseMaterial3D).albedo_color = color
 
 
 func _play_imported_clip(action: String, emit_started: bool) -> void:
@@ -536,7 +796,10 @@ func _play_imported_clip(action: String, emit_started: bool) -> void:
 		speed = animation.length / float(ACTION_DURATIONS[action])
 	elif action == "run":
 		speed = clampf(Vector2(_motion_velocity.x, _motion_velocity.z).length() / 3.2, 0.72, 1.65)
-	_animation_player.play(clip_name, 0.10, speed)
+	var blend_time := 0.10
+	if action == "pitch" or String(_animation_player.current_animation) == "pitch":
+		blend_time = 0.18
+	_animation_player.play(clip_name, blend_time, speed)
 	if emit_started:
 		action_started.emit(action)
 
@@ -546,6 +809,8 @@ func _apply_action_handedness(action: String) -> void:
 		return
 	var magnitude := absf(_model_root.scale.x)
 	_model_root.scale.x = -magnitude if _hand_for_action(action) == "left" else magnitude
+	if is_instance_valid(_equipment):
+		_equipment.sync_identity_orientation()
 
 
 func _hand_for_action(action: String) -> String:

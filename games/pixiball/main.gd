@@ -11,14 +11,21 @@ const SimScript = preload("res://gameplay/pixiball_sim.gd")
 const BallplayerScene = preload("res://characters/ballplayer_actor.tscn")
 const CatalogScript = preload("res://core/content/content_catalog.gd")
 const PitchModelScript = preload("res://core/model/pitch_model.gd")
+const ParkGeometry = preload("res://core/fielding/park_geometry.gd")
 const ShellModelScript = preload("res://ui/pixiball_shell_model.gd")
 const SaveRepositoryScript = preload("res://ui/pixiball_save_repository.gd")
 const ENDLESS_SIM_PATH := "res://gameplay/pixiball_endless_sim.gd"
 
 const DRIVER_GROUP := &"godot_ai_gameplay_driver"
-const PRESENTATION_PITCH_SECONDS := 0.92
-const WINDUP_RELEASE_SECONDS := 0.72
-const SWING_CONTACT_SECONDS := 0.82 * 0.64
+const DEFAULT_PITCH_FLIGHT_SECONDS := 0.46
+const WINDUP_RELEASE_FALLBACK_SECONDS := 0.90
+const SWING_CONTACT_LEAD_SECONDS := 0.23
+const PLATE_WORLD_PER_FOOT := ParkGeometry.VERTICAL_WORLD_PER_FOOT
+const PITCH_PLANE_Z_OFFSET := -0.55
+const PITCH_ARC_LIFT_FT := 2.2
+const AIM_LATERAL_FT := 1.35
+const AIM_VERTICAL_FT := 1.55
+const AIM_CENTER_HEIGHT_FT := 2.5
 
 var sim: PixiballSim
 var stadium: VoxelStadium
@@ -46,6 +53,8 @@ var aim := Vector2.ZERO
 var active_pitch: Dictionary = {}
 var pending_plate_result: Dictionary = {}
 var pitch_elapsed := 0.0
+var pitch_release_world := Vector3.ZERO
+var pitch_release_captured := false
 var swing_started := false
 var swing_started_at := -1.0
 var cpu_swing_animated := false
@@ -98,14 +107,28 @@ func _ready() -> void:
 func _start_command_line_autoplay() -> void:
 	var innings := 1
 	var batting_demo := false
+	var endless_demo := false
+	var autoplay_delay := 0.0
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--innings="):
 			innings = clampi(int(argument.trim_prefix("--innings=")), 1, 9)
+		elif argument.begins_with("--autoplay-delay="):
+			autoplay_delay = clampf(float(argument.trim_prefix("--autoplay-delay=")), 0.0, 60.0)
 		elif argument == "--scenario=batting":
 			batting_demo = true
+		elif argument == "--scenario=endless":
+			endless_demo = true
+	if endless_demo:
+		_start_endless(4242, 0)
+		if autoplay_delay > 0.0:
+			await get_tree().create_timer(autoplay_delay).timeout
+		_autoplay = true
+		return
 	_start_match(4242, innings, 0.72)
 	if batting_demo:
 		_advance_to_bottom_for_capture()
+	if autoplay_delay > 0.0:
+		await get_tree().create_timer(autoplay_delay).timeout
 	_autoplay = true
 
 
@@ -192,6 +215,8 @@ func _build_cast() -> void:
 		player.configure(_make_player_spec(C.HOME_TEAM, defenders.size(), key))
 		cast_root.add_child(player)
 		defenders[key] = player
+		if key == "pitcher":
+			player.action_marker.connect(_on_pitcher_action_marker)
 
 	batter = BallplayerScene.instantiate() as BallplayerActor
 	batter.name = "Batter"
@@ -263,10 +288,29 @@ func _configure_half(force := false) -> void:
 	for runner in runners:
 		_apply_team_uniform(runner, offense_team)
 	_reset_cast_positions()
-	if state.half == "top":
-		broadcast_camera.set_mode("pitching")
-	else:
-		broadcast_camera.set_mode("batting")
+	_set_gameplay_view(state.half == "bottom")
+
+
+func _set_gameplay_view(user_batting: bool) -> void:
+	# The plate camera sits in the catcher/umpire corridor. Those two actors are
+	# hidden only for zone hitting; the batter, pitcher, and pitch remain live.
+	broadcast_camera.set_mode("batting" if user_batting else "pitching")
+	if defenders.has("catcher"):
+		(defenders["catcher"] as BallplayerActor).visible = not user_batting
+	if umpire != null:
+		umpire.visible = not user_batting
+	if hud != null:
+		hud.set_batting_layout(user_batting)
+	_sync_strike_zone_projection()
+
+
+func _sync_strike_zone_projection() -> void:
+	if hud == null or broadcast_camera == null:
+		return
+	var projected := broadcast_camera.projected_strike_zone()
+	if projected.size.x > 1.0 and projected.size.y > 1.0:
+		hud.set_strike_zone_rect(projected)
+		hud.set_strike_zone_lateral_sign(broadcast_camera.plate_lateral_screen_sign())
 
 
 func _apply_team_uniform(player: BallplayerActor, team: Dictionary) -> void:
@@ -398,14 +442,20 @@ func _reset_cast_positions() -> void:
 			facing = C.PITCHER_MOUND - C.HOME_PLATE
 		player.set_facing(facing)
 		player.set_motion(Vector3.ZERO)
-		player.play_action("idle")
-	batter.global_position = C.HOME_PLATE + Vector3(-1.35, 0.0, -0.25)
+		if key == "pitcher":
+			player.hold_action_pose("pitch", 0.0)
+		else:
+			player.play_action("field_ready")
+	var batter_x := 1.35 if String(_current_batter_identity.get("bats", "right")) == "left" else -1.35
+	batter.global_position = C.HOME_PLATE + Vector3(batter_x, 0.0, -0.25)
 	batter.visible = true
 	batter.set_facing(C.PITCHER_MOUND - C.HOME_PLATE)
 	batter.set_motion(Vector3.ZERO)
-	batter.play_action("idle")
+	batter.hold_action_pose("swing", 0.25)
 	umpire.global_position = C.HOME_PLATE + Vector3(0.0, 0.0, 3.1)
 	umpire.set_facing(C.PITCHER_MOUND - C.HOME_PLATE)
+	umpire.set_motion(Vector3.ZERO)
+	umpire.play_action("field_ready")
 	_sync_runner_visuals()
 
 
@@ -416,6 +466,10 @@ func _show_landing() -> void:
 		shell.show_landing()
 	hud.show_landing(save_repository.snapshot() if save_repository != null else {}, shell.landing_focus if shell != null else 0)
 	broadcast_camera.set_mode("intro")
+	if defenders.has("catcher"):
+		(defenders["catcher"] as BallplayerActor).visible = true
+	if umpire != null:
+		umpire.visible = true
 	ball.set_active(false)
 	live_play.reset()
 	if pitch_intel_panel != null:
@@ -564,6 +618,7 @@ func _set_ready() -> void:
 	var defense_team: Dictionary = home_team if state.half == "top" else away_team
 	_configure_live_matchup_visuals(state, defense_team, offense_team)
 	_reset_cast_positions()
+	_set_gameplay_view(sim.is_user_batting())
 	var batter_index := int(state.batter_index[state.batting_side])
 	var player_name := String(_current_batter_identity.get("name", C.PLAYER_NAMES[batter_index % C.PLAYER_NAMES.size()]))
 	var player_number := int(_current_batter_identity.get("number", 2 + posmod(batter_index * 17, 88)))
@@ -598,6 +653,7 @@ func _physics_process(delta: float) -> void:
 			if flow_time >= 1.55:
 				_advance_result()
 	if not headless_fast_forward:
+		_sync_strike_zone_projection()
 		_refresh_hud()
 		_publish_new_events()
 
@@ -689,7 +745,11 @@ func _update_ready(delta: float) -> void:
 func _update_windup(delta: float) -> void:
 	if sim.is_user_batting():
 		_update_aim(delta)
-	if flow_time >= WINDUP_RELEASE_SECONDS:
+	# The imported animation marker owns normal release timing. This fallback is
+	# only for a missing/corrupt clip so gameplay can never deadlock in windup.
+	if flow_time >= WINDUP_RELEASE_FALLBACK_SECONDS:
+		pitch_release_world = defenders["pitcher"].get_socket_position("ball_release")
+		pitch_release_captured = true
 		_launch_pitch()
 
 
@@ -697,7 +757,8 @@ func _update_pitch_flight(delta: float) -> void:
 	pitch_elapsed += delta
 	if sim.is_user_batting():
 		_update_aim(delta)
-	var ideal_press := PRESENTATION_PITCH_SECONDS - SWING_CONTACT_SECONDS
+	var flight_seconds := _pitch_flight_seconds()
+	var ideal_press := maxf(0.0, flight_seconds - SWING_CONTACT_LEAD_SECONDS)
 	if not sim.is_user_batting() and not cpu_swing_animated and bool(pending_plate_result.get("swung", false)) and pitch_elapsed >= ideal_press:
 		cpu_swing_animated = true
 		batter.play_action("swing")
@@ -708,20 +769,46 @@ func _update_pitch_flight(delta: float) -> void:
 			var actual := _pitch_actual_to_aim(active_pitch)
 			aim = actual
 			_trigger_swing()
-	var u := clampf(pitch_elapsed / PRESENTATION_PITCH_SECONDS, 0.0, 1.0)
+	var u := clampf(pitch_elapsed / flight_seconds, 0.0, 1.0)
 	var actual_point := _array_vec2(active_pitch.get("actual", [0.0, 2.5]))
 	var break_point := _array_vec2(active_pitch.get("break_ft", [0.0, 0.0]))
-	var pitcher: BallplayerActor = defenders["pitcher"]
-	var start := pitcher.get_socket_position("ball_release")
-	var end := C.HOME_PLATE + Vector3(actual_point.x * 0.58, 0.18 + actual_point.y * 0.56, -0.55)
+	var start := pitch_release_world
+	var end := _plate_pitch_world(actual_point)
 	var position := start.lerp(end, u)
-	position.x += break_point.x * sin(PI * u) * 0.42
-	position.y += break_point.y * sin(PI * u) * 0.26 + sin(PI * u) * 0.22
-	ball.set_ball_position(position)
+	var bulge := u * (1.0 - u)
+	position.x -= break_point.x * PLATE_WORLD_PER_FOOT * bulge
+	position.y += (-break_point.y + PITCH_ARC_LIFT_FT) * PLATE_WORLD_PER_FOOT * bulge
+	ball.set_ball_position(position, delta)
 	if not headless_fast_forward:
-		hud.set_pitch_marker(Vector2(actual_point.x / 1.6, -(actual_point.y - 2.5) / 1.7), u > 0.74)
+		hud.set_pitch_marker(_plate_feet_to_aim(actual_point), u > 0.74)
 	if u >= 1.0:
 		_finish_pitch()
+
+
+func _plate_pitch_world(plate_feet: Vector2) -> Vector3:
+	return C.HOME_PLATE + Vector3(
+		plate_feet.x * PLATE_WORLD_PER_FOOT,
+		plate_feet.y * PLATE_WORLD_PER_FOOT,
+		PITCH_PLANE_Z_OFFSET
+	)
+
+
+func _pitch_flight_seconds() -> float:
+	return clampf(float(active_pitch.get("flight_sec", DEFAULT_PITCH_FLIGHT_SECONDS)), 0.32, 0.68)
+
+
+func _aim_to_plate_feet(normalized_aim: Vector2) -> Vector2:
+	return Vector2(
+		normalized_aim.x * AIM_LATERAL_FT,
+		AIM_CENTER_HEIGHT_FT - normalized_aim.y * AIM_VERTICAL_FT
+	)
+
+
+func _plate_feet_to_aim(plate_feet: Vector2) -> Vector2:
+	return Vector2(
+		plate_feet.x / AIM_LATERAL_FT,
+		(AIM_CENTER_HEIGHT_FT - plate_feet.y) / AIM_VERTICAL_FT
+	)
 
 
 func _update_live_play(_delta: float) -> void:
@@ -773,7 +860,7 @@ func _begin_pitch() -> void:
 	if flow != "ready" or not sim.is_pitch_phase():
 		return
 	if sim.is_user_pitching():
-		var sim_aim := Vector2(aim.x * 1.35, 2.5 - aim.y * 1.55)
+		var sim_aim := _aim_to_plate_feet(aim)
 		active_pitch = sim.create_user_pitch(_selected_pitch_kind(), sim_aim)
 	else:
 		active_pitch = sim.create_cpu_pitch()
@@ -782,10 +869,20 @@ func _begin_pitch() -> void:
 		return
 	flow = "windup"
 	flow_time = 0.0
+	pitch_release_world = Vector3.ZERO
+	pitch_release_captured = false
 	defenders["pitcher"].play_action("pitch")
 	hud.set_pitch_selector(false)
 	hud.set_pitch_marker(Vector2.ZERO, false)
 	hud.set_help("TRACK THE RELEASE" if sim.is_user_pitching() else "READ THE PITCH  •  TIME YOUR SWING")
+
+
+func _on_pitcher_action_marker(action_name: String, marker_name: String) -> void:
+	if flow != "windup" or action_name != "pitch" or marker_name != "ball_release":
+		return
+	pitch_release_world = defenders["pitcher"].get_socket_position("ball_release")
+	pitch_release_captured = true
+	_launch_pitch()
 
 
 func _selected_pitch_kind() -> String:
@@ -798,6 +895,11 @@ func _selected_pitch_kind() -> String:
 
 
 func _launch_pitch() -> void:
+	if flow != "windup":
+		return
+	if not pitch_release_captured:
+		pitch_release_world = defenders["pitcher"].get_socket_position("ball_release")
+		pitch_release_captured = true
 	flow = "pitch_flight"
 	flow_time = 0.0
 	pitch_elapsed = 0.0
@@ -806,8 +908,14 @@ func _launch_pitch() -> void:
 	cpu_swing_animated = false
 	ball.set_active(true)
 	ball.use_pitch_ball()
-	ball.set_trail_slot(selected_pitch)
-	ball.set_ball_position(defenders["pitcher"].get_socket_position("ball_release"))
+	ball.set_trail_slot(int(active_pitch.get("slot", selected_pitch)))
+	var pitch_shape: Dictionary = active_pitch.get("shape", {})
+	ball.begin_pitch_motion(
+		float(pitch_shape.get("spinRate", pitch_shape.get("spin_rate", 2200.0))),
+		float(pitch_shape.get("spinAxis", pitch_shape.get("spin_axis", 180.0))),
+		sim.is_user_batting()
+	)
+	ball.set_ball_position(pitch_release_world)
 	audio_director.play_event("pitch", -5.0, clampf(float(active_pitch.get("velocity_mph", 90.0)) / 92.0, 0.86, 1.13))
 	_play_release_haptic()
 	if sim.is_user_pitching():
@@ -829,11 +937,11 @@ func _finish_pitch() -> void:
 	if sim.is_user_batting():
 		var timing_error := 99.0
 		if swing_started:
-			var ideal_press := PRESENTATION_PITCH_SECONDS - SWING_CONTACT_SECONDS
-			timing_error = (swing_started_at - ideal_press) * 0.34
+			var ideal_press := maxf(0.0, _pitch_flight_seconds() - SWING_CONTACT_LEAD_SECONDS)
+			timing_error = swing_started_at - ideal_press
 		pending_plate_result = sim.resolve_user_batter(active_pitch, {
 			"did_swing": swing_started,
-			"reticle": [aim.x * 1.35, 2.5 - aim.y * 1.55],
+			"reticle": _aim_to_plate_feet(aim),
 			"timing_error_sec": timing_error,
 		})
 	var outcome := String(pending_plate_result.get("outcome", "ball"))
@@ -917,12 +1025,18 @@ func _start_live_play(trajectory: Dictionary) -> void:
 	flow_time = 0.0
 	ball.set_active(true)
 	ball.use_play_ball()
-	var contact_position := C.HOME_PLATE + Vector3(0, 1.5, -0.55)
+	# Preserve the physical plate endpoint from pitch flight. Re-centering here
+	# caused a visible jump before the fielding-camera cut.
+	var contact_position := ball.global_position
 	ball.set_ball_position(contact_position)
 	audio_director.play_event("bat", -1.5, 0.92 + float(trajectory.get("contact_quality", 0.5)) * 0.15)
 	broadcast_camera.contact_juice(float(trajectory.get("exit_velocity_mph", 90.0)))
 	_burst(contact_position, Color("ffd166"), 10)
-	broadcast_camera.set_mode("field", ball)
+	if defenders.has("catcher"):
+		(defenders["catcher"] as BallplayerActor).visible = true
+	if umpire != null:
+		umpire.visible = true
+	broadcast_camera.set_mode("fielding", ball)
 	hud.set_strike_zone_visible(false)
 	var play_state := sim.snapshot()
 	var play_seed := int(play_state.get("seed", 1)) ^ (int(active_pitch.get("serial", play_state.get("pitch_serial", 0))) * 0x9e3779b1) ^ int(play_state.get("epoch", 0))
@@ -932,6 +1046,7 @@ func _start_live_play(trajectory: Dictionary) -> void:
 		"outs_before": play_state.get("outs", 0),
 		"seed": play_seed,
 		"user_runner_control": not sim.is_user_fielding(),
+		"visual_contact_world": contact_position,
 	})
 	_prepare_offense_running()
 	hud.banner("BALL IN PLAY", _contact_detail(trajectory), Color("ffd166"), 0.7)
@@ -941,6 +1056,8 @@ func _show_plate_result(outcome: String, state: Dictionary) -> void:
 	var title := outcome.replace("_", " ").to_upper()
 	var detail := ""
 	var accent := Color("d7e4ee")
+	if stadium != null:
+		stadium.react_to_play(outcome)
 	match outcome:
 		"called_strike", "swinging_strike":
 			accent = Color("ff6b5e")
@@ -979,6 +1096,8 @@ func _on_live_play_completed(result: Dictionary) -> void:
 	var runs := int(committed.get("last_result", {}).get("runs", 0))
 	var detail := "%d RUN%s SCORE" % [runs, "" if runs == 1 else "S"] if runs > 0 else ""
 	var accent := Color("44d7b6") if classification in ["single", "double", "triple", "home_run"] else Color("ff6b5e")
+	if stadium != null:
+		stadium.react_to_play(classification)
 	hud.banner(String(result.get("label", classification.replace("_", " "))), detail, accent, 1.3)
 	if classification == "home_run":
 		audio_director.play_event("score", -1.0)
@@ -1009,6 +1128,7 @@ func _queue_pitch_report(report: Dictionary) -> void:
 func _reveal_pending_pitch_report() -> void:
 	if _pending_pitch_report.is_empty() or flow_time < 0.30:
 		return
+	hud.set_strike_zone_visible(false)
 	if pitch_intel_panel != null:
 		pitch_intel_panel.present(_pending_pitch_report)
 	_pending_pitch_report.clear()
@@ -1065,6 +1185,11 @@ func _refresh_hud() -> void:
 		return
 	var state := sim.snapshot()
 	var base_state: Dictionary = state.bases
+	var active_pitchers: Dictionary = state.get("active_pitchers", {})
+	var pitcher_side := String(state.get("fielding_side", "home" if state.half == "top" else "away"))
+	var active_pitcher: Dictionary = active_pitchers.get(pitcher_side, {})
+	if active_pitcher.is_empty() and sim.replica_enabled():
+		active_pitcher = sim.user_pitcher()
 	hud.update_state({
 		"away_score": state.score.away,
 		"home_score": state.score.home,
@@ -1075,6 +1200,8 @@ func _refresh_hud() -> void:
 		"outs": state.outs,
 		"bases": [base_state.first, base_state.second, base_state.third],
 		"phase_label": _phase_label(),
+		"pitcher_name": active_pitcher.get("name", "STARTER"),
+		"pitcher_throws": active_pitcher.get("throws", "R"),
 	})
 	var condition := _hud_pitcher_condition(state)
 	if not condition.is_empty():
@@ -1214,7 +1341,7 @@ func _contact_detail(trajectory: Dictionary) -> String:
 
 func _pitch_actual_to_aim(pitch: Dictionary) -> Vector2:
 	var actual := _array_vec2(pitch.get("actual", [0.0, 2.5]))
-	return Vector2(clampf(actual.x / 1.35, -1, 1), clampf((2.5 - actual.y) / 1.55, -1, 1))
+	return _plate_feet_to_aim(actual).clamp(Vector2(-1, -1), Vector2(1, 1))
 
 
 func _array_vec2(value: Variant) -> Vector2:
@@ -1313,10 +1440,11 @@ func _godot_ai_state() -> Dictionary:
 		"selected_pitcher": selected_pitcher_index + 1,
 		"pitcher": sim.user_pitcher() if sim != null and sim.replica_enabled() else {},
 		"aim": [aim.x, aim.y],
-		"pitch_progress": clampf(pitch_elapsed / PRESENTATION_PITCH_SECONDS, 0.0, 1.0) if flow == "pitch_flight" else 0.0,
+		"pitch_progress": clampf(pitch_elapsed / _pitch_flight_seconds(), 0.0, 1.0) if flow == "pitch_flight" else 0.0,
 		"swing_started": swing_started,
 		"autoplay": _autoplay,
 		"mood": ["day", "golden", "night"][_mood_index],
+		"camera_mode": broadcast_camera.mode if broadcast_camera != null else "",
 		"cast": {
 			"pitcher": {
 				"throws": (defenders.get("pitcher") as BallplayerActor).get_throwing_hand() if defenders.has("pitcher") else "",
