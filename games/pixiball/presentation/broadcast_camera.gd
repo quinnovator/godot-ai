@@ -4,16 +4,20 @@ extends Node
 ## Deterministic world-to-pixel view director.
 ##
 ## This keeps the simulation's three-axis baseball coordinates but replaces
-## perspective projection with 320x180 design-grid compositions. PixelScene
-## maps those positions to 4px-native blocks rendered directly into 1280x720;
+## perspective projection with 320x180 composition coordinates expanded onto
+## a 640x360 design grid. PixelScene maps those positions to 4px-native blocks
+## rendered directly into 2560x1440;
 ## the resulting pixels never pass through a low-res viewport, 3D camera, or
 ## post-processing filter.
 
 const C = preload("res://gameplay/game_constants.gd")
 const ParkGeometry = preload("res://core/fielding/park_geometry.gd")
+const Landmarks = preload("res://world/view_landmarks.gd")
 
-const DESIGN_SIZE := Vector2(320, 180)
-const FRAMEBUFFER_SIZE := Vector2(1280, 720)
+const COMPOSITION_SIZE := Vector2(320, 180)
+const DENSITY_SCALE := 2
+const DESIGN_SIZE := COMPOSITION_SIZE * DENSITY_SCALE
+const FRAMEBUFFER_SIZE := Vector2(2560, 1440)
 const GRID_PIXEL_SIZE := 4
 # Kept for consumers that use "logical" to mean the root rendering size.
 const LOGICAL_SIZE := FRAMEBUFFER_SIZE
@@ -30,7 +34,7 @@ const MODE_BATTING := "batting"
 const MODE_DUGOUT := "dugout"
 const GAMEPLAY_MODES := [MODE_PITCHING, MODE_FIELDING, MODE_BATTING]
 
-@export var logical_vertical_pixels := 720
+@export var logical_vertical_pixels := 1440
 
 var mode := MODE_INTRO
 var target_node
@@ -65,16 +69,10 @@ func plate_location_world(lateral_ft: float, height_ft: float) -> Vector3:
 
 
 func projected_strike_zone() -> Rect2:
-	# Authored design-grid regions remain legible at native 720p. They represent
-	# the exact rulebook proportions; only their presentation scale changes per
-	# fixed view, just like a hand-authored pixel room.
-	match mode:
-		MODE_BATTING:
-			return Rect2(137, 91, 46, 56)
-		MODE_PITCHING:
-			return Rect2(82, 62, 30, 38)
-		_:
-			return Rect2()
+	# Authored dense-grid regions remain legible at native 1440p. Shared with
+	# the world canvas through view_landmarks.gd so plate composition stays put.
+	var composition_rect := Landmarks.strike_zone(mode)
+	return Rect2(composition_rect.position * DENSITY_SCALE, composition_rect.size * DENSITY_SCALE)
 
 
 func projected_strike_zone_native() -> Rect2:
@@ -101,7 +99,7 @@ func project_world(value: Vector3) -> Vector2:
 			result = _project_dugout(value)
 		_:
 			result = _project_intro(value)
-	result += _pixel_shake
+	result = (result + _pixel_shake) * DENSITY_SCALE
 	return Vector2(roundi(result.x), roundi(result.y))
 
 
@@ -109,12 +107,50 @@ func project_world_native(value: Vector3) -> Vector2:
 	return project_world(value) * GRID_PIXEL_SIZE
 
 
-func actor_lod(value: Vector3, _role := "fielder") -> String:
+func project_pitch_world(value: Vector3) -> Vector2:
+	# Actors and field landmarks use the compact broadcast projection, while a
+	# pitched ball must finish inside the deliberately enlarged, readable zone.
+	# Blend into that plate-space mapping only over the back half of flight so
+	# release still comes directly out of the pitcher's hand.
+	if mode not in [MODE_PITCHING, MODE_BATTING]:
+		return project_world(value)
+	var normal := project_world(value)
+	var travel := clampf(
+		(value.z - C.PITCHER_MOUND.z) / (C.HOME_PLATE.z - C.PITCHER_MOUND.z),
+		0.0,
+		1.0
+	)
+	var zone := projected_strike_zone()
+	if zone.size.x <= 1.0 or zone.size.y <= 1.0:
+		return normal
+	if mode == MODE_PITCHING:
+		# World-height projection is intentionally compact for field actors, but
+		# the authored pitcher sprite is taller. Seat the first flight frames on
+		# the visible release hand, then converge back to physical plate space.
+		var release_weight := 1.0 - smoothstep(0.0, 0.28, travel)
+		normal += Vector2(signf(value.x) * 4.0, -12.0) * DENSITY_SCALE * release_weight
+	var lateral_ft := (value.x - C.HOME_PLATE.x) / PLATE_WORLD_PER_FOOT
+	var height_ft := (value.y - C.HOME_PLATE.y) / PLATE_WORLD_PER_FOOT
+	var plate_space := Vector2(
+		zone.get_center().x + plate_lateral_screen_sign() * lateral_ft / STRIKE_ZONE_HALF_WIDTH_FT * zone.size.x * 0.5,
+		zone.end.y - (height_ft - STRIKE_ZONE_BOTTOM_FT) / (STRIKE_ZONE_TOP_FT - STRIKE_ZONE_BOTTOM_FT) * zone.size.y
+	)
+	var plate_blend := smoothstep(0.42, 1.0, travel)
+	return normal.lerp(plate_space, plate_blend).round()
+
+
+func actor_lod(value: Vector3, role := "fielder") -> String:
 	match mode:
 		MODE_PITCHING:
+			# Pitcher and plate battery share the 22-cell gameplay tier. The former
+			# 40-cell marquee body hid the rubber and made the mound read as a base.
+			if role == "pitcher":
+				return "small"
 			if value.z <= 5.0:
 				return "large"
-			if value.z <= 24.0:
+			if role == "umpire":
+				return "tiny"
+			if role in ["batter", "catcher"] or value.z <= 24.0:
 				return "small"
 			return "tiny"
 		MODE_BATTING:
@@ -143,23 +179,47 @@ func actor_visible(value: Vector3, role := "fielder") -> bool:
 
 
 func actor_screen_offset(_value: Vector3, role := "fielder") -> Vector2:
+	# Pitching offsets are authored so the plate battery fans out around the
+	# strike-zone chalk: batter left of plate, catcher low under the zone,
+	# umpire clear right. Values are design cells (1 cell = 4 native px).
+	var offset := Vector2.ZERO
 	if mode == MODE_PITCHING:
 		match role:
 			"batter":
-				return Vector2(-8, 1)
+				offset = Vector2(-11, 1)
 			"catcher":
-				return Vector2(3, 3)
+				offset = Vector2(0, 7)
 			"umpire":
-				return Vector2(10, 1)
+				offset = Vector2(8, 1)
+			"pitcher":
+				# Plant the marquee figure a cell onto the rubber so delivery
+				# reads from the mound island, not floating over clay.
+				offset = Vector2(0, 1)
 	elif mode == MODE_BATTING and role == "batter":
-		return Vector2(-22, -1)
-	return Vector2.ZERO
+		offset = Vector2(-22, -1)
+	return offset * DENSITY_SCALE
 
 
-func depth_order(value: Vector3) -> int:
+func depth_order(value: Vector3, role := "fielder") -> int:
+	# Near actors (high screen-y on the pitch lane) draw above far ones. Plate
+	# roles get a stable within-cluster stack: catcher in front of batter in
+	# front of umpire so the crouch mitt never sinks under the hitter.
+	var base := 30 + int(project_world(Vector3(value.x, 0.08, value.z)).y)
 	if mode == MODE_FIELDING:
 		return 40 + int(project_world(value).y)
-	return 30 + int(project_world(Vector3(value.x, 0.08, value.z)).y)
+	if mode == MODE_PITCHING:
+		# Bonuses beat the ~5-cell screen-y gap between plate actors so the
+		# stack is role-stable: pitcher > catcher > batter > umpire.
+		match role:
+			"pitcher":
+				return base + 40
+			"catcher":
+				return base + 14
+			"batter":
+				return base + 6
+			"umpire":
+				return base
+	return base
 
 
 func shake(strength := 0.3) -> void:
@@ -186,15 +246,24 @@ func _process(delta: float) -> void:
 
 
 func _project_pitching(value: Vector3) -> Vector2:
-	var depth := clampf((value.z + 5.0) / 25.0, 0.0, 1.0)
-	var lane := Vector2(226, 145).lerp(Vector2(103, 87), depth)
-	var lateral_scale := lerpf(3.1, 1.25, depth)
-	return lane + Vector2(value.x * lateral_scale, -value.y * lerpf(4.0, 2.4, depth))
+	# Use the real plate-to-second-base depth interval. This keeps home, mound,
+	# and second collinear in the authored center-field view and prevents the
+	# old extreme lower-right to upper-left camera skew.
+	var depth := clampf(
+		(value.z - C.SECOND_BASE.z) / (C.HOME_PLATE.z - C.SECOND_BASE.z),
+		0.0,
+		1.0
+	)
+	var lane_spec: Dictionary = Landmarks.projection_lane(MODE_PITCHING)
+	var lane: Vector2 = (lane_spec.near as Vector2).lerp(lane_spec.far as Vector2, depth)
+	var lateral_scale := lerpf(2.8, 1.45, depth)
+	return lane + Vector2(value.x * lateral_scale, -value.y * lerpf(4.0, 2.5, depth))
 
 
 func _project_batting(value: Vector3) -> Vector2:
 	var depth := clampf((C.HOME_PLATE.z - value.z) / 18.0, 0.0, 1.0)
-	var lane := Vector2(160, 154).lerp(Vector2(160, 76), depth)
+	var lane_spec: Dictionary = Landmarks.projection_lane(MODE_BATTING)
+	var lane: Vector2 = (lane_spec.near as Vector2).lerp(lane_spec.far as Vector2, depth)
 	var lateral_scale := lerpf(4.2, 1.9, depth)
 	return lane + Vector2(value.x * lateral_scale, -value.y * lerpf(4.2, 2.4, depth))
 
@@ -205,19 +274,23 @@ func _project_fielding(value: Vector3) -> Vector2:
 		var focus := _world_position_of(target_node)
 		focus_shift.x = clampf(focus.x * -0.35, -22.0, 22.0)
 		focus_shift.y = clampf((focus.z + 4.0) * -0.18, -14.0, 14.0)
+	var origin: Vector2 = Landmarks.projection_lane(MODE_FIELDING).origin
 	return Vector2(
-		160.0 + value.x * 3.15,
-		155.0 + (value.z - C.HOME_PLATE.z) * 2.0 - value.y * 2.7
+		origin.x + value.x * 3.15,
+		origin.y + (value.z - C.HOME_PLATE.z) * 2.0 - value.y * 2.7
 	) + focus_shift
 
 
 func _project_intro(value: Vector3) -> Vector2:
 	var depth := clampf((value.z + 10.0) / 32.0, 0.0, 1.0)
-	return Vector2(208, 145).lerp(Vector2(116, 92), depth) + Vector2(value.x * lerpf(2.7, 1.3, depth), -value.y * 3.0)
+	var lane_spec: Dictionary = Landmarks.projection_lane(MODE_INTRO)
+	var lane: Vector2 = (lane_spec.near as Vector2).lerp(lane_spec.far as Vector2, depth)
+	return lane + Vector2(value.x * lerpf(2.7, 1.3, depth), -value.y * 3.0)
 
 
 func _project_dugout(value: Vector3) -> Vector2:
-	return Vector2(160 + value.x * 3.0, 142 + (value.z - 10.0) * 0.7 - value.y * 4.0)
+	var origin: Vector2 = Landmarks.projection_lane(MODE_DUGOUT).origin
+	return Vector2(origin.x + value.x * 3.0, origin.y + (value.z - 10.0) * 0.7 - value.y * 4.0)
 
 
 func _update_trauma(delta: float) -> void:

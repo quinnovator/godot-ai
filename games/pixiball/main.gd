@@ -22,11 +22,11 @@ const WINDUP_RELEASE_FALLBACK_SECONDS := 0.90
 const SWING_CONTACT_LEAD_SECONDS := 0.23
 const PLATE_WORLD_PER_FOOT := ParkGeometry.VERTICAL_WORLD_PER_FOOT
 const PITCH_PLANE_Z_OFFSET := -0.55
-const PITCH_ARC_LIFT_FT := 2.2
+const PitchTrajectory = preload("res://presentation/pitch_trajectory.gd")
 const AIM_LATERAL_FT := 1.35
 const AIM_VERTICAL_FT := 1.55
 const AIM_CENTER_HEIGHT_FT := 2.5
-const NATIVE_FRAMEBUFFER_SIZE := Vector2i(1280, 720)
+const NATIVE_FRAMEBUFFER_SIZE := Vector2i(2560, 1440)
 const PIXEL_GRID_SIZE := 4
 
 var sim: PixiballSim
@@ -92,9 +92,9 @@ func _enter_tree() -> void:
 
 
 func _configure_native_framebuffer() -> void:
-	# The game renders straight into a 720p root. PixelScene's 4x CanvasItem
-	# transform expands one authored design unit into one 4x4 native pixel block;
-	# there is deliberately no 320x180 SubViewport or sampled intermediate.
+	# The game renders straight into a 1440p root. PixelScene's 4x CanvasItem
+	# transform expands one dense 640x360 design unit into one 4x4 native block;
+	# there is deliberately no low-resolution SubViewport or sampled intermediate.
 	var game_window := get_window()
 	game_window.content_scale_size = NATIVE_FRAMEBUFFER_SIZE
 	game_window.content_scale_mode = Window.CONTENT_SCALE_MODE_VIEWPORT
@@ -118,6 +118,9 @@ func _ready() -> void:
 	_show_landing()
 	if "--autoplay" in OS.get_cmdline_user_args():
 		call_deferred("_start_command_line_autoplay")
+	elif "--scenario=endless" in OS.get_cmdline_user_args():
+		# Design iteration: jump into Endless Pitch ready-to-throw without autoplay.
+		call_deferred("_start_endless", 4242, 0)
 
 
 func _configure_pixel_scene_grid() -> void:
@@ -334,7 +337,7 @@ func _set_gameplay_view(user_batting: bool) -> void:
 func _sync_strike_zone_projection() -> void:
 	if hud == null or broadcast_camera == null:
 		return
-	# HUD controls live directly in the native 1280x720 root rather than under
+	# HUD controls live directly in the native 2560x1440 root rather than under
 	# PixelScene, so hand off the projector's explicitly converted native rect.
 	var projected := broadcast_camera.projected_strike_zone_native()
 	if projected.size.x > 1.0 and projected.size.y > 1.0:
@@ -463,6 +466,8 @@ func _stable_text_seed(value: String) -> int:
 
 
 func _reset_cast_positions() -> void:
+	# Plate battery faces the mound so pocket-giant silhouettes open toward the
+	# pitcher (and the camera behind him) instead of profile-smearing sideways.
 	for key_value in defenders:
 		var key := String(key_value)
 		var player: BallplayerActor = defenders[key]
@@ -803,13 +808,10 @@ func _update_pitch_flight(delta: float) -> void:
 			_trigger_swing()
 	var u := clampf(pitch_elapsed / flight_seconds, 0.0, 1.0)
 	var actual_point := _array_vec2(active_pitch.get("actual", [0.0, 2.5]))
-	var break_point := _array_vec2(active_pitch.get("break_ft", [0.0, 0.0]))
 	var start := pitch_release_world
 	var end := _plate_pitch_world(actual_point)
-	var position := start.lerp(end, u)
-	var bulge := u * (1.0 - u)
-	position.x -= break_point.x * PLATE_WORLD_PER_FOOT * bulge
-	position.y += (-break_point.y + PITCH_ARC_LIFT_FT) * PLATE_WORLD_PER_FOOT * bulge
+	var path: Dictionary = active_pitch.get("path", {})
+	var position := PitchTrajectory.sample(start, end, path, u)
 	ball.set_ball_position(position, delta)
 	if not headless_fast_forward:
 		hud.set_pitch_marker(_plate_feet_to_aim(actual_point), u > 0.74)

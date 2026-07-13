@@ -5,7 +5,7 @@ implementation of the user's original Unreal Engine game in `../pixiball-ue`.
 It preserves the authorized source game's baseball data, trained pitch models,
 deterministic fixtures, park dimensions, core rules, modes, and presentation
 textures while rebuilding the runtime around agent-operable Godot scenes and a
-native `1280x720` direct-CanvasItem presentation pipeline.
+native `2560x1440` direct-CanvasItem presentation pipeline.
 
 This is not a direct conversion of Unreal packages, a byte-exact runtime port,
 or a claim of Unreal trace-digest parity. The game consumes selected source data
@@ -23,11 +23,12 @@ bin/godot.macos.editor.dev.arm64 --editor --path games/pixiball
 ```
 
 Run the project, choose a mode, and play with keyboard or an SDL-standard
-controller. The project renders directly into one `1280x720` root framebuffer.
-Composition retains a `320x180` design coordinate system, and `PixelScene` uses
-an exact 4x CanvasItem transform so every authored unit becomes a `4x4` native
-block. There is no `320x180` texture, intermediate viewport, upscale, or
-post-process pixel filter.
+controller. The project renders directly into one `2560x1440` root framebuffer.
+Composition retains its `320x180` vocabulary, expands it through a 2x density
+pass onto a `640x360` design grid, and `PixelScene` uses an exact 4x CanvasItem
+transform so every dense design unit becomes a `4x4` native block. There is no
+low-resolution texture, intermediate viewport, upscale, or post-process pixel
+filter.
 
 ### Modes
 
@@ -124,11 +125,12 @@ See [Native pixel pipeline](docs/art_direction/NATIVE_PIXEL_PIPELINE.md) and
 [Visual direction](docs/art_direction/ART_DIRECTION.md) for the generation and
 promotion rules.
 
-### Native-720 pixel presentation
+### Native-1440 pixel presentation
 
-`PixelScene` is a direct `Node2D` stage scaled 4x inside the native `1280x720`
-root. World, actors, ball, effects, and HUD retain `320x180` design coordinates,
-but rasterize directly into that root; `320x180` is never a framebuffer.
+`PixelScene` is a direct `Node2D` stage scaled 4x inside the native `2560x1440`
+root. World, actors, ball, effects, and HUD use a `640x360` dense design grid;
+legacy composition landmarks remain in `320x180` vocabulary and are expanded
+2x before rasterization. Neither grid is ever an intermediate framebuffer.
 `PixelBallparkCanvas` draws flat sky, harbor, stadium, field, 8x8-design-unit
 tile detail, crowd clusters, and day/golden/night palettes. Crowd, LED, bell,
 and burst reactions are deterministic and outcome-driven.
@@ -227,7 +229,8 @@ bin/godot.macos.editor.dev.arm64 --headless --path games/pixiball \
 
 [`content/pixel/style_contract.json`](content/pixel/style_contract.json) is the
 source of truth for generated and hand-authored additions. It freezes the
-`1280x720` root framebuffer, `320x180` design space, 4 px authoring grid, actor
+`2560x1440` root framebuffer, `640x360` design space, 2x linear density pass,
+4 px authoring grid, actor
 sizes, 10 fps animation cadence, palette and binary-alpha limits, fixed views,
 and direct-CanvasItem runtime rules.
 
@@ -255,7 +258,7 @@ bin\godot.windows.editor.dev.x86_64.console.exe `
   --output=res://.godot/visual-qa/game-batting-golden.png
 ```
 
-The capture tool writes the native `1280x720` framebuffer. It supports landing,
+The capture tool writes the native `2560x1440` framebuffer. It supports landing,
 pitcher/team selection, final, the three moods in pitching, batting, and
 fielding views, plus the legacy `game-day`, `game-golden`, and `game-night`
 pitching aliases.

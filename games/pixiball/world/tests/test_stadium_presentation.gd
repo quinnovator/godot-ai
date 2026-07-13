@@ -51,10 +51,11 @@ func _run() -> void:
 	_check(not _has_3d_descendant(first_canvas), "pixel canvas contains a forbidden 3D descendant")
 	_check(first_canvas.get_child_count() == 0, "ballpark must draw on one canvas rather than allocating scene geometry")
 
-	_check(Stadium.ART_SIZE == Vector2i(320, 180), "facade design grid must be exactly 320x180 cells")
-	_check(PixelCanvas.ART_SIZE == Vector2i(320, 180), "canvas design grid must be exactly 320x180 cells")
-	_check(Style.DESIGN_SIZE == Vector2i(320, 180), "shared pixel style must retain the 320x180 design grid")
-	_check(Style.OUTPUT_SIZE == Vector2i(1280, 720), "shared pixel style output must be native 1280x720")
+	_check(Stadium.ART_SIZE == Vector2i(320, 180), "facade composition vocabulary must remain exactly 320x180 cells")
+	_check(PixelCanvas.ART_SIZE == Vector2i(320, 180), "canvas composition vocabulary must remain exactly 320x180 cells")
+	_check(Style.DESIGN_SIZE == Vector2i(640, 360), "shared pixel style must expose the 640x360 dense design grid")
+	_check(Style.OUTPUT_SIZE == Vector2i(2560, 1440), "shared pixel style output must be native 2560x1440")
+	_check(Style.DENSITY_SCALE == 2, "shared pixel style must retain the 2x linear density transform")
 	_check(Style.GRID_PIXEL_SIZE == 4, "shared pixel style must map each design cell to 4px")
 	_check(pixel_scene.scale == Vector2(4, 4), "world host must apply the exact direct-render 4x CanvasItem transform")
 	_check(pixel_scene.texture_filter == CanvasItem.TEXTURE_FILTER_NEAREST, "world host must prohibit filtered sampling")
@@ -84,8 +85,8 @@ func _run() -> void:
 		var second_state: Dictionary = second.crowd_state()
 		var expected_count := int(EXPECTED_CROWD_COUNTS[mode])
 		_check(String(first_state.view_mode) == mode, "%s view mode was not retained" % mode)
-		_check(first_state.design_size == Vector2i(320, 180), "%s state lost the authored design-grid size" % mode)
-		_check(first_state.output_size == Vector2i(1280, 720), "%s state lost the native framebuffer size" % mode)
+		_check(first_state.design_size == Vector2i(640, 360), "%s state lost the authored dense design-grid size" % mode)
+		_check(first_state.output_size == Vector2i(2560, 1440), "%s state lost the native framebuffer size" % mode)
 		_check(int(first_state.grid_pixel_size) == 4, "%s state lost the 4px authoring-grid scale" % mode)
 		_check(int(first_state.total_spectators) == expected_count, "%s crowd count changed: %s" % [mode, first_state.total_spectators])
 		_check(int(second_state.total_spectators) == expected_count, "%s second crowd count changed" % mode)
@@ -162,16 +163,9 @@ func _run() -> void:
 
 	_check(Stadium.MOODS.keys().size() == 3, "stadium must expose exactly three mood palettes")
 	var role_names: Array = (Stadium.MOODS.day as Dictionary).keys()
-	_check(role_names.size() == 42, "SALTLIGHT role table must hold exactly 42 roles, got %d" % role_names.size())
-	for role in [
-		"ink0", "ink1", "shadow_cool", "sky_high", "sky_low", "haze",
-		"sea_deep", "skyline_far", "skyline_mid", "skyline_near",
-		"turf", "turf_light", "turf_shadow", "clay", "chalk",
-		"seat_a", "seat_b", "crowd_shade", "structure",
-		"lamp_core", "lamp_glow", "saltlight", "stitch",
-		"team_teal", "team_gold", "ui_ink", "ui_slate", "ui_paper", "ui_steel",
-	]:
-		_check(role_names.has(role), "SALTLIGHT role %s is missing from the palette API" % role)
+	_check(role_names.size() == Style.ENVIRONMENT_ROLE_NAMES.size(), "Lantern Wharf role table size drifted: got %d" % role_names.size())
+	for role in Style.ENVIRONMENT_ROLE_NAMES:
+		_check(role_names.has(role), "Lantern Wharf role %s is missing from the palette API" % role)
 	for mood in ["day", "golden", "night"]:
 		_check(Stadium.MOODS.has(mood), "missing flat %s palette" % mood)
 		var palette: Dictionary = Stadium.MOODS[mood]
@@ -180,6 +174,7 @@ func _run() -> void:
 			_check(palette.get(key) is Color, "%s palette entry %s is not a flat color" % [mood, key])
 			if palette.get(key) is Color:
 				_check(is_equal_approx((palette[key] as Color).a, 1.0), "%s/%s must remain opaque" % [mood, key])
+		_check(Style.veil_role("mist_veil", mood).a < 1.0, "%s mist veil must be translucent" % mood)
 	first.set_mood("day")
 	var day_state: Dictionary = first.crowd_state()
 	first.set_mood("golden")
@@ -188,10 +183,10 @@ func _run() -> void:
 	var night_state: Dictionary = first.crowd_state()
 	_check(day_state.mood == "day" and golden_state.mood == "golden" and night_state.mood == "night", "facade did not retain all mood selections")
 	_check(Stadium.MOODS.day.sky_high != Stadium.MOODS.golden.sky_high and Stadium.MOODS.golden.sky_high != Stadium.MOODS.night.sky_high, "mood skies are not visually distinct")
-	_check(Stadium.MOODS.day.turf != Stadium.MOODS.golden.turf and Stadium.MOODS.golden.turf != Stadium.MOODS.night.turf, "mood fields are not visually distinct")
-	_check(Style.value_step(Stadium.MOODS.day.chalk) > Style.value_step(Stadium.MOODS.day.turf), "chalk must sit above turf on the value ladder")
-	_check(Style.value_steps_between(Stadium.MOODS.night.chalk, Stadium.MOODS.night.turf) >= 4, "night chalk must keep >=4 value steps of field contrast")
-	_check(Style.haze_veil(Stadium.MOODS.day.skyline_far, "day", Style.HAZE_FAR).a == 1.0, "haze pre-blend must author opaque colors")
+	_check(Stadium.MOODS.day.turf_main != Stadium.MOODS.golden.turf_main and Stadium.MOODS.golden.turf_main != Stadium.MOODS.night.turf_main, "mood fields are not visually distinct")
+	_check(Style.value_step(Stadium.MOODS.day.chalk_line) > Style.value_step(Stadium.MOODS.day.turf_main), "chalk must sit above turf on the value ladder")
+	_check(Style.value_steps_between(Stadium.MOODS.night.chalk_line, Stadium.MOODS.night.turf_main) >= 4, "night chalk must keep >=4 value steps of field contrast")
+	_check(Style.haze_veil(Stadium.MOODS.day.town_far, "day", Style.HAZE_FAR).a == 1.0, "haze pre-blend must author opaque colors")
 
 	var first_canvas_ref: WeakRef = weakref(first_canvas)
 	var second_canvas_ref: WeakRef = weakref(second_canvas)
@@ -229,7 +224,7 @@ func _check(condition: bool, message: String) -> void:
 
 func _finish() -> void:
 	if _failures.is_empty():
-		print("PIXIBALL_STADIUM_PRESENTATION_OK native_canvas=1280x720 design_grid=320x180 cell=4px views=5 crowd=12fps no_3d=verified")
+		print("PIXIBALL_STADIUM_PRESENTATION_OK native_canvas=2560x1440 design_grid=640x360 density=2x cell=4px views=5 crowd=12fps no_3d=verified")
 		quit(0)
 		return
 	for failure in _failures:

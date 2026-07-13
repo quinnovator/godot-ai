@@ -1,8 +1,10 @@
 {
-  "schema": "pixiball.native-pixel-style.v2",
-  "logical_canvas": [1280, 720],
-  "native_framebuffer": [1280, 720],
-  "design_canvas_units": [320, 180],
+  "schema": "pixiball.native-pixel-style.v3",
+  "logical_canvas": [2560, 1440],
+  "native_framebuffer": [2560, 1440],
+  "composition_canvas_units": [320, 180],
+  "design_canvas_units": [640, 360],
+  "density_scale": 2,
   "authoring_grid_px": 4,
   "tile_grid": [4, 4],
   "runtime": {
@@ -22,35 +24,35 @@
     "integer_transforms": true
   },
   "characters": {
-    "avatar_language": "saltlight_pocket_giants",
+    "avatar_language": "lantern_wharf_pocket_giants",
     "authoring_grid_px": 4,
     "lod_names": ["marquee", "battery", "diamond"],
     "projector_lod_map": {"large": "marquee", "small": "battery", "tiny": "diamond"},
-    "hero_height_px": 160,
-    "hero_head_height_px": 64,
+    "hero_height_px": 320,
+    "hero_head_height_px": 128,
     "hero_head_ratio": 0.4,
-    "midground_height_px": 88,
-    "field_height_px": 44,
-    "lod_heights_px": {"large": 160, "small": 88, "tiny": 44},
-    "lod_head_heights_px": {"large": 64, "small": 36, "tiny": 20},
+    "midground_height_px": 176,
+    "field_height_px": 88,
+    "lod_heights_px": {"large": 320, "small": 176, "tiny": 88},
+    "lod_head_heights_px": {"large": 128, "small": 72, "tiny": 40},
     "eye_highlight_px": 4,
-    "hero_height_design_units": 40,
-    "hero_head_height_design_units": 16,
-    "lod_heights_design_units": {"large": 40, "small": 22, "tiny": 11},
-    "lod_head_heights_design_units": {"large": 16, "small": 9, "tiny": 5},
+    "hero_height_design_units": 80,
+    "hero_head_height_design_units": 32,
+    "lod_heights_design_units": {"large": 80, "small": 44, "tiny": 22},
+    "lod_head_heights_design_units": {"large": 32, "small": 18, "tiny": 10},
     "eye_highlight_design_units": 1,
     "eye_highlights_by_lod": {"large": true, "small": true, "tiny": false},
     "facial_features": ["eyes", "eye_highlights", "brows", "mouth", "hair_or_headwear", "cheek_smudge", "cap_brim_shadow"],
     "animation_fps": 10,
     "maximum_ramp_tones": 4,
     "silhouette_first": true,
-    "equipment_minimum_mark_px": 8,
-    "equipment_minimum_mark_design_units": 2
+    "equipment_minimum_mark_px": 16,
+    "equipment_minimum_mark_design_units": 4
   },
   "world": {
     "background_layers": 4,
-    "cluster_grid_design_units": [8, 8],
-    "cluster_grid_px": [32, 32],
+    "cluster_grid_design_units": [16, 16],
+    "cluster_grid_px": [64, 64],
     "large_quiet_color_fields": true,
     "procedural_crowd_clusters": true,
     "perspective": "authored_fixed_views",
@@ -66,6 +68,6 @@
     "source_kind": "declarative_pixel_clusters",
     "required_metadata": ["role", "action", "frame", "pivot", "palette_slots"],
     "validation_command": "python tools/validate_native_pixel_art.py content/pixel/style_contract.json <png...>",
-    "notes": "Generated bitmaps are accepted only after 1280x720 native-framebuffer, palette, alpha, and 4px-grid validation. The 320x180 coordinate system is design space only; PixelScene scales those CanvasItems directly into the root framebuffer without an intermediate texture."
+    "notes": "Generated bitmaps are accepted only after 2560x1440 native-framebuffer, palette, alpha, and 4px-grid validation. The 320x180 coordinate vocabulary is composition space; a 2x density transform authors onto the 640x360 design grid before PixelScene maps those CanvasItems directly into the root framebuffer without an intermediate texture."
   }
 }

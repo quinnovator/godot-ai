@@ -58,7 +58,7 @@ Every implementation decision must be justifiable by at least one pillar.
 
 ## 2. Technical frame (inherited, restated)
 
-- Native root framebuffer `1280x720`. No SubViewport, no 320x180 buffer, no
+- Native root framebuffer `2560x1440`. No SubViewport, no 320x180 buffer, no
   sampled intermediate, no 3D node, no shader pixelation.
 - World/actor art authors on the 320x180 design grid; one design cell
   (**1 cell**) = exactly 4x4 native pixels through the existing `PixelScene`
@@ -604,7 +604,7 @@ no particle spam, no full-screen tint.
 
 Owned by `ui/pixiball_hud.gd`, `ui/pixiball_style.gd`,
 `ui/pixiball_pixel_overlay.gd`, `ui/strike_zone.gd`, and `ui/pitch_intel/*`.
-All Controls in native 720p coordinates; all fonts render at native size.
+All Controls in native 1440p coordinates; all fonts render at native size.
 
 ### 10.1 Materials
 
@@ -842,10 +842,10 @@ for its owned screens.
 
 ### 12.10 Mood unification (final gate)
 
-- [ ] All 5 views × 3 moods captured at native 1280×720.
+- [ ] All 5 views × 3 moods captured at native 2560×1440.
 - [ ] Night captures: V4–V5 area ≤ 20% of frame, all deliberate light.
 - [ ] Side-by-side with the baseline
-      (`.godot/visual-qa/native-720/game-pitching-day.png`) shows a
+      (`.godot/visual-qa/native-1440/game-pitching-day.png`) shows a
       transformed, original game; side-by-side with
       the [official Celeste reference](https://www.celestegame.com/images/screenshots/p00.png) shows kinship in
       method and zero copied content.

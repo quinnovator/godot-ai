@@ -1,7 +1,7 @@
 class_name PixiballPitchIntelPanel
 extends Control
 
-## Reusable post-pitch model report, composed as a SALTLIGHT slate board
+## Reusable post-pitch model report, composed as a Lantern Wharf slate board
 ## (art bible §10.1 "Slate board" + §10.7): an opaque slate plank with an ink
 ## frame and hard offset shadow, a chalk Header/Numerals/Body hierarchy, the
 ## finished chalk diagram (tallies, tunnel overlay, lantern-gold target) as its
@@ -105,7 +105,7 @@ func _apply_digit_faces() -> void:
 		row.get_node("Erv").add_theme_font_override("font", S.FONT_SCORE)
 
 
-## SALTLIGHT slate composition, built over the untouched scene: the same slate
+## Lantern Wharf slate composition, built over the untouched scene: the same slate
 ## face the diagram authors (HARBOR_WASH) so the whole board reads as one
 ## chalked surface, an ink frame, and the §10.2 Header/Numerals/Body tiers.
 ## Gold appears only on the recommendation readouts — the BEST-call line here

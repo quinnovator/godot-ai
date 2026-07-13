@@ -93,11 +93,10 @@ func _draw() -> void:
 		queue_redraw()
 
 
-## Chalk-paper corner L-ticks seated on a full 1-cell ink surround so the
-## brackets hold ≥2 value rungs against bright clay and the dark battery
-## cluster alike (§5.2 seat intent); passive marks, not a full frame.
+## Compact chalk corner ticks. Short arms keep the plate battery readable —
+## long L-brackets used to smear through catcher/batter heads (§5.2 seat intent).
 func _draw_corner_ticks(zone_w: int, zone_h: int) -> void:
-	var arm := clampi(_snap(minf(zone_w, zone_h) / 5.0), CELL * 3, CELL * 8)
+	var arm := clampi(_snap(minf(zone_w, zone_h) / 8.0), CELL * 2, CELL * 4)
 	var arms: Array[Rect2] = [
 		Rect2(0, 0, arm, CELL), Rect2(0, 0, CELL, arm),
 		Rect2(zone_w - arm, 0, arm, CELL), Rect2(zone_w - CELL, 0, CELL, arm),
@@ -105,29 +104,37 @@ func _draw_corner_ticks(zone_w: int, zone_h: int) -> void:
 		Rect2(zone_w - arm, zone_h - CELL, arm, CELL), Rect2(zone_w - CELL, zone_h - arm, CELL, arm),
 	]
 	for rect in arms:
-		draw_rect(rect.grow(CELL), S.INK)
+		draw_rect(rect.grow(1), S.INK)
 	for rect in arms:
 		draw_rect(rect, S.CHALK)
 
 
-## Dashed steel 3x3 interior grid: 2-cell dashes on a 3-cell cadence, each on
-## a 1-cell offset ink seat, inset so the grid never touches the chalk ticks
-## and stays within 2 quiet rungs of its backdrop (§10.5).
+## Quiet 3x3 guide: only the two interior crosses while aiming. The full dashed
+## grid appears once a pitch is live so the zone does not fight the battery.
 func _draw_dashed_grid(cols: Array[int], rows: Array[int]) -> void:
-	var inset := CELL * 2
+	var inset := CELL * 3
 	var dashes: Array[Rect2] = []
-	for x in [cols[1], cols[2]]:
-		var y := rows[0] + inset
-		while y + CELL * 2 <= rows[3] - inset:
-			dashes.append(Rect2(x, y, CELL, CELL * 2))
-			y += CELL * 3
-	for y in [rows[1], rows[2]]:
-		var x := cols[0] + inset
-		while x + CELL * 2 <= cols[3] - inset:
-			dashes.append(Rect2(x, y, CELL * 2, CELL))
-			x += CELL * 3
+	if show_pitch:
+		for x in [cols[1], cols[2]]:
+			var y := rows[0] + inset
+			while y + CELL * 2 <= rows[3] - inset:
+				dashes.append(Rect2(x, y, CELL, CELL * 2))
+				y += CELL * 4
+		for y in [rows[1], rows[2]]:
+			var x := cols[0] + inset
+			while x + CELL * 2 <= cols[3] - inset:
+				dashes.append(Rect2(x, y, CELL * 2, CELL))
+				x += CELL * 4
+	else:
+		# Aiming: four short mid-edge ticks only — enough to aim, not a cage.
+		var mx := _snap(float(cols[3]) * 0.5)
+		var my := _snap(float(rows[3]) * 0.5)
+		dashes.append(Rect2(mx, rows[0] + inset, CELL, CELL * 2))
+		dashes.append(Rect2(mx, rows[3] - inset - CELL * 2, CELL, CELL * 2))
+		dashes.append(Rect2(cols[0] + inset, my, CELL * 2, CELL))
+		dashes.append(Rect2(cols[3] - inset - CELL * 2, my, CELL * 2, CELL))
 	for dash in dashes:
-		draw_rect(Rect2(dash.position + Vector2(CELL, CELL), dash.size), S.INK)
+		draw_rect(Rect2(dash.position + Vector2(1, 1), dash.size), S.INK)
 	for dash in dashes:
 		draw_rect(dash, S.STEEL)
 

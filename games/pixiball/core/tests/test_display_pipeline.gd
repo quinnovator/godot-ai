@@ -1,7 +1,9 @@
 extends SceneTree
 
-const FRAMEBUFFER_SIZE := Vector2i(1280, 720)
-const DESIGN_SIZE := Vector2i(320, 180)
+const FRAMEBUFFER_SIZE := Vector2i(2560, 1440)
+const DEBUG_WINDOW_SIZE := Vector2i(2560, 1440)
+const COMPOSITION_SIZE := Vector2i(320, 180)
+const DESIGN_SIZE := Vector2i(640, 360)
 const GRID_PIXEL_SIZE := 4
 
 var _failures: Array[String] = []
@@ -27,10 +29,11 @@ func _check_project_contract() -> void:
 		int(ProjectSettings.get_setting("display/window/size/window_width_override", 0)),
 		int(ProjectSettings.get_setting("display/window/size/window_height_override", 0)),
 	)
-	_expect(framebuffer == FRAMEBUFFER_SIZE, "root framebuffer must be native 1280x720, got %s" % framebuffer)
-	_expect(output == FRAMEBUFFER_SIZE, "default output must be 1280x720, got %s" % output)
-	_expect(framebuffer == output, "default window must not upscale a lower-resolution root framebuffer")
-	_expect(framebuffer != DESIGN_SIZE, "320x180 design space must never become the root framebuffer")
+	_expect(framebuffer == FRAMEBUFFER_SIZE, "root framebuffer must be native 2560x1440, got %s" % framebuffer)
+	_expect(output == DEBUG_WINDOW_SIZE, "default debug window must be 2560x1440, got %s" % output)
+	_expect(output == framebuffer, "default debug window must present the native framebuffer one-to-one")
+	_expect(DESIGN_SIZE == COMPOSITION_SIZE * 2, "design density must remain exactly 2x the composition grid")
+	_expect(framebuffer != DESIGN_SIZE, "640x360 design space must never become the root framebuffer")
 	_expect(framebuffer == DESIGN_SIZE * GRID_PIXEL_SIZE, "native framebuffer must contain the exact 4px design grid")
 	_expect(String(ProjectSettings.get_setting("display/window/stretch/mode", "")) == "viewport", "stretch mode must target the native root viewport")
 	_expect(String(ProjectSettings.get_setting("display/window/stretch/aspect", "")) == "keep", "stretch aspect must letterbox instead of distorting")
@@ -42,8 +45,8 @@ func _check_project_contract() -> void:
 func _check_root_window_contract() -> void:
 	# Headless display drivers expose a 64x64 dummy OS surface, so the stable
 	# rendering contract is the root content scale configured for real windows.
-	_expect(root.content_scale_size == FRAMEBUFFER_SIZE, "root content scale size must be native 1280x720, got %s" % root.content_scale_size)
-	_expect(root.content_scale_size != DESIGN_SIZE, "root content scale must not use the 320x180 design grid")
+	_expect(root.content_scale_size == FRAMEBUFFER_SIZE, "root content scale size must be native 2560x1440, got %s" % root.content_scale_size)
+	_expect(root.content_scale_size != DESIGN_SIZE, "root content scale must not use the 640x360 design grid")
 	_expect(root.content_scale_mode == Window.CONTENT_SCALE_MODE_VIEWPORT, "root window did not apply viewport stretch mode")
 	_expect(root.content_scale_aspect == Window.CONTENT_SCALE_ASPECT_KEEP, "root window did not apply keep-aspect letterboxing")
 	_expect(root.content_scale_stretch == Window.CONTENT_SCALE_STRETCH_INTEGER, "root window did not apply integer stretch")
@@ -57,7 +60,7 @@ func _expect(condition: bool, message: String) -> void:
 
 func _finish() -> void:
 	if _failures.is_empty():
-		print("PIXIBALL_DISPLAY_PIPELINE_OK framebuffer=1280x720 design_grid=320x180 cell=4px direct=true filter=nearest hidpi=true")
+		print("PIXIBALL_DISPLAY_PIPELINE_OK framebuffer=2560x1440 debug_window=2560x1440 design_grid=640x360 density=2x cell=4px direct=true filter=nearest hidpi=true")
 		quit(0)
 		return
 	for failure in _failures:

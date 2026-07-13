@@ -1,6 +1,7 @@
 extends SceneTree
 
 const BroadcastCamera := preload("res://presentation/broadcast_camera.gd")
+const C := preload("res://gameplay/game_constants.gd")
 
 class FocusNode extends Node:
 	var global_position := Vector3.ZERO
@@ -18,11 +19,12 @@ func _run() -> void:
 	await process_frame
 	director.set_process(false)
 
-	_check(director.DESIGN_SIZE == Vector2(320, 180), "projector design grid must remain 320x180 cells")
-	_check(director.FRAMEBUFFER_SIZE == Vector2(1280, 720), "projector framebuffer must be native 1280x720")
-	_check(director.LOGICAL_SIZE == Vector2(1280, 720), "projector logical root must be native 1280x720")
+	_check(director.COMPOSITION_SIZE == Vector2(320, 180), "projector composition vocabulary must remain 320x180 cells")
+	_check(director.DESIGN_SIZE == Vector2(640, 360), "projector design grid must be 640x360 cells")
+	_check(director.FRAMEBUFFER_SIZE == Vector2(2560, 1440), "projector framebuffer must be native 2560x1440")
+	_check(director.LOGICAL_SIZE == Vector2(2560, 1440), "projector logical root must be native 2560x1440")
 	_check(director.GRID_PIXEL_SIZE == 4, "projector design cells must map to 4px native blocks")
-	_check(director.logical_vertical_pixels == 720, "projector must expose 720 logical root lines")
+	_check(director.logical_vertical_pixels == 1440, "projector must expose 1440 logical root lines")
 	_check(director.GAMEPLAY_MODES == ["pitching", "fielding", "batting"], "projector must expose the three gameplay views")
 	_check(director.is_in_group("pixiball_pixel_projector"), "projector group was not installed")
 	_validate_native_tree(director)
@@ -30,34 +32,58 @@ func _run() -> void:
 	director.set_mode("pitching")
 	_check(director.mode == "pitching", "pitching view was not selected")
 	_check(director.plate_lateral_screen_sign() == -1.0, "pitching view must mirror plate lateral coordinates")
-	_check(director.projected_strike_zone() == Rect2(82, 62, 30, 38), "pitching strike zone moved off its authored pixels")
-	_check(director.projected_strike_zone_native() == Rect2(328, 248, 120, 152), "pitching strike zone lost its exact native-grid mapping")
-	_check(director.project_world(Vector3(0.0, 0.08, 0.0)) == Vector2(201, 133), "pitching mound projection changed")
-	_check(director.project_world(Vector3(0.0, 0.08, 18.0)) == Vector2(113, 91), "pitching plate projection changed")
-	_check(director.project_world_native(Vector3(0.0, 0.08, 0.0)) == Vector2(804, 532), "pitching mound did not map to native 720p coordinates")
-	_check(director.project_world_native(Vector3(0.0, 0.08, 18.0)) == Vector2(452, 364), "pitching plate did not map to native 720p coordinates")
-	_check(director.actor_lod(Vector3(0, 0, 0)) == "large", "near pitching actor must use large pixels")
-	_check(director.actor_lod(Vector3(0, 0, 12)) == "small", "middle pitching actor must use small pixels")
+	_check(director.projected_strike_zone() == Rect2(286, 132, 60, 72), "pitching strike zone moved off its authored pixels")
+	_check(director.projected_strike_zone_native() == Rect2(1144, 528, 240, 288), "pitching strike zone lost its exact native-grid mapping")
+	var pitching_plate := director.project_world(C.HOME_PLATE)
+	var pitching_mound := director.project_world(C.PITCHER_MOUND)
+	var pitching_first := director.project_world(C.FIRST_BASE)
+	var pitching_second := director.project_world(C.SECOND_BASE)
+	var pitching_third := director.project_world(C.THIRD_BASE)
+	_check(pitching_mound == Vector2(329, 269), "pitching mound projection changed: %s" % pitching_mound)
+	_check(pitching_plate == Vector2(316, 192), "pitching plate projection changed: %s" % pitching_plate)
+	_check(director.project_world_native(C.PITCHER_MOUND) == Vector2(1316, 1076), "pitching mound did not map to native 1440p coordinates")
+	_check(director.project_world_native(C.HOME_PLATE) == Vector2(1264, 768), "pitching plate did not map to native 1440p coordinates")
+	_check(pitching_plate.y < pitching_first.y and pitching_first.y < pitching_second.y, "pitching diamond lost plate-to-second depth order")
+	_check(pitching_plate.y < pitching_mound.y and pitching_mound.y < pitching_second.y, "pitching mound is not between plate and second")
+	_check(pitching_third.x < pitching_mound.x and pitching_mound.x < pitching_first.x, "pitching corner bags no longer bracket the mound")
+	_check(absf(pitching_first.y - pitching_third.y) <= 1.0, "pitching corner bags lost their shared depth")
+	var lower_left := director.plate_location_world(director.STRIKE_ZONE_HALF_WIDTH_FT, director.STRIKE_ZONE_BOTTOM_FT)
+	var upper_right := director.plate_location_world(-director.STRIKE_ZONE_HALF_WIDTH_FT, director.STRIKE_ZONE_TOP_FT)
+	_check(director.project_pitch_world(lower_left) == Vector2(286, 204), "pitch ball missed lower-left zone corner")
+	_check(director.project_pitch_world(upper_right) == Vector2(346, 132), "pitch ball missed upper-right zone corner")
+	_check(director.actor_lod(Vector3(0, 0, 0), "pitcher") == "small", "pitcher must preserve the visible mound at battery scale")
+	_check(director.actor_lod(Vector3(0, 0, 18), "batter") == "small", "pitching batter must use battery/small pixels")
+	_check(director.actor_lod(Vector3(0, 0, 20), "catcher") == "small", "pitching catcher must use battery/small pixels")
+	_check(director.actor_lod(Vector3(0, 0, 21), "umpire") == "tiny", "pitching umpire must collapse to diamond/tiny")
 	_check(director.actor_lod(Vector3(0, 0, 30)) == "tiny", "distant pitching actor must use tiny pixels")
 	for role in ["pitcher", "batter", "catcher", "umpire"]:
 		_check(director.actor_visible(Vector3.ZERO, role), "pitching view hid required role %s" % role)
 	_check(not director.actor_visible(Vector3.ZERO, "fielder"), "pitching view exposed a distant fielder")
-	_check(director.actor_screen_offset(Vector3.ZERO, "batter") == Vector2(-8, 1), "pitching batter offset changed")
-	_check(director.actor_screen_offset(Vector3.ZERO, "catcher") == Vector2(3, 3), "pitching catcher offset changed")
-	_check(director.actor_screen_offset(Vector3.ZERO, "umpire") == Vector2(10, 1), "pitching umpire offset changed")
+	_check(director.actor_screen_offset(Vector3.ZERO, "batter") == Vector2(-22, 2), "pitching batter offset changed")
+	_check(director.actor_screen_offset(Vector3.ZERO, "catcher") == Vector2(0, 14), "pitching catcher offset changed")
+	_check(director.actor_screen_offset(Vector3.ZERO, "umpire") == Vector2(16, 2), "pitching umpire offset changed")
+	_check(director.actor_screen_offset(Vector3.ZERO, "pitcher") == Vector2(0, 2), "pitching pitcher rubber plant offset changed")
+	_check(
+		director.depth_order(Vector3(0, 0, 20), "catcher") > director.depth_order(Vector3(0, 0, 18), "batter"),
+		"catcher must draw above batter in the plate stack"
+	)
+	_check(
+		director.depth_order(Vector3(0, 0, 0), "pitcher") > director.depth_order(Vector3(0, 0, 18), "batter"),
+		"pitcher must draw above the plate battery"
+	)
 
 	director.set_mode("batting")
 	_check(director.mode == "batting", "batting view was not selected")
 	_check(director.plate_lateral_screen_sign() == 1.0, "batting view must preserve plate lateral coordinates")
-	_check(director.projected_strike_zone() == Rect2(137, 91, 46, 56), "batting strike zone moved off its authored pixels")
-	_check(director.projected_strike_zone_native() == Rect2(548, 364, 184, 224), "batting strike zone lost its exact native-grid mapping")
-	_check(director.project_world(Vector3(0.0, 0.08, 18.0)) == Vector2(160, 154), "batting plate projection changed")
-	_check(director.project_world(Vector3(0.0, 0.08, 0.0)) == Vector2(160, 76), "batting mound projection changed")
+	_check(director.projected_strike_zone() == Rect2(274, 182, 92, 112), "batting strike zone moved off its authored pixels")
+	_check(director.projected_strike_zone_native() == Rect2(1096, 728, 368, 448), "batting strike zone lost its exact native-grid mapping")
+	_check(director.project_world(Vector3(0.0, 0.08, 18.0)) == Vector2(320, 307), "batting plate projection changed")
+	_check(director.project_world(Vector3(0.0, 0.08, 0.0)) == Vector2(320, 152), "batting mound projection changed")
 	_check(director.actor_lod(Vector3(0, 0, 18)) == "large", "batting foreground actor must use large pixels")
 	_check(director.actor_lod(Vector3(0, 0, 0)) == "small", "batting pitcher must use small pixels")
 	_check(director.actor_visible(Vector3.ZERO, "pitcher") and director.actor_visible(Vector3.ZERO, "batter"), "batting view lost a required role")
 	_check(not director.actor_visible(Vector3.ZERO, "catcher"), "batting view exposed the catcher corridor")
-	_check(director.actor_screen_offset(Vector3.ZERO, "batter") == Vector2(-22, -1), "batting actor offset changed")
+	_check(director.actor_screen_offset(Vector3.ZERO, "batter") == Vector2(-44, -2), "batting actor offset changed")
 
 	var focus := FocusNode.new()
 	focus.global_position = Vector3(7.0, 4.0, -9.0)
@@ -88,7 +114,7 @@ func _run() -> void:
 
 	var exit_code := 0
 	if _failures.is_empty():
-		print("PIXIBALL_CAMERA_OK framebuffer=1280x720 design_grid=320x180 cell=4px projection=integer lod=deterministic")
+		print("PIXIBALL_CAMERA_OK framebuffer=2560x1440 design_grid=640x360 density=2x cell=4px projection=integer lod=deterministic")
 	else:
 		for failure in _failures:
 			push_error("PIXIBALL_CAMERA: %s" % failure)

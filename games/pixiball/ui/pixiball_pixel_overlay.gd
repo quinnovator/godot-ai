@@ -8,7 +8,7 @@ extends Control
 ## never reads as a translucent engine layer.
 
 const S := preload("res://ui/pixiball_style.gd")
-const CANVAS_SIZE := Vector2(1280, 720)
+const COMPOSITION_SIZE := Vector2(1280, 720)
 
 const SAFE_FRAME := 24
 const TICK_ARM := 12
@@ -28,11 +28,12 @@ func configure(amount := 1.0, warm_light := false) -> PixiballPixelOverlay:
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	position = Vector2.ZERO
-	size = CANVAS_SIZE
+	size = S.NATIVE_SIZE
 	queue_redraw()
 
 
 func _draw() -> void:
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * S.DENSITY_SCALE)
 	_draw_corner_ticks()
 	_draw_wharf_windows()
 
@@ -41,15 +42,15 @@ func _draw() -> void:
 ## chalk/steel/slate: lantern_gold corner ticks are reserved for focus (10.4).
 func _draw_corner_ticks() -> void:
 	var chalk := _stepped(S.CHALK, S.STEEL, S.SLATE)
-	var far_x := CANVAS_SIZE.x - SAFE_FRAME
-	var far_y := CANVAS_SIZE.y - SAFE_FRAME
+	var far_x := COMPOSITION_SIZE.x - SAFE_FRAME
+	var far_y := COMPOSITION_SIZE.y - SAFE_FRAME
 	for origin in [
 		Vector2(SAFE_FRAME, SAFE_FRAME), Vector2(far_x, SAFE_FRAME),
 		Vector2(SAFE_FRAME, far_y), Vector2(far_x, far_y),
 	]:
 		var point: Vector2 = origin
-		var left: bool = point.x < CANVAS_SIZE.x * 0.5
-		var top: bool = point.y < CANVAS_SIZE.y * 0.5
+		var left: bool = point.x < COMPOSITION_SIZE.x * 0.5
+		var top: bool = point.y < COMPOSITION_SIZE.y * 0.5
 		var horizontal: Vector2 = point + Vector2(0 if left else -TICK_ARM, 0 if top else -TICK_THICK)
 		var vertical: Vector2 = point + Vector2(0 if left else -TICK_THICK, 0 if top else -TICK_ARM)
 		var shadow := Vector2(SHADOW_STEP, SHADOW_STEP)

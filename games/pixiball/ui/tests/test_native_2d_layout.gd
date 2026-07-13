@@ -1,7 +1,7 @@
 extends SceneTree
 
 const MAIN_SCENE := preload("res://main.tscn")
-const NATIVE_SIZE := Vector2i(1280, 720)
+const NATIVE_SIZE := Vector2i(2560, 1440)
 const NATIVE_CANVAS := Rect2(Vector2.ZERO, Vector2(NATIVE_SIZE))
 const EPSILON := 0.001
 
@@ -49,7 +49,7 @@ func _run() -> void:
 	_check_shell_state(hud.pitcher_layer, "pitcher")
 	for index in range(hud.pitcher_card_labels.size()):
 		var card_label := hud.pitcher_card_labels[index]
-		_check(card_label.size.is_equal_approx(Vector2(224, 140)), "pitcher card %d label must own a native 224x140 content rect, got %s" % [index, card_label.size])
+		_check(card_label.size.is_equal_approx(Vector2(448, 280)), "pitcher card %d label must own a native 448x280 content rect, got %s" % [index, card_label.size])
 		_check(not card_label.text.is_empty(), "pitcher card %d must render its starter name" % index)
 	states_checked += 1
 
@@ -69,7 +69,7 @@ func _run() -> void:
 	hud.set_batting_layout(false)
 	hud.set_pitch_selector(true, 2)
 	hud.set_help("1-5 SELECT / WASD AIM / SPACE THROW")
-	hud.set_strike_zone_rect(Rect2(484, 248, 312, 288))
+	hud.set_strike_zone_rect(Rect2(968, 496, 624, 576))
 	hud.update_state({
 		"away_score": 2,
 		"home_score": 1,
@@ -87,8 +87,8 @@ func _run() -> void:
 	await process_frame
 	_check_visible_controls(hud.game_layer, "game")
 	_check(hud.help_panel.get_global_rect().end.y <= hud.pitch_row.get_global_rect().position.y, "help band must end above the pitch-selector cards")
-	_check(hud.help_panel.position.is_equal_approx(Vector2(16, 596)) and hud.help_panel.size.y <= 32.0, "help band must use the native y=596 band, got position=%s size=%s" % [hud.help_panel.position, hud.help_panel.size])
-	_check(hud.field_meter.position.is_equal_approx(Vector2(420, 604)) and is_equal_approx(hud.field_meter.size.x, 440.0), "field meter placement must remain unchanged, got position=%s size=%s" % [hud.field_meter.position, hud.field_meter.size])
+	_check(hud.help_panel.position.is_equal_approx(Vector2(32, 1192)) and hud.help_panel.size.y <= 64.0, "help band must use the native y=1192 band, got position=%s size=%s" % [hud.help_panel.position, hud.help_panel.size])
+	_check(hud.field_meter.position.is_equal_approx(Vector2(840, 1208)) and is_equal_approx(hud.field_meter.size.x, 880.0), "field meter placement must retain its dense-grid placement, got position=%s size=%s" % [hud.field_meter.position, hud.field_meter.size])
 	hud.set_field_meter(true, 0.5)
 	_check(hud.field_meter.visible and is_equal_approx(hud.field_meter.value, 0.5), "field meter must retain its visibility and value behavior")
 	hud.set_field_meter(false)
@@ -132,7 +132,7 @@ func _run() -> void:
 func _check_project_contract() -> void:
 	var width := int(ProjectSettings.get_setting("display/window/size/viewport_width", 0))
 	var height := int(ProjectSettings.get_setting("display/window/size/viewport_height", 0))
-	_check(Vector2i(width, height) == NATIVE_SIZE, "project framebuffer must be native 1280x720, got %dx%d" % [width, height])
+	_check(Vector2i(width, height) == NATIVE_SIZE, "project framebuffer must be native 2560x1440, got %dx%d" % [width, height])
 	_check(String(ProjectSettings.get_setting("display/window/stretch/mode", "")) == "viewport", "native UI requires viewport stretch mode")
 	_check(String(ProjectSettings.get_setting("display/window/stretch/scale_mode", "")) == "integer", "native UI requires integer stretch scaling")
 
@@ -160,7 +160,7 @@ func _check_visible_controls(node: Node, context: String) -> void:
 		if control.is_visible_in_tree():
 			_visible_controls_checked += 1
 			var rect := control.get_global_rect()
-			_check(_rect_inside_canvas(rect), "%s/%s leaves the 1280x720 canvas: %s" % [context, control.name, rect])
+			_check(_rect_inside_canvas(rect), "%s/%s leaves the 2560x1440 canvas: %s" % [context, control.name, rect])
 			_check(_rect_is_integer(rect), "%s/%s uses fractional layout coordinates: %s" % [context, control.name, rect])
 			_check(control.scale.is_equal_approx(Vector2.ONE), "%s/%s must not use a Control scale: %s" % [context, control.name, control.scale])
 	for child in node.get_children():
@@ -203,12 +203,12 @@ func _rect_inside_canvas(rect: Rect2) -> bool:
 
 
 func _check_native_typography(hud: PixiballHUD) -> void:
-	_check(hud.score_label.get_theme_font_size("font_size") == 36, "scoreboard digits must rasterize natively at 36px")
-	_check(hud.phase_label.get_theme_font_size("font_size") == 16, "game phase label must rasterize natively at 16px")
-	_check(hud.phase_label.position.is_equal_approx(Vector2(840, 8)) and hud.phase_label.size.is_equal_approx(Vector2(264, 36)), "phase label must occupy the native scoreboard gap")
+	_check(hud.score_label.get_theme_font_size("font_size") == 72, "scoreboard digits must rasterize natively at 72px")
+	_check(hud.phase_label.get_theme_font_size("font_size") == 32, "game phase label must rasterize natively at 32px")
+	_check(hud.phase_label.position.is_equal_approx(Vector2(1680, 16)) and hud.phase_label.size.is_equal_approx(Vector2(528, 72)), "phase label must occupy the native scoreboard gap")
 	_check(not hud.phase_label.get_global_rect().intersects(hud.out_lamps[-1].get_global_rect()), "phase label must clear the final out lamp")
 	_check(not hud.phase_label.get_global_rect().intersects(hud.bases[0].get_global_rect()), "phase label must clear the first base lamp")
-	_check(hud.landing_prompt.get_theme_font_size("font_size") == 28, "landing prompt must rasterize natively at 28px")
+	_check(hud.landing_prompt.get_theme_font_size("font_size") == 56, "landing prompt must rasterize natively at 56px")
 	_check(_on_four_pixel_grid(hud.score_label.position) and _on_four_pixel_grid(hud.score_label.size), "scoreboard geometry must use the native 4px grid")
 	_check(_on_four_pixel_grid(hud.pitch_row.position) and _on_four_pixel_grid(hud.pitch_row.size), "pitch-selector focus geometry must use the native 4px grid")
 
@@ -233,7 +233,7 @@ func _is_integer(value: float) -> bool:
 func _finish(game: Node, states_checked: int) -> void:
 	var exit_code := 0
 	if _failures.is_empty():
-		print("PIXIBALL_NATIVE_2D_LAYOUT_OK states=%d controls=%d canvas=1280x720 intel=384x432" % [states_checked, _visible_controls_checked])
+		print("PIXIBALL_NATIVE_2D_LAYOUT_OK states=%d controls=%d canvas=2560x1440 intel=768x864" % [states_checked, _visible_controls_checked])
 	else:
 		for failure in _failures:
 			push_error("PIXIBALL_NATIVE_2D_LAYOUT: %s" % failure)

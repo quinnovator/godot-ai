@@ -44,12 +44,12 @@ func _run() -> void:
 	ball.use_pitch_ball()
 	ball.begin_pitch_motion(2400.0, 180.0, false)
 	_check(ball.get_spin_contract() == {"rpm": 2400.0, "axis_degrees": 180.0}, "spin contract changed")
-	for index in range(1, 8):
+	for index in range(1, 14):
 		ball.set_ball_position(Vector3(float(index), float(index % 2), float(index) * -0.5))
 	var pitch_trail: Array = ball.get_trail_world_points()
-	_check(pitch_trail.size() == 5, "pitch trail must be bounded to five discrete points")
-	_check(pitch_trail[0] == Vector3(6.0, 0.0, -3.0), "pitch trail did not keep newest point first")
-	_check(pitch_trail[4] == Vector3(2.0, 0.0, -1.0), "pitch trail did not evict its oldest point")
+	_check(pitch_trail.size() == 10, "pitch trail must be bounded to ten discrete points")
+	_check(pitch_trail[0] == Vector3(12.0, 0.0, -6.0), "pitch trail did not keep newest point first")
+	_check(pitch_trail[9] == Vector3(3.0, 1.0, -1.5), "pitch trail did not evict its oldest point")
 	_validate_trail_points(pitch_trail, "pitch")
 	var unchanged_size := pitch_trail.size()
 	ball.set_ball_position(ball.global_position)
@@ -80,7 +80,7 @@ func _run() -> void:
 
 	var exit_code := 0
 	if _failures.is_empty():
-		print("PIXIBALL_BASEBALL_VISUAL_OK presenter=native_720p grid=4px trail=5/2 spin=bounded")
+		print("PIXIBALL_BASEBALL_VISUAL_OK presenter=native_1440p density=2x grid=4px trail=10/2 spin=bounded")
 	else:
 		for failure in _failures:
 			push_error("PIXIBALL_BASEBALL_VISUAL: %s" % failure)

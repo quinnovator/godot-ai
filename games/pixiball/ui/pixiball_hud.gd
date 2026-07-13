@@ -1,9 +1,9 @@
 class_name PixiballHUD
 extends CanvasLayer
 
-## Native 1280x720 shell and gameplay HUD.
+## Native 2560x1440 shell and gameplay HUD.
 ##
-## Every Control owns direct 720p coordinates and every font is rasterized at
+## Every Control owns direct 1440p coordinates and every font is rasterized at
 ## its native output size. The small design-grid values in the construction
 ## helpers are converted into 4px layout units; no parent Control, texture, or
 ## intermediate viewport is enlarged.
@@ -324,8 +324,8 @@ func _build_pitcher_select() -> void:
 	pitcher_layer.add_child(rail)
 	for index in range(10):
 		var slat_label := _body_label("", 5, STEEL)
-		slat_label.position = Vector2(16, index * RosterRail.SLAT_STEP + 8)
-		slat_label.size = Vector2(152, 28)
+		slat_label.position = Vector2(16, index * RosterRail.SLAT_STEP + 8) * S.DENSITY_SCALE
+		slat_label.size = Vector2(152, 28) * S.DENSITY_SCALE
 		slat_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		rail.add_child(slat_label)
 
@@ -620,28 +620,24 @@ func _build_final() -> void:
 	panorama.sky_low = S.world_role("sky_low", "night")
 	panorama.cloud_lit = S.world_role("cloud_lit", "night")
 	panorama.cloud_shade = S.world_role("cloud_shade", "night")
-	panorama.sea_deep = S.world_role("sea_deep", "night")
-	panorama.sea_mid = S.world_role("sea_mid", "night")
-	panorama.sea_light = S.world_role("sea_light", "night")
-	panorama.foam = S.world_role("foam", "night")
-	panorama.skyline_far = S.world_role("skyline_far", "night")
-	panorama.skyline_near = S.world_role("skyline_near", "night")
-	panorama.structure = S.world_role("structure", "night")
-	panorama.structure_light = S.world_role("structure_light", "night")
-	panorama.seat_a = S.world_role("seat_a", "night")
-	panorama.seat_b = S.world_role("seat_b", "night")
-	panorama.crowd_shade = S.world_role("crowd_shade", "night")
-	panorama.turf = S.world_role("turf", "night")
-	panorama.turf_shadow = S.world_role("turf_shadow", "night")
-	panorama.turf_dark = S.world_role("turf_dark", "night")
-	panorama.clay_shadow = S.world_role("clay_shadow", "night")
-	panorama.lamp_core = S.world_role("lamp_core", "night")
+	panorama.sea_far = S.world_role("sea_far", "night")
+	panorama.sea_near = S.world_role("sea_near", "night")
+	panorama.sea_glint = S.world_role("sea_glint", "night")
+	panorama.town_far = S.world_role("town_far", "night")
+	panorama.town_near = S.world_role("town_near", "night")
+	panorama.stand_shell = S.world_role("stand_shell", "night")
+	panorama.seat_board = S.world_role("seat_board", "night")
+	panorama.crowd_shadow = S.world_role("crowd_shadow", "night")
+	panorama.turf_main = S.world_role("turf_main", "night")
+	panorama.turf_shade = S.world_role("turf_shade", "night")
+	panorama.clay_shade = S.world_role("clay_shade", "night")
+	panorama.window_lit = S.world_role("window_lit", "night")
 	panorama.lamp_glow = S.world_role("lamp_glow", "night")
-	panorama.chalk = S.world_role("chalk", "night")
-	panorama.ink0 = S.world_role("ink0", "night")
-	panorama.gold = S.world_role("team_gold", "night")
-	panorama.trim_red = S.world_role("stitch", "night")
-	panorama.trim_teal = S.world_role("team_teal", "night")
+	panorama.chalk_line = S.world_role("chalk_line", "night")
+	panorama.ink = S.world_role("ink", "night")
+	panorama.lantern_gold = S.world_role("lantern_gold", "night")
+	panorama.stitch_red = S.world_role("stitch_red", "night")
+	panorama.signal_teal = S.world_role("signal_teal", "night")
 	final_layer.add_child(panorama)
 
 	# One dominant rope-hung enamel result sign (bible 10.1/10.6). Win/new-best
@@ -1441,6 +1437,7 @@ class ChevronCell extends Control:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	func _draw() -> void:
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * S.DENSITY_SCALE)
 		if points_up:
 			draw_rect(Rect2(4, 0, 8, 4), color)
 			draw_rect(Rect2(0, 4, 4, 4), color)
@@ -1465,6 +1462,7 @@ class CountPips extends Control:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	func _draw() -> void:
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * S.DENSITY_SCALE)
 		for index in range(3):
 			_draw_round(index * 20, index < balls)
 		for index in range(2):
@@ -1498,6 +1496,7 @@ class DiamondCell extends Panel:
 		add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 
 	func _draw() -> void:
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * S.DENSITY_SCALE)
 		var color := fill if occupied else hollow
 		draw_rect(Rect2(4, 0, 4, 4), color)
 		draw_rect(Rect2(0, 4, 12, 4), color)
@@ -1538,6 +1537,7 @@ class PennantTab extends Panel:
 		add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 
 	func _draw() -> void:
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * S.DENSITY_SCALE)
 		for row in INK_ROWS:
 			draw_rect(Rect2(row[0], row[1], row[2], row[3]), ink)
 		var color := cloth if focused else cloth.lerp(dim, 0.55)
@@ -1566,6 +1566,7 @@ class EnamelSign extends Control:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	func _draw() -> void:
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * S.DENSITY_SCALE)
 		for rope_x in [64, 380]:
 			draw_rect(Rect2(rope_x, 0, 4, 40), rope)
 			draw_rect(Rect2(rope_x, 8, 4, 4), rope_lit)
@@ -1626,23 +1627,25 @@ class PlankCard extends PanelContainer:
 
 	func set_focused(active: bool) -> void:
 		focused = active
-		position.y = rest_top - (4.0 if active else 0.0)
+		position.y = rest_top - (4.0 * S.DENSITY_SCALE if active else 0.0)
 		queue_redraw()
 
 	func _draw() -> void:
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * S.DENSITY_SCALE)
+		var draw_size := size / S.DENSITY_SCALE
 		var drop := 20.0 if focused else 16.0
-		draw_rect(Rect2(Vector2(drop, drop), size), ink)
-		draw_rect(Rect2(Vector2.ZERO, size), ink)
-		draw_rect(Rect2(8, 8, size.x - 16, size.y - 16), BOARD)
+		draw_rect(Rect2(Vector2(drop, drop), draw_size), ink)
+		draw_rect(Rect2(Vector2.ZERO, draw_size), ink)
+		draw_rect(Rect2(8, 8, draw_size.x - 16, draw_size.y - 16), BOARD)
 		var seam := BOARD.lerp(ink, 0.4)
-		draw_rect(Rect2(16, 48, size.x - 24, 4), seam)
-		draw_rect(Rect2(16, 100, size.x - 24, 4), seam)
+		draw_rect(Rect2(16, 48, draw_size.x - 24, 4), seam)
+		draw_rect(Rect2(16, 100, draw_size.x - 24, 4), seam)
 		for dash in GRAIN_DASHES:
 			draw_rect(Rect2(dash[0], dash[1], dash[2], 4), GRAIN)
-		draw_rect(Rect2(8, 8, 8, size.y - 16), trim)
+		draw_rect(Rect2(8, 8, 8, draw_size.y - 16), trim)
 		_draw_chip()
 		if focused:
-			_draw_ticks()
+			_draw_ticks(draw_size)
 
 	func _draw_chip() -> void:
 		draw_rect(Rect2(24, 24, 72, 80), ink)
@@ -1665,15 +1668,15 @@ class PlankCard extends PanelContainer:
 			draw_rect(Rect2(60, 56, 12, 4), teal)
 			draw_rect(Rect2(64, 60, 8, 4), teal)
 
-	func _draw_ticks() -> void:
+	func _draw_ticks(draw_size: Vector2) -> void:
 		draw_rect(Rect2(0, 0, TICK_ARM, TICK_THICK), tick)
 		draw_rect(Rect2(0, 0, TICK_THICK, TICK_ARM), tick)
-		draw_rect(Rect2(size.x - TICK_ARM, 0, TICK_ARM, TICK_THICK), tick)
-		draw_rect(Rect2(size.x - TICK_THICK, 0, TICK_THICK, TICK_ARM), tick)
-		draw_rect(Rect2(0, size.y - TICK_THICK, TICK_ARM, TICK_THICK), tick)
-		draw_rect(Rect2(0, size.y - TICK_ARM, TICK_THICK, TICK_ARM), tick)
-		draw_rect(Rect2(size.x - TICK_ARM, size.y - TICK_THICK, TICK_ARM, TICK_THICK), tick)
-		draw_rect(Rect2(size.x - TICK_THICK, size.y - TICK_ARM, TICK_THICK, TICK_ARM), tick)
+		draw_rect(Rect2(draw_size.x - TICK_ARM, 0, TICK_ARM, TICK_THICK), tick)
+		draw_rect(Rect2(draw_size.x - TICK_THICK, 0, TICK_THICK, TICK_ARM), tick)
+		draw_rect(Rect2(0, draw_size.y - TICK_THICK, TICK_ARM, TICK_THICK), tick)
+		draw_rect(Rect2(0, draw_size.y - TICK_ARM, TICK_THICK, TICK_ARM), tick)
+		draw_rect(Rect2(draw_size.x - TICK_ARM, draw_size.y - TICK_THICK, TICK_ARM, TICK_THICK), tick)
+		draw_rect(Rect2(draw_size.x - TICK_THICK, draw_size.y - TICK_ARM, TICK_THICK, TICK_ARM), tick)
 
 
 class LandingPrompt extends Label:
@@ -1712,20 +1715,22 @@ class ScoutPlank extends Control:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	func _draw() -> void:
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * S.DENSITY_SCALE)
+		var draw_size := size / S.DENSITY_SCALE
 		if shadow_drop > 0:
-			draw_rect(Rect2(Vector2(shadow_drop, shadow_drop), size), ink)
-		draw_rect(Rect2(Vector2.ZERO, size), ink)
-		draw_rect(Rect2(8, 8, size.x - 16, size.y - 16), board)
-		draw_rect(Rect2(8, 8, 8, size.y - 16), trim)
+			draw_rect(Rect2(Vector2(shadow_drop, shadow_drop), draw_size), ink)
+		draw_rect(Rect2(Vector2.ZERO, draw_size), ink)
+		draw_rect(Rect2(8, 8, draw_size.x - 16, draw_size.y - 16), board)
+		draw_rect(Rect2(8, 8, 8, draw_size.y - 16), trim)
 		# Deterministic grain: one dash per 24px row, walking a fixed 44px
 		# stride so no two neighboring rows repeat (bible 5.1).
 		var row := 0
 		var y := 24.0
-		while y < size.y - 16.0:
-			var span := size.x - 88.0
+		while y < draw_size.y - 16.0:
+			var span := draw_size.x - 88.0
 			if span >= 4.0:
 				var dash_x := 24.0 + fmod(row * 44.0, span)
-				var dash_w := minf(16.0 + (row % 3) * 8.0, size.x - 8.0 - dash_x)
+				var dash_w := minf(16.0 + (row % 3) * 8.0, draw_size.x - 8.0 - dash_x)
 				if dash_w >= 8.0:
 					draw_rect(Rect2(dash_x, y, dash_w, 4), grain)
 			row += 1
@@ -1759,6 +1764,7 @@ class RosterRail extends Control:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	func _draw() -> void:
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * S.DENSITY_SCALE)
 		for index in range(count):
 			var focused := index == focus_index
 			var top := index * SLAT_STEP - (4 if focused else 0)
@@ -1830,9 +1836,11 @@ class PitcherPortraitChip extends Control:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	func _draw() -> void:
-		draw_rect(Rect2(Vector2.ZERO, size), ink)
-		draw_rect(Rect2(4, 4, size.x - 8, size.y - 8), trim)
-		draw_rect(Rect2(8, 8, size.x - 16, size.y - 16), backdrop)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * S.DENSITY_SCALE)
+		var draw_size := size / S.DENSITY_SCALE
+		draw_rect(Rect2(Vector2.ZERO, draw_size), ink)
+		draw_rect(Rect2(4, 4, draw_size.x - 8, draw_size.y - 8), trim)
+		draw_rect(Rect2(8, 8, draw_size.x - 16, draw_size.y - 16), backdrop)
 		var flip := throws.to_upper().begins_with("R")
 		for row in range(BUST.size()):
 			var line: String = BUST[row]
@@ -1890,18 +1898,20 @@ class ClubPlankCard extends PanelContainer:
 		focused = has_focus
 		picked_p1 = p1
 		picked_cpu = cpu
-		position.y = rest_top - (4.0 if has_focus else 0.0)
+		position.y = rest_top - (4.0 * S.DENSITY_SCALE if has_focus else 0.0)
 		queue_redraw()
 
 	func _draw() -> void:
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * S.DENSITY_SCALE)
+		var draw_size := size / S.DENSITY_SCALE
 		var drop := 12.0 if focused else 8.0
-		draw_rect(Rect2(Vector2(drop, drop), size), ink)
-		draw_rect(Rect2(Vector2.ZERO, size), ink)
-		draw_rect(Rect2(4, 4, size.x - 8, size.y - 8), board_lit if focused else board)
-		draw_rect(Rect2(4, 4, 4, size.y - 8), trim)
+		draw_rect(Rect2(Vector2(drop, drop), draw_size), ink)
+		draw_rect(Rect2(Vector2.ZERO, draw_size), ink)
+		draw_rect(Rect2(4, 4, draw_size.x - 8, draw_size.y - 8), board_lit if focused else board)
+		draw_rect(Rect2(4, 4, 4, draw_size.y - 8), trim)
 		# Deterministic authored grain so no plank matches its neighbor.
-		draw_rect(Rect2(16 + (grain_seed % 3) * 12, size.y - 24, 20, 4), grain)
-		draw_rect(Rect2(52 + (grain_seed % 2) * 16, size.y - 12, 16, 4), grain)
+		draw_rect(Rect2(16 + (grain_seed % 3) * 12, draw_size.y - 24, 20, 4), grain)
+		draw_rect(Rect2(52 + (grain_seed % 2) * 16, draw_size.y - 12, 16, 4), grain)
 		draw_rect(Rect2(56 + (grain_seed % 4) * 8, 28, 12, 4), grain)
 		# Club pennant: ink pole with the bounded club-color flag.
 		draw_rect(Rect2(12, 8, 4, 24), ink)
@@ -1918,12 +1928,12 @@ class ClubPlankCard extends PanelContainer:
 		if focused:
 			draw_rect(Rect2(0, 0, TICK_ARM, TICK_THICK), tick)
 			draw_rect(Rect2(0, 0, TICK_THICK, TICK_ARM), tick)
-			draw_rect(Rect2(size.x - TICK_ARM, 0, TICK_ARM, TICK_THICK), tick)
-			draw_rect(Rect2(size.x - TICK_THICK, 0, TICK_THICK, TICK_ARM), tick)
-			draw_rect(Rect2(0, size.y - TICK_THICK, TICK_ARM, TICK_THICK), tick)
-			draw_rect(Rect2(0, size.y - TICK_ARM, TICK_THICK, TICK_ARM), tick)
-			draw_rect(Rect2(size.x - TICK_ARM, size.y - TICK_THICK, TICK_ARM, TICK_THICK), tick)
-			draw_rect(Rect2(size.x - TICK_THICK, size.y - TICK_ARM, TICK_THICK, TICK_ARM), tick)
+			draw_rect(Rect2(draw_size.x - TICK_ARM, 0, TICK_ARM, TICK_THICK), tick)
+			draw_rect(Rect2(draw_size.x - TICK_THICK, 0, TICK_THICK, TICK_ARM), tick)
+			draw_rect(Rect2(0, draw_size.y - TICK_THICK, TICK_ARM, TICK_THICK), tick)
+			draw_rect(Rect2(0, draw_size.y - TICK_ARM, TICK_THICK, TICK_ARM), tick)
+			draw_rect(Rect2(draw_size.x - TICK_ARM, draw_size.y - TICK_THICK, TICK_ARM, TICK_THICK), tick)
+			draw_rect(Rect2(draw_size.x - TICK_THICK, draw_size.y - TICK_ARM, TICK_THICK, TICK_ARM), tick)
 
 
 class OptionFixture extends PanelContainer:
@@ -1950,27 +1960,29 @@ class OptionFixture extends PanelContainer:
 
 	func set_focused(active: bool) -> void:
 		focused = active
-		position.y = rest_top - (4.0 if active else 0.0)
+		position.y = rest_top - (4.0 * S.DENSITY_SCALE if active else 0.0)
 		queue_redraw()
 
 	func _draw() -> void:
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * S.DENSITY_SCALE)
+		var draw_size := size / S.DENSITY_SCALE
 		var drop := 12.0 if focused else 8.0
-		draw_rect(Rect2(Vector2(drop, drop), size), ink)
-		draw_rect(Rect2(Vector2.ZERO, size), ink)
-		draw_rect(Rect2(4, 4, size.x - 8, size.y - 8), board_lit if focused else board)
-		draw_rect(Rect2(4, 4, 4, size.y - 8), trim)
+		draw_rect(Rect2(Vector2(drop, drop), draw_size), ink)
+		draw_rect(Rect2(Vector2.ZERO, draw_size), ink)
+		draw_rect(Rect2(4, 4, draw_size.x - 8, draw_size.y - 8), board_lit if focused else board)
+		draw_rect(Rect2(4, 4, 4, draw_size.y - 8), trim)
 		draw_rect(Rect2(124, 16, 20, 4), grain)
-		draw_rect(Rect2(16, size.y - 24, 24, 4), grain)
-		draw_rect(Rect2(64, size.y - 12, 20, 4), grain)
+		draw_rect(Rect2(16, draw_size.y - 24, 24, 4), grain)
+		draw_rect(Rect2(64, draw_size.y - 12, 20, 4), grain)
 		if focused:
 			draw_rect(Rect2(0, 0, TICK_ARM, TICK_THICK), tick)
 			draw_rect(Rect2(0, 0, TICK_THICK, TICK_ARM), tick)
-			draw_rect(Rect2(size.x - TICK_ARM, 0, TICK_ARM, TICK_THICK), tick)
-			draw_rect(Rect2(size.x - TICK_THICK, 0, TICK_THICK, TICK_ARM), tick)
-			draw_rect(Rect2(0, size.y - TICK_THICK, TICK_ARM, TICK_THICK), tick)
-			draw_rect(Rect2(0, size.y - TICK_ARM, TICK_THICK, TICK_ARM), tick)
-			draw_rect(Rect2(size.x - TICK_ARM, size.y - TICK_THICK, TICK_ARM, TICK_THICK), tick)
-			draw_rect(Rect2(size.x - TICK_THICK, size.y - TICK_ARM, TICK_THICK, TICK_ARM), tick)
+			draw_rect(Rect2(draw_size.x - TICK_ARM, 0, TICK_ARM, TICK_THICK), tick)
+			draw_rect(Rect2(draw_size.x - TICK_THICK, 0, TICK_THICK, TICK_ARM), tick)
+			draw_rect(Rect2(0, draw_size.y - TICK_THICK, TICK_ARM, TICK_THICK), tick)
+			draw_rect(Rect2(0, draw_size.y - TICK_ARM, TICK_THICK, TICK_ARM), tick)
+			draw_rect(Rect2(draw_size.x - TICK_ARM, draw_size.y - TICK_THICK, TICK_ARM, TICK_THICK), tick)
+			draw_rect(Rect2(draw_size.x - TICK_THICK, draw_size.y - TICK_ARM, TICK_THICK, TICK_ARM), tick)
 
 
 class MatchupBoard extends Control:
@@ -1987,10 +1999,12 @@ class MatchupBoard extends Control:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	func _draw() -> void:
-		draw_rect(Rect2(Vector2(8, 8), size), ink)
-		draw_rect(Rect2(Vector2.ZERO, size), bezel)
-		draw_rect(Rect2(4, 4, size.x - 8, size.y - 8), face)
-		for corner in [Vector2(8, 8), Vector2(size.x - 12, 8), Vector2(8, size.y - 12), Vector2(size.x - 12, size.y - 12)]:
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * S.DENSITY_SCALE)
+		var draw_size := size / S.DENSITY_SCALE
+		draw_rect(Rect2(Vector2(8, 8), draw_size), ink)
+		draw_rect(Rect2(Vector2.ZERO, draw_size), bezel)
+		draw_rect(Rect2(4, 4, draw_size.x - 8, draw_size.y - 8), face)
+		for corner in [Vector2(8, 8), Vector2(draw_size.x - 12, 8), Vector2(8, draw_size.y - 12), Vector2(draw_size.x - 12, draw_size.y - 12)]:
 			draw_rect(Rect2(corner, Vector2(4, 4)), rivet)
 
 
@@ -2028,18 +2042,20 @@ class PlayBallFixture extends Control:
 	func set_state(can_play: bool, has_focus: bool) -> void:
 		enabled = can_play
 		focused = has_focus
-		position.y = rest_top - (4.0 if has_focus else 0.0)
+		position.y = rest_top - (4.0 * S.DENSITY_SCALE if has_focus else 0.0)
 		if label != null:
 			label.add_theme_color_override("font_color", lit_text if can_play else dim_text)
 		queue_redraw()
 
 	func _draw() -> void:
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * S.DENSITY_SCALE)
+		var draw_size := size / S.DENSITY_SCALE
 		if enabled:
 			var drop := 12.0 if focused else 8.0
-			draw_rect(Rect2(Vector2(drop, drop), size), ink)
-		draw_rect(Rect2(Vector2.ZERO, size), bezel if enabled else ink)
-		draw_rect(Rect2(4, 4, size.x - 8, size.y - 8), face if enabled else disabled_fill)
-		for corner in [Vector2(8, 8), Vector2(size.x - 12, 8), Vector2(8, size.y - 12), Vector2(size.x - 12, size.y - 12)]:
+			draw_rect(Rect2(Vector2(drop, drop), draw_size), ink)
+		draw_rect(Rect2(Vector2.ZERO, draw_size), bezel if enabled else ink)
+		draw_rect(Rect2(4, 4, draw_size.x - 8, draw_size.y - 8), face if enabled else disabled_fill)
+		for corner in [Vector2(8, 8), Vector2(draw_size.x - 12, 8), Vector2(8, draw_size.y - 12), Vector2(draw_size.x - 12, draw_size.y - 12)]:
 			draw_rect(Rect2(corner, Vector2(4, 4)), rivet if enabled else rivet_off)
 		# Ready lamp: the shape stays put and only its value changes, so the
 		# enabled state never reads by hue alone.
@@ -2048,12 +2064,12 @@ class PlayBallFixture extends Control:
 		if focused:
 			draw_rect(Rect2(0, 0, TICK_ARM, TICK_THICK), tick)
 			draw_rect(Rect2(0, 0, TICK_THICK, TICK_ARM), tick)
-			draw_rect(Rect2(size.x - TICK_ARM, 0, TICK_ARM, TICK_THICK), tick)
-			draw_rect(Rect2(size.x - TICK_THICK, 0, TICK_THICK, TICK_ARM), tick)
-			draw_rect(Rect2(0, size.y - TICK_THICK, TICK_ARM, TICK_THICK), tick)
-			draw_rect(Rect2(0, size.y - TICK_ARM, TICK_THICK, TICK_ARM), tick)
-			draw_rect(Rect2(size.x - TICK_ARM, size.y - TICK_THICK, TICK_ARM, TICK_THICK), tick)
-			draw_rect(Rect2(size.x - TICK_THICK, size.y - TICK_ARM, TICK_THICK, TICK_ARM), tick)
+			draw_rect(Rect2(draw_size.x - TICK_ARM, 0, TICK_ARM, TICK_THICK), tick)
+			draw_rect(Rect2(draw_size.x - TICK_THICK, 0, TICK_THICK, TICK_ARM), tick)
+			draw_rect(Rect2(0, draw_size.y - TICK_THICK, TICK_ARM, TICK_THICK), tick)
+			draw_rect(Rect2(0, draw_size.y - TICK_ARM, TICK_THICK, TICK_ARM), tick)
+			draw_rect(Rect2(draw_size.x - TICK_ARM, draw_size.y - TICK_THICK, TICK_ARM, TICK_THICK), tick)
+			draw_rect(Rect2(draw_size.x - TICK_THICK, draw_size.y - TICK_ARM, TICK_THICK, TICK_ARM), tick)
 
 
 class FinalNightPanorama extends Control:
@@ -2074,28 +2090,24 @@ class FinalNightPanorama extends Control:
 	var sky_low := Color.BLACK
 	var cloud_lit := Color.BLACK
 	var cloud_shade := Color.BLACK
-	var sea_deep := Color.BLACK
-	var sea_mid := Color.BLACK
-	var sea_light := Color.BLACK
-	var foam := Color.BLACK
-	var skyline_far := Color.BLACK
-	var skyline_near := Color.BLACK
-	var structure := Color.BLACK
-	var structure_light := Color.BLACK
-	var seat_a := Color.BLACK
-	var seat_b := Color.BLACK
-	var crowd_shade := Color.BLACK
-	var turf := Color.BLACK
-	var turf_shadow := Color.BLACK
-	var turf_dark := Color.BLACK
-	var clay_shadow := Color.BLACK
-	var lamp_core := Color.BLACK
+	var sea_far := Color.BLACK
+	var sea_near := Color.BLACK
+	var sea_glint := Color.BLACK
+	var town_far := Color.BLACK
+	var town_near := Color.BLACK
+	var stand_shell := Color.BLACK
+	var seat_board := Color.BLACK
+	var crowd_shadow := Color.BLACK
+	var turf_main := Color.BLACK
+	var turf_shade := Color.BLACK
+	var clay_shade := Color.BLACK
+	var window_lit := Color.BLACK
 	var lamp_glow := Color.BLACK
-	var chalk := Color.BLACK
-	var ink0 := Color.BLACK
-	var gold := Color.BLACK
-	var trim_red := Color.BLACK
-	var trim_teal := Color.BLACK
+	var chalk_line := Color.BLACK
+	var ink := Color.BLACK
+	var lantern_gold := Color.BLACK
+	var stitch_red := Color.BLACK
+	var signal_teal := Color.BLACK
 	var celebrating := false
 	var _time := 0.0
 	var _tick := 0
@@ -2122,32 +2134,33 @@ class FinalNightPanorama extends Control:
 		draw_rect(Rect2(x * CELL, y * CELL, w * CELL, h * CELL), color)
 
 	func _draw() -> void:
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * S.DENSITY_SCALE)
 		_draw_sky()
 		_draw_water()
 		_draw_skyline()
 		_draw_stands()
 		_draw_field()
-		_cell(0, 166, 320, 14, ink0)
+		_cell(0, 166, 320, 14, ink)
 		for i in range(24):
-			_cell(i * 13 + (i % 4), 165, 5, 1, ink0)
+			_cell(i * 13 + (i % 4), 165, 5, 1, ink)
 		for i in range(7):
-			_cell(i * 44 + 12, 169, 8, 1, structure)
+			_cell(i * 44 + 12, 169, 8, 1, stand_shell)
 		if celebrating:
-			_draw_firework(36, 22, _tick % 4, trim_teal)
-			_draw_firework(272, 28, (_tick + 2) % 4, trim_red)
-			_draw_streamer(60, 88, trim_red)
-			_draw_streamer(252, 88, trim_teal)
+			_draw_firework(36, 22, _tick % 4, signal_teal)
+			_draw_firework(272, 28, (_tick + 2) % 4, stitch_red)
+			_draw_streamer(60, 88, stitch_red)
+			_draw_streamer(252, 88, signal_teal)
 
 	func _draw_sky() -> void:
 		_cell(0, 0, 320, 46, sky_high)
 		# Static star field: 34 single accent cells, authored-list exception.
 		for i in range(34):
-			_cell((i * 67 + 13) % 316, (i * 29 + 3) % 38, 1, 1, foam if i % 7 == 0 else cloud_lit)
+			_cell((i * 67 + 13) % 316, (i * 29 + 3) % 38, 1, 1, sea_glint if i % 7 == 0 else cloud_lit)
 		# Stepped moon disc, upper right, feeding the water path below.
-		_cell(281, 8, 2, 1, chalk)
-		_cell(280, 9, 4, 2, chalk)
-		_cell(281, 11, 2, 1, chalk)
-		_cell(280, 9, 1, 2, foam)
+		_cell(281, 8, 2, 1, chalk_line)
+		_cell(280, 9, 4, 2, chalk_line)
+		_cell(281, 11, 2, 1, chalk_line)
+		_cell(280, 9, 1, 2, sea_glint)
 		# Two cloud masses with lit tops and shaded bellies.
 		_cell(20, 26, 22, 3, cloud_shade)
 		_cell(26, 24, 12, 2, cloud_shade)
@@ -2163,106 +2176,106 @@ class FinalNightPanorama extends Control:
 		_cell(0, 46, 320, 12, sky_low)
 
 	func _draw_water() -> void:
-		_cell(0, 58, 320, 14, sea_deep)
-		_cell(0, 72, 320, 14, sea_mid)
-		# Permitted 2x1 checker at the sea_deep -> sea_mid seam.
+		_cell(0, 58, 320, 14, sea_far)
+		_cell(0, 72, 320, 14, sea_near)
+		# Permitted 2x1 checker at the sea_far -> sea_near seam.
 		for x in range(0, 320, 4):
-			_cell(x, 71, 2, 1, sea_mid)
-			_cell(x + 2, 72, 2, 1, sea_deep)
+			_cell(x, 71, 2, 1, sea_near)
+			_cell(x + 2, 72, 2, 1, sea_far)
 
 	func _draw_skyline() -> void:
 		# Far row: pure silhouette teeth and masts on its own value rung.
-		_cell(0, 48, 320, 10, skyline_far)
+		_cell(0, 48, 320, 10, town_far)
 		for i in range(13):
 			var bh := 3 + (i * 5) % 6
-			_cell(i * 25 + (i % 3) * 3, 48 - bh, 16 - (i % 3) * 4, bh, skyline_far)
+			_cell(i * 25 + (i % 3) * 3, 48 - bh, 16 - (i % 3) * 4, bh, town_far)
 		for i in range(6):
-			_cell(i * 51 + 24, 40 + (i % 3) * 2, 1, 8, skyline_far)
+			_cell(i * 51 + 24, 40 + (i % 3) * 2, 1, 8, town_far)
 		# Near row: continuous wharf front with gabled blocks over the water.
-		_cell(0, 54, 320, 12, skyline_near)
+		_cell(0, 54, 320, 12, town_near)
 		for i in range(10):
 			var bh := 3 + (i * 7) % 7
 			var bx := i * 33 + (i % 4) * 2
-			_cell(bx, 54 - bh, 12 + (i % 3) * 6, bh, skyline_near)
-			_cell(bx + 4, 54 - bh - 2, 4, 2, skyline_near)
+			_cell(bx, 54 - bh, 12 + (i % 3) * 6, bh, town_near)
+			_cell(bx + 4, 54 - bh - 2, 4, 2, town_near)
 		# Lighthouse at the right skyline edge, lamp room quietly lit.
-		_cell(294, 38, 5, 16, skyline_near)
-		_cell(295, 44, 3, 2, foam)
-		_cell(294, 36, 5, 2, ink0)
+		_cell(294, 38, 5, 16, town_near)
+		_cell(295, 44, 3, 2, sea_glint)
+		_cell(294, 36, 5, 2, ink)
 		_cell(295, 34, 3, 2, lamp_glow)
 		# Lit windows across the wharf; celebration pulses one value step.
 		var pulse := celebrating and _tick % 5 == 0
 		for i in range(36):
-			_cell(4 + (i * 26 + (i * i) % 7) % 310, 56 + (i * 11) % 8, 1, 1, lamp_core if pulse else lamp_glow)
+			_cell(4 + (i * 26 + (i * i) % 7) % 310, 56 + (i * 11) % 8, 1, 1, window_lit if pulse else lamp_glow)
 		# Directional wave grain and the moonlight path, drawn over the wharf
 		# base so the chop laps the pilings.
 		for i in range(22):
 			var wy := 67 + (i * 29) % 17
-			_cell((i * 53 + 7) % 314, wy, 2, 1, sea_light if wy >= 74 else sea_mid)
+			_cell((i * 53 + 7) % 314, wy, 2, 1, sea_glint if wy >= 74 else sea_near)
 		for i in range(7):
-			_cell(274 + ((i * 5) % 3) * 4, 66 + i * 3, 2, 1, foam if i % 3 == 0 else sea_light)
+			_cell(274 + ((i * 5) % 3) * 4, 66 + i * 3, 2, 1, sea_glint if i % 3 == 0 else sea_glint)
 
 	func _draw_stands() -> void:
-		_cell(0, 86, 320, 32, structure)
+		_cell(0, 86, 320, 32, stand_shell)
 		for i in range(13):
-			_cell(8 + i * 24, 87, 6, 1, trim_red if i % 2 == 0 else trim_teal)
-		_cell(0, 89, 320, 1, ink0)
+			_cell(8 + i * 24, 87, 6, 1, stitch_red if i % 2 == 0 else signal_teal)
+		_cell(0, 89, 320, 1, ink)
 		for row in range(6):
-			_cell(0, 92 + row * 2, 320, 1, seat_a if row % 2 == 0 else seat_b)
+			_cell(0, 92 + row * 2, 320, 1, seat_board if row % 2 == 0 else stand_shell)
 		for i in range(32):
-			_cell(2 + i * 10, 90, 1, 14, structure)
+			_cell(2 + i * 10, 90, 1, 14, stand_shell)
 		# Sparse crowd clumps silhouetted over the under-deck dark band.
 		for i in range(38):
 			var ch := 2 + (i * 3) % 3
-			_cell((i * 17 + (i % 5) * 3) % 314, 104 - ch, 4 + (i % 3) * 2, ch, crowd_shade)
-		_cell(0, 104, 320, 14, crowd_shade)
+			_cell((i * 17 + (i % 5) * 3) % 314, 104 - ch, 4 + (i % 3) * 2, ch, crowd_shadow)
+		_cell(0, 104, 320, 14, crowd_shadow)
 		# Two lit lamp towers on the flanks with stepped pre-blended halos.
 		for tower_x in [40, 280]:
-			_cell(tower_x - 7, 55, 16, 10, lamp_glow.lerp(skyline_near, 0.75))
-			_cell(tower_x - 5, 57, 12, 6, lamp_glow.lerp(skyline_near, 0.5))
-			_cell(tower_x - 5, 58, 12, 4, ink0)
+			_cell(tower_x - 7, 55, 16, 10, lamp_glow.lerp(town_near, 0.75))
+			_cell(tower_x - 5, 57, 12, 6, lamp_glow.lerp(town_near, 0.5))
+			_cell(tower_x - 5, 58, 12, 4, ink)
 			for head in range(3):
-				_cell(tower_x - 4 + head * 4, 59, 3, 2, lamp_core)
-			_cell(tower_x - 5, 62, 12, 2, structure_light)
-			_cell(tower_x, 64, 2, 22, structure_light)
+				_cell(tower_x - 4 + head * 4, 59, 3, 2, window_lit)
+			_cell(tower_x - 5, 62, 12, 2, seat_board)
+			_cell(tower_x, 64, 2, 22, seat_board)
 
 	func _draw_field() -> void:
 		# Outfield wall band with a lit top rail and distance markers.
-		_cell(0, 118, 320, 6, skyline_near)
-		_cell(0, 118, 320, 1, structure_light)
-		_cell(0, 123, 320, 1, ink0)
-		_cell(56, 120, 6, 2, sea_light)
-		_cell(262, 120, 6, 2, sea_light)
+		_cell(0, 118, 320, 6, town_near)
+		_cell(0, 118, 320, 1, seat_board)
+		_cell(0, 123, 320, 1, ink)
+		_cell(56, 120, 6, 2, sea_glint)
+		_cell(262, 120, 6, 2, sea_glint)
 		# Night playfield: dark base, warning-track seam, drifting mow bands.
-		_cell(0, 124, 320, 42, turf_dark)
-		_cell(0, 124, 320, 2, clay_shadow)
+		_cell(0, 124, 320, 42, turf_shade)
+		_cell(0, 124, 320, 2, clay_shade)
 		for band in range(3):
 			var y := 130 + band * 12
-			_cell(0, y, 320, 8, turf_shadow)
+			_cell(0, y, 320, 8, turf_shade)
 			for i in range(11):
-				_cell(i * 29 + band * 7, y - 1, 6, 1, turf_shadow)
-				_cell(i * 29 + 14 + band * 5, y + 8, 6, 1, turf_shadow)
+				_cell(i * 29 + band * 7, y - 1, 6, 1, turf_shade)
+				_cell(i * 29 + 14 + band * 5, y + 8, 6, 1, turf_shade)
 		# The field lifts inside two stepped lamp pools under the towers.
 		for pool_x in [40, 280]:
 			var widths := [12, 20, 26, 28, 26, 20, 12]
 			for r in range(widths.size()):
-				_cell(pool_x - widths[r] / 2, 134 + r * 2, widths[r], 2, turf_shadow)
+				_cell(pool_x - widths[r] / 2, 134 + r * 2, widths[r], 2, turf_shade)
 			var inner := [10, 16, 18, 16, 10]
 			for r in range(inner.size()):
-				_cell(pool_x - inner[r] / 2, 136 + r * 2, inner[r], 2, turf)
+				_cell(pool_x - inner[r] / 2, 136 + r * 2, inner[r], 2, turf_main)
 
 	func _draw_firework(cx: int, cy: int, phase: int, tone: Color) -> void:
 		# Stepped 8-spoke burst (bible 9.7): bloom, spokes, tips, dark — four
 		# ticks; the two bursts run offset so at most two are ever alive.
 		match phase:
 			0:
-				_cell(cx - 1, cy - 1, 2, 2, gold)
+				_cell(cx - 1, cy - 1, 2, 2, lantern_gold)
 			1:
-				_cell(cx, cy, 1, 1, lamp_core)
-				_cell(cx - 3, cy, 2, 1, gold)
-				_cell(cx + 2, cy, 2, 1, gold)
-				_cell(cx, cy - 3, 1, 2, gold)
-				_cell(cx, cy + 2, 1, 2, gold)
+				_cell(cx, cy, 1, 1, window_lit)
+				_cell(cx - 3, cy, 2, 1, lantern_gold)
+				_cell(cx + 2, cy, 2, 1, lantern_gold)
+				_cell(cx, cy - 3, 1, 2, lantern_gold)
+				_cell(cx, cy + 2, 1, 2, lantern_gold)
 				_cell(cx - 2, cy - 2, 1, 1, tone)
 				_cell(cx + 2, cy - 2, 1, 1, tone)
 				_cell(cx - 2, cy + 2, 1, 1, tone)
@@ -2311,6 +2324,7 @@ class FinalResultSign extends Control:
 		queue_redraw()
 
 	func _draw() -> void:
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * S.DENSITY_SCALE)
 		for rope_x in [128, 560]:
 			draw_rect(Rect2(rope_x, 0, 4, 72), rope)
 			draw_rect(Rect2(rope_x, 12, 4, 4), rope_lit)
@@ -2380,7 +2394,7 @@ class FinalActionFixture extends PanelContainer:
 
 	func set_focused(active: bool) -> void:
 		focused = active
-		position.y = rest_top - (4.0 if active else 0.0)
+		position.y = rest_top - (4.0 * S.DENSITY_SCALE if active else 0.0)
 		queue_redraw()
 
 	func _process(_delta: float) -> void:
@@ -2392,19 +2406,21 @@ class FinalActionFixture extends PanelContainer:
 			queue_redraw()
 
 	func _draw() -> void:
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * S.DENSITY_SCALE)
+		var draw_size := size / S.DENSITY_SCALE
 		var drop := 12.0 if focused else 8.0
-		draw_rect(Rect2(Vector2(drop, drop), size), ink)
-		draw_rect(Rect2(Vector2.ZERO, size), ink)
-		draw_rect(Rect2(4, 4, size.x - 8, size.y - 8), board_lit if focused and not _blink_dim else board)
-		draw_rect(Rect2(4, 4, 4, size.y - 8), trim)
-		draw_rect(Rect2(16 + (grain_seed % 3) * 20, size.y - 12, 24, 4), grain)
-		draw_rect(Rect2(size.x - 60 + (grain_seed % 2) * 12, 8, 20, 4), grain)
+		draw_rect(Rect2(Vector2(drop, drop), draw_size), ink)
+		draw_rect(Rect2(Vector2.ZERO, draw_size), ink)
+		draw_rect(Rect2(4, 4, draw_size.x - 8, draw_size.y - 8), board_lit if focused and not _blink_dim else board)
+		draw_rect(Rect2(4, 4, 4, draw_size.y - 8), trim)
+		draw_rect(Rect2(16 + (grain_seed % 3) * 20, draw_size.y - 12, 24, 4), grain)
+		draw_rect(Rect2(draw_size.x - 60 + (grain_seed % 2) * 12, 8, 20, 4), grain)
 		if focused:
 			draw_rect(Rect2(0, 0, TICK_ARM, TICK_THICK), tick)
 			draw_rect(Rect2(0, 0, TICK_THICK, TICK_ARM), tick)
-			draw_rect(Rect2(size.x - TICK_ARM, 0, TICK_ARM, TICK_THICK), tick)
-			draw_rect(Rect2(size.x - TICK_THICK, 0, TICK_THICK, TICK_ARM), tick)
-			draw_rect(Rect2(0, size.y - TICK_THICK, TICK_ARM, TICK_THICK), tick)
-			draw_rect(Rect2(0, size.y - TICK_ARM, TICK_THICK, TICK_ARM), tick)
-			draw_rect(Rect2(size.x - TICK_ARM, size.y - TICK_THICK, TICK_ARM, TICK_THICK), tick)
-			draw_rect(Rect2(size.x - TICK_THICK, size.y - TICK_ARM, TICK_THICK, TICK_ARM), tick)
+			draw_rect(Rect2(draw_size.x - TICK_ARM, 0, TICK_ARM, TICK_THICK), tick)
+			draw_rect(Rect2(draw_size.x - TICK_THICK, 0, TICK_THICK, TICK_ARM), tick)
+			draw_rect(Rect2(0, draw_size.y - TICK_THICK, TICK_ARM, TICK_THICK), tick)
+			draw_rect(Rect2(0, draw_size.y - TICK_ARM, TICK_THICK, TICK_ARM), tick)
+			draw_rect(Rect2(draw_size.x - TICK_ARM, draw_size.y - TICK_THICK, TICK_ARM, TICK_THICK), tick)
+			draw_rect(Rect2(draw_size.x - TICK_THICK, draw_size.y - TICK_ARM, TICK_THICK, TICK_ARM), tick)

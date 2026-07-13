@@ -2,7 +2,7 @@ extends SceneTree
 
 ## GPU-backed visual QA for the pixel-art rebuild.
 ##
-## Run without --headless so the native 1280x720 framebuffer is read back:
+## Run without --headless so the native 2560x1440 framebuffer is read back:
 ##   godot --path games/pixiball --script res://tools/capture_visual_rebuild.gd \
 ##     -- --screen=game-batting-golden \
 ##     --output=res://.godot/visual-qa/game-batting-golden.png
@@ -32,7 +32,7 @@ func _capture() -> void:
 		quit(2)
 		return
 	var output := String(options.get("output", "res://.godot/visual-qa/%s.png" % screen))
-	root.size = Vector2i(1280, 720)
+	root.size = Vector2i(2560, 1440)
 	var game := MAIN_SCENE.instantiate()
 	root.add_child(game)
 	for unused in range(8):
@@ -78,8 +78,8 @@ func _capture() -> void:
 		push_error("Visual QA viewport did not produce an image. Run without --headless.")
 		quit(3)
 		return
-	if image.get_size() != Vector2i(1280, 720):
-		push_error("Visual QA must capture the native 1280x720 framebuffer, got %s." % image.get_size())
+	if image.get_size() != Vector2i(2560, 1440):
+		push_error("Visual QA must capture the native 2560x1440 framebuffer, got %s." % image.get_size())
 		quit(6)
 		return
 	var absolute := ProjectSettings.globalize_path(output)

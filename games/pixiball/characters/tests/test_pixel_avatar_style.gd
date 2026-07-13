@@ -5,14 +5,14 @@ const STYLE_CONTRACT_PATH := "res://content/pixel/style_contract.json"
 const LOD_NAMES := ["marquee", "battery", "diamond"]
 const PROJECTOR_MAP := {"large": "marquee", "small": "battery", "tiny": "diamond"}
 const CELL_SIZES := {
-	"marquee": [28, 40],
-	"battery": [14, 22],
-	"diamond": [7, 11],
+	"marquee": [56, 80],
+	"battery": [28, 44],
+	"diamond": [14, 22],
 }
-const BODY_HEIGHTS := {"marquee": 40, "battery": 22, "diamond": 11}
-const HEAD_HEIGHTS := {"marquee": 16, "battery": 9, "diamond": 5}
-const NATIVE_BODY_HEIGHTS := {"marquee": 160, "battery": 88, "diamond": 44}
-const NATIVE_HEAD_HEIGHTS := {"marquee": 64, "battery": 36, "diamond": 20}
+const BODY_HEIGHTS := {"marquee": 80, "battery": 44, "diamond": 22}
+const HEAD_HEIGHTS := {"marquee": 32, "battery": 18, "diamond": 10}
+const NATIVE_BODY_HEIGHTS := {"marquee": 320, "battery": 176, "diamond": 88}
+const NATIVE_HEAD_HEIGHTS := {"marquee": 128, "battery": 72, "diamond": 40}
 const REQUIRED_ROLES := [
 	"pitcher", "catcher", "batter", "infielder",
 	"outfielder", "umpire", "runner",
@@ -59,8 +59,8 @@ func _validate_metrics(metrics: Dictionary) -> void:
 			"%s LOD is not face-first" % lod,
 		)
 
-	_expect(int(metrics.get("eye_highlight_px", 0)) == 4, "eye highlight must occupy one native grid cell")
-	_expect(int(metrics.get("eye_highlight_design_units", 0)) == 1, "eye highlight must remain one design cell")
+	_expect(int(metrics.get("eye_highlight_px", 0)) == 4, "eye highlight must occupy one native dense-grid cell")
+	_expect(int(metrics.get("eye_highlight_design_units", 0)) == 1, "eye highlight must occupy one dense design cell")
 	_expect(
 		metrics.get("eye_highlights_by_lod", {}) == {"marquee": true, "battery": true, "diamond": false},
 		"Pocket Giants catch-light coverage changed",
@@ -90,13 +90,14 @@ func _validate_style_contract(metrics: Dictionary) -> void:
 		return
 	var contract: Dictionary = parsed
 	var framebuffer: Array = contract.get("native_framebuffer", [])
-	_expect(framebuffer.size() == 2 and int(framebuffer[0]) == 1280 and int(framebuffer[1]) == 720, "style contract lost the native 1280x720 framebuffer")
+	_expect(framebuffer.size() == 2 and int(framebuffer[0]) == 2560 and int(framebuffer[1]) == 1440, "style contract lost the native 2560x1440 framebuffer")
+	_expect(int(contract.get("density_scale", 0)) == 2, "style contract lost the 2x linear density scale")
 	_expect(int(contract.get("authoring_grid_px", 0)) == int(metrics.get("authoring_grid_px", -1)), "style contract and avatar disagree on the 4px authoring grid")
 	var runtime: Dictionary = contract.get("runtime", {})
 	_expect(String(runtime.get("render_path", "")) == "direct_root_canvas", "style contract lost the direct root canvas")
 	_expect(not bool(runtime.get("offscreen_intermediate", true)), "style contract reintroduced an offscreen intermediate")
 	var characters: Dictionary = contract.get("characters", {})
-	_expect(String(characters.get("avatar_language", "")) == "saltlight_pocket_giants", "style contract lost the SALTLIGHT Pocket Giants language")
+	_expect(String(characters.get("avatar_language", "")) == "lantern_wharf_pocket_giants", "style contract lost the Lantern Wharf Pocket Giants language")
 	_expect(characters.get("lod_names", []) == LOD_NAMES, "style contract lost the named Pocket Giants LODs")
 	_expect(characters.get("projector_lod_map", {}) == PROJECTOR_MAP, "style contract projector mapping drifted from the runtime")
 	var contract_body_heights: Dictionary = characters.get("lod_heights_px", {})

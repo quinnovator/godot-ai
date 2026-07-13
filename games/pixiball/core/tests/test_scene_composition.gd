@@ -1,8 +1,8 @@
 extends SceneTree
 
 const MAIN_SCENE_PATH := "res://main.tscn"
-const FRAMEBUFFER_SIZE := Vector2i(1280, 720)
-const DESIGN_SIZE := Vector2i(320, 180)
+const FRAMEBUFFER_SIZE := Vector2i(2560, 1440)
+const DESIGN_SIZE := Vector2i(640, 360)
 const GRID_PIXEL_SIZE := 4
 
 var _failures: Array[String] = []
@@ -48,8 +48,8 @@ func _run() -> void:
 		_expect(pixel_scene.scale == Vector2(GRID_PIXEL_SIZE, GRID_PIXEL_SIZE), "PixelScene must map design units directly to 4px native blocks")
 
 	var camera_director = session.get_node_or_null("Presentation/CameraDirector")
-	_expect(camera_director != null and camera_director.logical_vertical_pixels == 720, "world projector does not expose the native 720-line root")
-	_expect(camera_director != null and camera_director.DESIGN_SIZE == Vector2(DESIGN_SIZE), "world projector lost its 320x180 design grid")
+	_expect(camera_director != null and camera_director.logical_vertical_pixels == 1440, "world projector does not expose the native 1440-line root")
+	_expect(camera_director != null and camera_director.DESIGN_SIZE == Vector2(DESIGN_SIZE), "world projector lost its 640x360 design grid")
 	_expect(camera_director != null and camera_director.FRAMEBUFFER_SIZE == Vector2(FRAMEBUFFER_SIZE), "world projector lost its native framebuffer contract")
 	_expect(camera_director != null and camera_director.is_in_group("pixiball_pixel_projector"), "world projector group was not installed")
 
@@ -83,10 +83,10 @@ func _validate_project_settings() -> void:
 		int(ProjectSettings.get_setting("display/window/size/window_width_override", 0)),
 		int(ProjectSettings.get_setting("display/window/size/window_height_override", 0)),
 	)
-	_expect(framebuffer == FRAMEBUFFER_SIZE, "root framebuffer must be native 1280x720, got %s" % framebuffer)
-	_expect(window == FRAMEBUFFER_SIZE, "window override must be native 1280x720, got %s" % window)
-	_expect(framebuffer == window, "window must not scale a lower-resolution framebuffer")
-	_expect(framebuffer != DESIGN_SIZE, "320x180 design space must never become the root framebuffer")
+	_expect(framebuffer == FRAMEBUFFER_SIZE, "root framebuffer must be native 2560x1440, got %s" % framebuffer)
+	_expect(window == FRAMEBUFFER_SIZE, "debug window override must be 2560x1440, got %s" % window)
+	_expect(window == framebuffer, "debug window must present native pixels one-to-one")
+	_expect(framebuffer != DESIGN_SIZE, "640x360 design space must never become the root framebuffer")
 	_expect(String(ProjectSettings.get_setting("display/window/stretch/mode", "")) == "viewport", "stretch mode must preserve the native root viewport")
 	_expect(String(ProjectSettings.get_setting("display/window/stretch/aspect", "")) == "keep", "stretch aspect must preserve 16:9")
 	_expect(String(ProjectSettings.get_setting("display/window/stretch/scale_mode", "")) == "integer", "stretch scale mode must be integer")
@@ -112,7 +112,7 @@ func _expect(condition: bool, message: String) -> void:
 
 func _finish() -> void:
 	if _failures.is_empty():
-		print("PIXIBALL_SCENE_CONTRACT_OK framebuffer=1280x720 design_grid=320x180 cell=4px direct_canvas=true no_subviewport=true")
+		print("PIXIBALL_SCENE_CONTRACT_OK framebuffer=2560x1440 design_grid=640x360 density=2x cell=4px direct_canvas=true no_subviewport=true")
 		quit(0)
 		return
 	for failure in _failures:

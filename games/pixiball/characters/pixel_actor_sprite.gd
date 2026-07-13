@@ -1,11 +1,13 @@
 class_name PixiballPixelActorSprite
 extends Node2D
 
+const Style := preload("res://presentation/pixel_art_style.gd")
+
 ## "Pocket Giants" presenter for a BallplayerActor logic proxy (art bible §8).
 ##
 ## Every mark is authored in integer design cells, then the PixelScene's exact
 ## 4x CanvasItem transform rasterizes each cell as a native 4x4 block directly
-## into the 1280x720 root framebuffer. There is no low-resolution texture,
+## into the 2560x1440 root framebuffer. There is no low-resolution texture,
 ## filtered silhouette, or post-process upscale.
 ##
 ## Three fixed LODs (bible §8.1):
@@ -86,11 +88,11 @@ const AVATAR_METRICS := {
 	"authoring_grid_px": 4,
 	"lod_names": ["marquee", "battery", "diamond"],
 	"projector_lod_map": {"large": "marquee", "small": "battery", "tiny": "diamond"},
-	"lod_cell_sizes": {"marquee": [28, 40], "battery": [14, 22], "diamond": [7, 11]},
-	"lod_heights_design_units": {"marquee": 40, "battery": 22, "diamond": 11},
-	"lod_head_heights_design_units": {"marquee": 16, "battery": 9, "diamond": 5},
-	"lod_heights_px": {"marquee": 160, "battery": 88, "diamond": 44},
-	"lod_head_heights_px": {"marquee": 64, "battery": 36, "diamond": 20},
+	"lod_cell_sizes": {"marquee": [56, 80], "battery": [28, 44], "diamond": [14, 22]},
+	"lod_heights_design_units": {"marquee": 80, "battery": 44, "diamond": 22},
+	"lod_head_heights_design_units": {"marquee": 32, "battery": 18, "diamond": 10},
+	"lod_heights_px": {"marquee": 320, "battery": 176, "diamond": 88},
+	"lod_head_heights_px": {"marquee": 128, "battery": 72, "diamond": 40},
 	"head_share_min": 0.40,
 	"eye_highlight_px": 4,
 	"eye_highlight_design_units": 1,
@@ -170,9 +172,15 @@ func _process(_delta: float) -> void:
 		if offset is Vector2:
 			projected += offset
 	position = Vector2(roundi(projected.x), roundi(projected.y))
-	var tier := String(projector.call("actor_lod", world_position, host.get_role()))
+	var role_name := String(host.get_role())
+	var tier := String(projector.call("actor_lod", world_position, role_name))
 	_lod = String(PROJECTOR_LOD_MAP.get(tier, LOD_BATTERY))
-	z_index = int(projector.call("depth_order", world_position))
+	if projector.has_method("depth_order"):
+		# Prefer the role-aware signature when present so the plate battery can
+		# stack catcher → batter → umpire without fighting screen-y ties.
+		z_index = int(projector.call("depth_order", world_position, role_name))
+	else:
+		z_index = int(projector.call("depth_order", world_position))
 	_mood = _world_mood()
 	var pose: Dictionary = host.get_pixel_pose()
 	var next_key := "%s/%s/%s/%s/%s/%s/%s/%s/%s/%s/%s/%s/%s" % [
@@ -198,6 +206,7 @@ func _process(_delta: float) -> void:
 func _draw() -> void:
 	if not is_instance_valid(host):
 		return
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * Style.DENSITY_SCALE)
 	var night := _mood == "night"
 	var palette: Dictionary = host.get_pixel_palette()
 	if night:
@@ -234,10 +243,20 @@ func _compute_stance(pose: Dictionary, variant: String) -> Dictionary:
 	}
 	match variant:
 		"catcher":
-			stance.crouch = 4
-			stance.spread = 2
-			stance.l_hand = Vector2i(-7, -9)
-			stance.r_hand = Vector2i(5, -6)
+			# Deep crouch with mitt target so the plate silhouette is a wide
+			# squat, not a standing body lost inside the batter cluster.
+			stance.crouch = 6
+			stance.spread = 3
+			stance.l_hand = Vector2i(-6, -8)
+			stance.r_hand = Vector2i(6, -5)
+		"batter":
+			# Closed stance, bat vertical off the back shoulder — reads as a
+			# batter even when only 14 cells tall next to the catcher.
+			stance.crouch = 1
+			stance.spread = 1
+			stance.lean = -1
+			stance.l_hand = Vector2i(4, -14)
+			stance.r_hand = Vector2i(6, -15)
 		"infielder":
 			stance.crouch = 2
 			stance.spread = 1
@@ -246,10 +265,12 @@ func _compute_stance(pose: Dictionary, variant: String) -> Dictionary:
 		"outfielder":
 			stance.spread = 1
 		"umpire":
-			stance.crouch = 2
-			stance.spread = 2
-			stance.l_hand = Vector2i(-7, -5)
-			stance.r_hand = Vector2i(7, -5)
+			# Compact, upright, hands on knees — diamond LOD still reads as
+			# the third body without competing with the catcher's gear mass.
+			stance.crouch = 1
+			stance.spread = 1
+			stance.l_hand = Vector2i(-5, -6)
+			stance.r_hand = Vector2i(5, -6)
 		"runner":
 			stance.lean = 2
 	match action:
@@ -271,21 +292,35 @@ func _compute_stance(pose: Dictionary, variant: String) -> Dictionary:
 		"pitch":
 			match pose_key:
 				"anticipation":
-					# Wind-up compresses the whole figure to 90% height (§8.5).
-					stance.stretch = -2
-					stance.l_hand = Vector2i(-2, -13)
-					stance.r_hand = Vector2i(2, -13)
+					# Wind-up: figure compresses, glove gathers at the chest,
+					# free leg lifts so the rubber load reads before the stride.
+					stance.stretch = -3
+					stance.spread = 1
+					stance.l_hand = Vector2i(-1, -14)
+					stance.r_hand = Vector2i(3, -14)
+					if variant == "pitcher":
+						stance.lean = 1
+						stance.head_drop = 0
 				"action":
-					# Drive stretches to 115% with a 3-cell stride (§8.5).
-					stance.stretch = 3
+					# Drive: long front-leg stride, torso over the rubber, high
+					# release hand so the ball leaves the mound silhouette.
+					stance.stretch = 4
 					stance.stride = true
-					stance.lean = -1
-					stance.l_hand = Vector2i(-9, -13)
-					stance.r_hand = Vector2i(8, -19)
-				_:
 					stance.lean = -2
-					stance.l_hand = Vector2i(-4, -9)
-					stance.r_hand = Vector2i(-7, -11)
+					stance.spread = 0
+					stance.l_hand = Vector2i(-10, -11)
+					stance.r_hand = Vector2i(9, -22)
+					if variant == "pitcher":
+						stance.head_drop = -1
+				_:
+					# Follow-through: arm across the body, chest over front knee.
+					stance.stretch = 1
+					stance.lean = -3
+					stance.stride = true
+					stance.l_hand = Vector2i(-6, -8)
+					stance.r_hand = Vector2i(-9, -12)
+					if variant == "pitcher":
+						stance.head_drop = 1
 		"throw", "field_throw":
 			match pose_key:
 				"anticipation":
@@ -592,8 +627,8 @@ func _draw_battery_head(cx: int, top: int, p: Dictionary, pose: Dictionary, vari
 	_rect(cx - 4, top + 5, 2, 2, INK)
 	_rect(cx + 2, top + 5, 2, 2, INK)
 	var glint := 0 if f > 0 else 1
-	_rect(cx - 4 + glint, top + 5, 1, 1, BALL_WHITE)
-	_rect(cx + 2 + glint, top + 5, 1, 1, BALL_WHITE)
+	_dense_rect(cx - 4 + glint, top + 5, 0.5, 0.5, BALL_WHITE)
+	_dense_rect(cx + 2 + glint, top + 5, 0.5, 0.5, BALL_WHITE)
 	# Mouth states: 1-2 cells only at Battery LOD.
 	match String(e.mouth):
 		"grin":
@@ -658,8 +693,8 @@ func _draw_marquee_head(cx: int, top: int, p: Dictionary, pose: Dictionary, vari
 	_rect(cx - 5, top + 8, 2, 3, INK)
 	_rect(cx + 3, top + 8, 2, 3, INK)
 	var glint := 0 if f > 0 else 1
-	_rect(cx - 5 + glint, top + 8, 1, 1, BALL_WHITE)
-	_rect(cx + 3 + glint, top + 8, 1, 1, BALL_WHITE)
+	_dense_rect(cx - 5 + glint, top + 8, 0.5, 0.5, BALL_WHITE)
+	_dense_rect(cx + 3 + glint, top + 8, 0.5, 0.5, BALL_WHITE)
 	# Cheek blush / dirt smudge, 1 cell per cheek.
 	_rect(cx - 6, top + 12, 1, 1, CLAY_SMUDGE)
 	_rect(cx + 5, top + 12, 1, 1, CLAY_SMUDGE)
@@ -990,3 +1025,10 @@ func _rect(x: int, y: int, width: int, height: int, color: Color) -> void:
 		y += height
 		height = -height
 	draw_rect(Rect2(px, y, maxi(1, w), maxi(1, height)), color, true)
+
+
+func _dense_rect(x: float, y: float, width: float, height: float, color: Color) -> void:
+	# Half-composition increments become individual cells on the 640x360 grid.
+	# Use this for facial/equipment accents that should gain real detail instead
+	# of inheriting the legacy 2x block footprint.
+	draw_rect(Rect2(x, y, maxf(0.5, width), maxf(0.5, height)), color, true)

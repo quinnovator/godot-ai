@@ -33,7 +33,7 @@ script = ExtResource("3_ball")
 
 [node name="CameraDirector" type="Node" parent="Presentation" unique_id=1147639371]
 script = ExtResource("4_camera")
-logical_vertical_pixels = 720
+logical_vertical_pixels = 1440
 
 [node name="Systems" type="Node" parent="." unique_id=179917152]
 
@@ -51,6 +51,7 @@ script = ExtResource("8_hud")
 
 [node name="PitchIntelLayer" type="CanvasLayer" parent="." unique_id=381213954]
 layer = 24
+transform = Transform2D(2, 0, 0, 2, 0, 0)
 
 [node name="PitchIntelPanel" parent="PitchIntelLayer" unique_id=754981 instance=ExtResource("9_intel")]
 offset_left = 872.0

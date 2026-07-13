@@ -1,7 +1,7 @@
 class_name VoxelStadium
 extends Node
 
-## Compatibility facade for the native-720p ballpark canvas. Gameplay retains
+## Compatibility facade for the native-1440p ballpark canvas. Gameplay retains
 ## the established stadium API while every visual is drawn by one Node2D under
 ## the 4x design-grid transform in the shared `pixiball_pixel_scene` host.
 

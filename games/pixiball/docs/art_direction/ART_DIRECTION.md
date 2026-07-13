@@ -1,11 +1,12 @@
 # Pixiball visual direction
 
-Pixiball renders directly into one native `1280x720` root framebuffer. World,
+Pixiball renders directly into one native `2560x1440` root framebuffer. World,
 athletes, ball, effects, and HUD are intentional CanvasItem clusters authored
-in a `320x180` design space whose unit is exactly one `4x4` framebuffer block.
-`PixelScene` applies that 4x CanvasItem transform directly; `320x180` is never
-an image, texture, viewport, or intermediate framebuffer. The game does not
-depend on resampling or a post-process filter to create its style.
+on a `640x360` dense design grid whose unit is exactly one `4x4` framebuffer
+block. Existing `320x180` composition landmarks receive an exact 2x density
+transform before `PixelScene` applies its direct 4x CanvasItem transform. No
+design grid is an image, texture, viewport, or intermediate framebuffer, and
+the game does not depend on resampling or a post-process filter for its style.
 
 The target is an original harbor-league world with clear action silhouettes,
 expressive color, layered environmental storytelling, and dense detail only
@@ -15,8 +16,10 @@ be traced into runtime assets.
 
 ## Hard runtime contract
 
-- Capture and review the exact `1280x720` framebuffer. Author composition in
-  `320x180` design units, with every unit landing on the 4 px framebuffer grid.
+- Capture and review the exact `2560x1440` framebuffer. Author graphics in
+  `640x360` design units, with every unit landing on the 4 px framebuffer grid.
+  Composition may retain the shared `320x180` landmarks through the exact 2x
+  density transform.
 - Use the Compatibility renderer only as the CanvasItem backend. Do not add a
   spatial scene, `SubViewport`, offscreen low-resolution texture, dynamic
   surface lighting, anti-aliasing, framebuffer filter, or composite shader.
@@ -103,10 +106,16 @@ needed by that view.
 - The HUD shares the native root framebuffer. Text, focus rails, strike-zone
   lines, and icons follow the 4 px grid and remain crisp in all three moods.
 
+## Live receipts
+
+Native framebuffer captures for all five views × three moods live under
+[`receipts/`](receipts/). Prefer those over older `after/` or `final/` images
+when reviewing world art.
+
 ## Generated-art acceptance
 
 Generated PNGs must target the native 4 px grid, with complete backgrounds at
-exactly `1280x720`, binary alpha, bounded palettes, explicit pivots, palette
+exactly `2560x1440`, binary alpha, bounded palettes, explicit pivots, palette
 slots, roles, actions, and frame metadata. Do not accept an image that needs
 resampling, palette repair, edge cleanup, or runtime filtering to fit the game.
 
@@ -133,7 +142,7 @@ bin\godot.windows.editor.dev.x86_64.console.exe `
 
 Review landing, pitcher select, team select, final, and pitching/batting/fielding
 in day, golden, and night. Also inspect the intro and dugout fixed views during
-live review. Captures must remain exactly `1280x720`; a `320x180` capture would
+live review. Captures must remain exactly `2560x1440`; a `320x180` capture would
 prove that an obsolete low-resolution intermediate has returned.
 
 Run the focused contracts after any renderer, projector, actor, ball, or style

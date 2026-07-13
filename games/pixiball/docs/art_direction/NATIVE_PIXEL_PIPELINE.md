@@ -1,10 +1,11 @@
 # Pixiball native pixel pipeline
 
-Pixiball renders directly into one `1280x720` root framebuffer. Composition is
-authored in `320x180` design units, and `PixelScene.scale = Vector2(4, 4)` makes
-each unit a deliberate `4x4` block in that framebuffer. `PixelScene` is an
-ordinary `Node2D`, not a texture or viewport: there is no `320x180` framebuffer
-to enlarge, sample, or filter.
+Pixiball renders directly into one `2560x1440` root framebuffer. Composition
+retains a `320x180` coordinate vocabulary, a 2x density pass expands it onto a
+`640x360` design grid, and `PixelScene.scale = Vector2(4, 4)` makes each dense
+unit a deliberate `4x4` block in that framebuffer. `PixelScene` is an ordinary
+`Node2D`, not a texture or viewport: neither design grid is a framebuffer to
+enlarge, sample, or filter.
 
 The runtime keeps baseball positions as `Vector3` data because height, lateral
 movement, and field depth remain useful simulation concepts. The view director
@@ -18,7 +19,7 @@ texture, or framebuffer post-process participates either.
 [`style_contract.json`](../../content/pixel/style_contract.json) is the stable
 target for AI-authored additions. New sprite or tile generators must emit:
 
-- 4 px-aligned clusters or a complete `1280x720` background;
+- 4 px-aligned clusters or a complete `2560x1440` background;
 - binary alpha with no antialiased fringe;
 - no more than 32 simultaneous opaque colors;
 - explicit pivots, palette slots, roles, actions, and frame metadata;
@@ -38,9 +39,10 @@ silently repairs an asset with resampling or a pixel filter.
 
 ## Runtime layers
 
-1. The root window owns the only framebuffer, exactly `1280x720`.
-2. `PixelScene` is a direct CanvasItem stage scaled 4x from `320x180` design
-   coordinates. It does not allocate or sample an intermediate image.
+1. The root window owns the only framebuffer, exactly `2560x1440`.
+2. `PixelScene` is a direct CanvasItem stage scaled 4x from `640x360` dense
+   design coordinates. Legacy `320x180` composition landmarks receive an exact
+   2x coordinate transform; no intermediate image is allocated or sampled.
 3. `PixelBallparkCanvas` draws flat sky, harbor, stadium, field, tile detail,
    crowd clusters, and semantic reactions.
 4. `BallplayerActor` retains deterministic baseball state while its detached

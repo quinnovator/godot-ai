@@ -1,9 +1,10 @@
 class_name PixiballPixelBallSprite
 extends Node2D
 
-## Drawn in 320x180 design units beneath PixelScene's exact 4x transform. Each
-## 1x1 primitive therefore becomes a crisp 4x4 block in the native 720p root;
-## no ball texture or low-resolution viewport is involved.
+## Drawn with the 320x180 composition vocabulary, expanded onto the 640x360
+## dense grid beneath PixelScene's exact 4x transform. Each dense primitive
+## becomes a crisp 4x4 block in the native 1440p root; no ball texture or
+## low-resolution viewport is involved.
 ##
 ## Lantern Wharf effects language (art bible §9.1–9.4): LOD ball with a spin
 ## tick and an always-rendered ground shadow, an effort-coded chain of opaque
@@ -30,9 +31,10 @@ const WALL_TOP_WORLD := 10.5 * 0.3048
 # Design-grid horizon rows per view (§6): ghosts above read against sky/sea,
 # ghosts below read against turf, so the trail pre-mixes toward that band.
 const HORIZON_ROWS := {"pitching": 46, "batting": 42, "fielding": 60, "intro": 58, "dugout": 40}
-const TRAIL_SPACING := [3, 6, 9]
-const TRAIL_SPACING_FAST := [2, 4, 6]
-const FAST_TRAIL_CELLS_PER_FRAME := 4.5
+const TRAIL_SPACING := [2, 5, 8, 12]
+const TRAIL_SPACING_FAST := [1, 3, 5, 8]
+const FAST_TRAIL_CELLS_PER_FRAME := 3.0
+# Pitch-view trail keeps more history so the plate lane reads as a bent path.
 const RAY_DIRS := [Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1)]
 # Three authored clay puffs per landing (§9.4): base seat, hop direction, and
 # the 2–3 cell cluster shape.
@@ -93,6 +95,7 @@ func _poll_events() -> void:
 func _draw() -> void:
 	if not is_instance_valid(host) or not is_instance_valid(projector):
 		return
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * Style.DENSITY_SCALE)
 	var mode := String(projector.get("mode"))
 	var mood := _world_mood()
 	var palette: Dictionary = Style.palette(mood)
@@ -109,31 +112,33 @@ func _draw() -> void:
 	_draw_burst(palette, burst_age, strength)
 
 
-## §9.1 — Battery LOD: 2x2 ball_white core, ink lower-right shade cell, and a
-## stitch_red tick alternating sides every 2 ticks (the spin read). Diamond
-## LOD: a single ball_white cell. Both carry an opaque ink ground shadow that
-## separates from the ball with height; night adds a 1-ring lamp_glow halo
-## when the ball is above wall height.
+## §9.1 — Pitching/batting: 3x3 ball_white core with ink shade and stitch tick.
+## Diamond: 1-cell ball_white. Ground shadow always separates with height;
+## night adds a 1-ring lamp_glow halo above wall height.
 func _draw_ball(palette: Dictionary, mood: String, mode: String, tick: int, flash: bool) -> void:
 	var world: Vector3 = host.global_position
-	var screen: Vector2 = projector.call("project_world", world)
-	var ground: Vector2 = projector.call("project_world", Vector3(world.x, 0.08, world.z))
+	var pitch_flight := not bool(host.is_play_ball()) and mode in ["pitching", "batting"]
+	var screen: Vector2 = _project_ball(world, pitch_flight)
+	var ground: Vector2 = _project_composition(Vector3(world.x, 0.08, world.z))
 	var x := roundi(screen.x)
 	var y := roundi(screen.y)
 	var battery := mode in ["pitching", "batting", "dugout"]
 	var halo := mood == "night" and world.y > WALL_TOP_WORLD
 	if battery:
-		_cell(roundi(ground.x) - 1, roundi(ground.y), 2, 1, INK)
+		# A pitch is airborne for its entire battery-view life; a field shadow
+		# would detach from the enlarged zone mapping and imply a ground ball.
+		if not pitch_flight:
+			_cell(roundi(ground.x) - 1, roundi(ground.y), 3, 1, INK)
 		if halo:
-			_cell(x - 1, y - 2, 2, 1, palette.lamp_glow)
-			_cell(x - 1, y + 1, 2, 1, palette.lamp_glow)
-			_cell(x - 2, y - 1, 1, 2, palette.lamp_glow)
-			_cell(x + 1, y - 1, 1, 2, palette.lamp_glow)
-		_cell(x - 1, y - 1, 2, 2, BALL_WHITE)
+			_cell(x - 2, y - 2, 4, 1, palette.lamp_glow)
+			_cell(x - 2, y + 2, 4, 1, palette.lamp_glow)
+			_cell(x - 2, y - 1, 1, 3, palette.lamp_glow)
+			_cell(x + 2, y - 1, 1, 3, palette.lamp_glow)
+		_cell(x - 1, y - 1, 3, 3, BALL_WHITE)
 		if flash:
 			return
-		_cell(x, y, 1, 1, INK)
-		_cell(x - 1 if posmod(tick, 4) < 2 else x, y - 1, 1, 1, STITCH_RED)
+		_dense_cell(x, y + 1.5, 1.0, 0.5, INK)
+		_dense_cell(x - 1 if posmod(tick, 4) < 2 else x + 1.5, y - 1, 0.5, 0.5, STITCH_RED)
 	else:
 		_cell(roundi(ground.x), roundi(ground.y), 1, 1, INK)
 		if halo:
@@ -144,37 +149,48 @@ func _draw_ball(palette: Dictionary, mood: String, mode: String, tick: int, flas
 		_cell(x, y, 1, 1, BALL_WHITE)
 
 
-## §9.2 — Up to three opaque afterimage cells behind the flight path, stepped
-## toward the local background band. Effort codes the ghost count; fast flight
-## tightens the spacing from 3/6/9 to 2/4/6 cells. The chain walks the actual
-## projected trail polyline, so breaking balls bend it. The trail is the only
-## motion cue: no ribbons, no continuous lines.
+## §9.2 — Up to four opaque afterimage clusters behind the flight path. Effort
+## codes ghost count; fast flight tightens spacing. Pitching mode uses 2x2
+## clusters so the plate corridor trail survives mow arcs and clay. The chain
+## walks the projected polyline so breaking balls bend it — no continuous lines.
 func _draw_trail(palette: Dictionary, mode: String) -> void:
 	var points: Array = host.get_trail_world_points()
 	if points.is_empty():
 		return
 	var path: Array[Vector2] = []
-	path.append(projector.call("project_world", host.global_position))
+	var pitch_flight := not bool(host.is_play_ball()) and mode in ["pitching", "batting"]
+	path.append(_project_ball(host.global_position, pitch_flight))
 	for point in points:
 		if point is Vector3:
-			path.append(projector.call("project_world", point))
+			path.append(_project_ball(point, pitch_flight))
 	if path.size() < 2:
 		return
 	var effort := float(host.get_flight_effort())
-	var ghost_count := 1
+	var ghost_count := 2
 	if effort >= 0.67:
-		ghost_count = 3
+		ghost_count = 4
 	elif effort >= 0.34:
-		ghost_count = 2
+		ghost_count = 3
 	var speed := path[0].distance_to(path[1])
 	var spacings: Array = TRAIL_SPACING_FAST if speed >= FAST_TRAIL_CELLS_PER_FRAME else TRAIL_SPACING
 	var ball_cell := Vector2i(roundi(path[0].x), roundi(path[0].y))
-	for ghost in range(ghost_count):
+	var pitch_view := mode == "pitching"
+	var trail_tint: Color = host.get_trail_color() if host.has_method("get_trail_color") else BALL_WHITE
+	for ghost in range(mini(ghost_count, spacings.size())):
 		var at := _point_along(path, float(spacings[ghost]))
 		var cell := Vector2i(roundi(at.x), roundi(at.y))
 		if cell == ball_cell:
 			continue
-		_cell(cell.x, cell.y, 1, 1, _ghost_color(palette, mode, cell.y, ghost))
+		var fill := _ghost_color(palette, mode, cell.y, ghost)
+		if pitch_view and ghost == 0:
+			# Nearest ghost carries a pulse of the pitch-slot color so the lane
+			# reads as *this* pitch, not a generic chalk dash.
+			fill = fill.lerp(trail_tint, 0.45)
+			fill.a = 1.0
+		if pitch_view and ghost <= 1:
+			_cell(cell.x, cell.y, 2, 2, fill)
+		else:
+			_cell(cell.x, cell.y, 1, 1, fill)
 
 
 ## §9.3 — 6-tick contact starburst: ticks 1–2 a lantern_gold diamond, ticks
@@ -187,7 +203,7 @@ func _draw_burst(palette: Dictionary, age: int, strength: float) -> void:
 	if age >= 6:
 		_burst = {}
 		return
-	var screen: Vector2 = projector.call("project_world", _burst["world"])
+	var screen: Vector2 = _project_composition(_burst["world"])
 	var x := roundi(screen.x)
 	var y := roundi(screen.y)
 	if age <= 1:
@@ -207,7 +223,7 @@ func _draw_burst(palette: Dictionary, age: int, strength: float) -> void:
 				_cell(x + dir.x * step, y + dir.y * step, 1, 1, CHALK_PAPER)
 	else:
 		for dir in RAY_DIRS:
-			_cell(x + dir.x * ray_reach, y + dir.y * ray_reach, 1, 1, palette.clay_light)
+			_cell(x + dir.x * ray_reach, y + dir.y * ray_reach, 1, 1, palette.clay_lit)
 
 
 ## §9.4 — Landing dust: three clay puffs hop one cell up-and-out over four
@@ -222,7 +238,7 @@ func _draw_dust(palette: Dictionary, tick: int) -> void:
 		_dust = {}
 		return
 	var world: Vector3 = _dust["world"]
-	var screen: Vector2 = projector.call("project_world", world)
+	var screen: Vector2 = _project_composition(world)
 	var anchor := Vector2i(roundi(screen.x), roundi(screen.y))
 	for puff_value in DUST_PUFFS:
 		var puff: Dictionary = puff_value
@@ -230,12 +246,12 @@ func _draw_dust(palette: Dictionary, tick: int) -> void:
 		if age >= 2:
 			origin += puff["out"]
 		if age >= 4:
-			_cell(origin.x, origin.y, 1, 1, palette.turf_shadow)
+			_cell(origin.x, origin.y, 1, 1, palette.turf_shade)
 			continue
 		var cells: Array = puff["cells"]
 		for cell_index in range(cells.size()):
 			var offset: Vector2i = cells[cell_index]
-			var color: Color = palette.clay_light if age <= 1 and cell_index == 0 else palette.clay
+			var color: Color = palette.clay_lit if age <= 1 and cell_index == 0 else palette.clay_main
 			_cell(origin.x + offset.x, origin.y + offset.y, 1, 1, color)
 
 
@@ -250,10 +266,10 @@ func _draw_rosin(palette: Dictionary, tick: int) -> void:
 	if age >= 3:
 		_rosin = {}
 		return
-	var screen: Vector2 = projector.call("project_world", _rosin["world"])
-	_cell(roundi(screen.x), roundi(screen.y), 1, 1, palette.chalk)
+	var screen: Vector2 = _project_composition(_rosin["world"])
+	_cell(roundi(screen.x), roundi(screen.y), 1, 1, palette.chalk_line)
 	if age <= 1:
-		_cell(roundi(screen.x) + 1, roundi(screen.y) - 1, 1, 1, palette.chalk)
+		_cell(roundi(screen.x) + 1, roundi(screen.y) - 1, 1, 1, palette.chalk_line)
 
 
 func _draw_scuffs(palette: Dictionary) -> void:
@@ -262,12 +278,12 @@ func _draw_scuffs(palette: Dictionary) -> void:
 		var mark: Variant = marks[index]
 		if not mark is Vector3:
 			continue
-		var screen: Vector2 = projector.call("project_world", mark)
+		var screen: Vector2 = _project_composition(mark)
 		var x := roundi(screen.x)
 		var y := roundi(screen.y)
-		_cell(x, y, 1, 1, palette.clay_shadow)
+		_cell(x, y, 1, 1, palette.clay_shade)
 		if Style.hash01(index * 13 + 5) > 0.5:
-			_cell(x + 1, y, 1, 1, palette.clay_shadow)
+			_cell(x + 1, y, 1, 1, palette.clay_shade)
 
 
 ## Ghost fill pre-mixed toward the band it flies over: sea-glint family above
@@ -275,9 +291,19 @@ func _draw_scuffs(palette: Dictionary) -> void:
 ## the ball, stepping down toward the background (§9.2).
 func _ghost_color(palette: Dictionary, mode: String, ghost_y: int, ghost: int) -> Color:
 	if ghost_y < int(HORIZON_ROWS.get(mode, 58)):
-		var sky: Array = [palette.foam, palette.sea_light, palette.sea_mid]
+		var sky: Array = [palette.sea_glint, palette.sea_glint, palette.sea_near]
 		return sky[clampi(ghost, 0, 2)]
-	return Style.shift_value(palette.turf_light, 2 - clampi(ghost, 0, 2))
+	return Style.shift_value(palette.turf_lit, 2 - clampi(ghost, 0, 2))
+
+
+func _project_ball(world: Vector3, pitch_flight: bool) -> Vector2:
+	if pitch_flight and projector.has_method("project_pitch_world"):
+		return (projector.call("project_pitch_world", world) as Vector2) / Style.DENSITY_SCALE
+	return _project_composition(world)
+
+
+func _project_composition(world: Vector3) -> Vector2:
+	return (projector.call("project_world", world) as Vector2) / Style.DENSITY_SCALE
 
 
 ## Arc-length walk along the projected trail polyline; short histories
@@ -318,3 +344,9 @@ func _tick() -> int:
 
 func _cell(x: int, y: int, w: int, h: int, color: Color) -> void:
 	draw_rect(Rect2(x, y, w, h), color, true)
+
+
+func _dense_cell(x: float, y: float, w: float, h: float, color: Color) -> void:
+	# Half-composition cells are the new 640x360 design-grid primitive. Ball
+	# seams and shading use them so the ball gains detail at the same screen size.
+	draw_rect(Rect2(x, y, maxf(0.5, w), maxf(0.5, h)), color, true)

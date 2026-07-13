@@ -6,7 +6,8 @@ extends Node
 ##
 ## The legacy Vector3 is deliberately retained as baseball field data. It is
 ## never submitted to Godot's 3D renderer; the detached presenter maps it onto
-## a 320x180 design grid whose 4px units render directly into native 1280x720.
+## a 320x180 composition grid expanded 2x onto a 640x360 design grid whose 4px
+## units render directly into native 2560x1440.
 
 signal action_started(action_name: String)
 signal action_marker(action_name: String, marker_name: String)

@@ -3,8 +3,8 @@ extends SceneTree
 const MainScene := preload("res://main.tscn")
 const Style := preload("res://presentation/pixel_art_style.gd")
 
-const NATIVE_SIZE := Vector2i(1280, 720)
-const DESIGN_SIZE := Vector2i(320, 180)
+const NATIVE_SIZE := Vector2i(2560, 1440)
+const DESIGN_SIZE := Vector2i(640, 360)
 const GRID_PIXEL_SIZE := 4
 
 var _failures: Array[String] = []
@@ -19,8 +19,8 @@ func _run() -> void:
 		int(ProjectSettings.get_setting("display/window/size/viewport_width", 0)),
 		int(ProjectSettings.get_setting("display/window/size/viewport_height", 0)),
 	)
-	_check(configured_size == NATIVE_SIZE, "project root is not a native 1280x720 framebuffer: %s" % configured_size)
-	_check(configured_size != DESIGN_SIZE, "project root regressed to the 320x180 design canvas")
+	_check(configured_size == NATIVE_SIZE, "project root is not a native 2560x1440 framebuffer: %s" % configured_size)
+	_check(configured_size != DESIGN_SIZE, "project root regressed to the 640x360 design canvas")
 	_check(root.content_scale_size == NATIVE_SIZE, "root content scale regressed to a non-native size: %s" % root.content_scale_size)
 	_check(Style.DESIGN_SIZE == DESIGN_SIZE, "style design-grid dimensions changed")
 	_check(Style.OUTPUT_SIZE == NATIVE_SIZE, "style native output dimensions changed")
@@ -57,9 +57,9 @@ func _check(condition: bool, message: String) -> void:
 
 func _finish() -> void:
 	if _failures.is_empty():
-		print("PIXIBALL_NATIVE_720_PIPELINE_OK root=1280x720 design=320x180 grid=4px subviewports=0 postprocess=0")
+		print("PIXIBALL_NATIVE_1440_PIPELINE_OK root=2560x1440 design=640x360 density=2x grid=4px subviewports=0 postprocess=0")
 		quit(0)
 		return
 	for failure in _failures:
-		push_error("PIXIBALL_NATIVE_720_PIPELINE: %s" % failure)
+		push_error("PIXIBALL_NATIVE_1440_PIPELINE: %s" % failure)
 	quit(1)

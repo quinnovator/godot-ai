@@ -1,7 +1,7 @@
 class_name BaseballVisual
 extends Node
 
-## Simulation-facing host for the direct native-720p CanvasItem ball presenter.
+## Simulation-facing host for the direct native-1440p CanvasItem ball presenter.
 ##
 ## The sim drives this node through the same public API as before; it now also
 ## keeps deterministic effect bookkeeping (flight effort, contact, release,
@@ -139,7 +139,9 @@ func set_ball_position(value: Vector3, _delta := 0.0) -> void:
 				_landing_serial += 1
 				_landing_world = Vector3(value.x, 0.0, value.z)
 		_trail_points.push_front(global_position)
-		while _trail_points.size() > (2 if _play_ball else 5):
+		# Pitch flight keeps a longer stepped history so the plate corridor
+		# trail can bend; live batted balls stay short (2) for readability.
+		while _trail_points.size() > (2 if _play_ball else 10):
 			_trail_points.pop_back()
 	global_position = value
 	_refresh()
