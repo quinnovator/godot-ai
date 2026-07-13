@@ -34,10 +34,10 @@ const DEFAULT_RUNNER_SPEED_WORLD := 7.6
 var active := false
 var user_fielding := false
 var phase := "idle"
-var ball: Node3D
+var ball
 var defenders: Dictionary = {}
 var controlled_key := ""
-var controlled_player: Node3D
+var controlled_player
 var trajectory: Dictionary = {}
 var start_position := Vector3.ZERO
 var landing_position := Vector3.ZERO
@@ -48,7 +48,7 @@ var elapsed := 0.0
 var hang_time := 1.5
 var landed := false
 var bounce_count := 0
-var holder: Node3D
+var holder
 var holder_key := ""
 var throw_base := -1
 var throw_elapsed := 0.0
@@ -79,7 +79,7 @@ var _throw_count := 0
 var _auto_release_throw := false
 var _possession_elapsed := 0.0
 var _dead_timer := 0.0
-var _pickup_candidate: Node3D
+var _pickup_candidate
 var _pickup_candidate_key := ""
 var _pickup_elapsed := 0.0
 var _fielder_home: Dictionary = {}
@@ -107,7 +107,7 @@ func configure_play_state(context: Dictionary) -> void:
 ## begin(contact, ball, defense, user_controls) contract.
 func begin(
 	contact: Dictionary,
-	ball_visual: Node3D,
+	ball_visual,
 	defense: Dictionary,
 	user_controls: bool,
 	context: Dictionary = {},
@@ -416,16 +416,16 @@ func _update_fielders(delta: float) -> void:
 	var covers := _cover_assignments(primary)
 	for key_value in defenders:
 		var key := String(key_value)
-		var player: Node3D = defenders[key]
+		var player = defenders[key]
 		if not is_instance_valid(player):
 			continue
 		if player == holder or player == _pickup_candidate:
 			_stop_fielder(player)
 			continue
 		var desired := Vector3.ZERO
-		var motion_target := player.global_position
+		var motion_target: Vector3 = player.global_position
 		var speed := _fielder_speed_world(key)
-		var is_controlled := player == controlled_player and user_fielding
+		var is_controlled: bool = player == controlled_player and user_fielding
 		if is_controlled and _input_vector.length() > 0.08:
 			var assisted := _flat_direction(player.global_position, pursuit_target)
 			var user_direction := Vector3(_input_vector.x, 0.0, _input_vector.y)
@@ -494,17 +494,17 @@ func _check_fielding() -> void:
 		and not bool(_ball_state.get("wall", false))
 	)
 	var height_ft := float(_ball_state.get("z", 0.0))
-	var best_player: Node3D
+	var best_player
 	var best_key := ""
 	var best_distance := INF
 	for key_value in defenders:
 		var key := String(key_value)
-		var player: Node3D = defenders[key]
+		var player = defenders[key]
 		if not is_instance_valid(player):
 			continue
 		var target_height := 1.2 if pristine_fly else 0.45
-		var target_3d := player.global_position + Vector3.UP * target_height
-		var distance := target_3d.distance_to(ball_position)
+		var target_3d: Vector3 = player.global_position + Vector3.UP * target_height
+		var distance: float = target_3d.distance_to(ball_position)
 		var cpu_scale := lerpf(0.82, 1.08, _difficulty) if not user_fielding else 1.0
 		var radius := (1.65 if pristine_fly else 1.35) * cpu_scale
 		if distance < radius and distance < best_distance:
@@ -522,7 +522,7 @@ func _check_fielding() -> void:
 		_stop_fielder(best_player)
 
 
-func _catch_fly(player: Node3D, key: String, diving: bool) -> void:
+func _catch_fly(player, key: String, diving: bool) -> void:
 	holder = player
 	holder_key = key
 	_fly_caught = true
@@ -609,9 +609,9 @@ func _update_throw(delta: float) -> void:
 
 func _arrive_throw() -> void:
 	var target_base := throw_base
-	var receiver := _coverer_at(target_base)
-	var clean := throw_error_ft < THROW_CLEAN_ERROR_FT and is_instance_valid(receiver)
-	var previous_holder := holder
+	var receiver = _coverer_at(target_base)
+	var clean: bool = throw_error_ft < THROW_CLEAN_ERROR_FT and is_instance_valid(receiver)
+	var previous_holder = holder
 	holder = null
 	holder_key = ""
 	if clean:
@@ -633,7 +633,7 @@ func _arrive_throw() -> void:
 	_make_overthrow_live(previous_holder, target_base)
 
 
-func _make_overthrow_live(previous_holder: Node3D, base_index: int) -> void:
+func _make_overthrow_live(previous_holder, base_index: int) -> void:
 	var at := C.base_position(base_index)
 	var from := throw_start
 	if is_instance_valid(previous_holder):
@@ -724,7 +724,7 @@ func _configure_context(contact: Dictionary, queued: Dictionary, direct: Diction
 func _cache_fielder_home() -> void:
 	for key_value in defenders:
 		var key := String(key_value)
-		var player: Node3D = defenders[key]
+		var player = defenders[key]
 		if is_instance_valid(player):
 			_fielder_home[key] = player.global_position
 
@@ -893,7 +893,7 @@ func _defense_time_to(base_index: int) -> float:
 	var target_ball := _playable_target()
 	for key_value in defenders:
 		var key := String(key_value)
-		var player: Node3D = defenders[key]
+		var player = defenders[key]
 		if not is_instance_valid(player):
 			continue
 		var pursuit := _flat_distance(player.global_position, target_ball) / maxf(0.1, _fielder_speed_world(key) * lerpf(0.70, 0.94, _difficulty))
@@ -1096,11 +1096,11 @@ func _throw_accuracy_label(error_ft: float) -> String:
 	return "overthrow"
 
 
-func _coverer_at(base_index: int) -> Node3D:
-	var best: Node3D
+func _coverer_at(base_index: int):
+	var best
 	var best_distance := COVER_RADIUS_WORLD
 	for player_value in defenders.values():
-		var player: Node3D = player_value
+		var player = player_value
 		if not is_instance_valid(player) or player == holder:
 			continue
 		var distance := _flat_distance(player.global_position, C.base_position(base_index))
@@ -1136,13 +1136,13 @@ func _ranked_fielder_keys(target: Vector3) -> Array:
 	var ranked: Array = []
 	for key_value in defenders:
 		var key := String(key_value)
-		var player: Node3D = defenders[key]
+		var player = defenders[key]
 		if not is_instance_valid(player):
 			continue
 		var inserted := false
 		var distance := _flat_distance(player.global_position, target)
 		for index in range(ranked.size()):
-			var other: Node3D = defenders[String(ranked[index])]
+			var other = defenders[String(ranked[index])]
 			if distance < _flat_distance(other.global_position, target):
 				ranked.insert(index, key)
 				inserted = true
@@ -1239,7 +1239,7 @@ func _base_name(base_index: int) -> String:
 	return ["home", "first", "second", "third"][clampi(base_index, 0, 3)]
 
 
-func _key_for_player(player: Node3D) -> String:
+func _key_for_player(player) -> String:
 	for key_value in defenders:
 		var key := String(key_value)
 		if defenders[key] == player:
@@ -1247,7 +1247,7 @@ func _key_for_player(player: Node3D) -> String:
 	return ""
 
 
-func _stop_fielder(player: Node3D) -> void:
+func _stop_fielder(player) -> void:
 	if player.has_method("set_motion"):
 		player.call("set_motion", Vector3.ZERO)
 
@@ -1337,7 +1337,7 @@ func _complete(result: Dictionary) -> void:
 	if is_instance_valid(controlled_player) and controlled_player.has_method("set_highlighted"):
 		controlled_player.call("set_highlighted", false)
 	for player_value in defenders.values():
-		var player: Node3D = player_value
+		var player = player_value
 		if is_instance_valid(player) and player.has_method("set_motion"):
 			player.call("set_motion", Vector3.ZERO)
 	phase_changed.emit(phase)

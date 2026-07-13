@@ -1,40 +1,23 @@
 class_name PixiballBroadcastCamera
-extends Node3D
+extends Node
+
+## Deterministic world-to-pixel view director.
+##
+## This keeps the simulation's three-axis baseball coordinates but replaces
+## perspective projection with 320x180 design-grid compositions. PixelScene
+## maps those positions to 4px-native blocks rendered directly into 1280x720;
+## the resulting pixels never pass through a low-res viewport, 3D camera, or
+## post-processing filter.
 
 const C = preload("res://gameplay/game_constants.gd")
 const ParkGeometry = preload("res://core/fielding/park_geometry.gd")
 
-## --- Park <-> Godot stage coordinate mapping ---------------------------------
-## The authoritative simulation works in Citizens-Bank-Park FEET; the presentation
-## boundary (see gameplay/live_play_controller.gd::_field_state_to_world) maps a
-## park sample to this stage's Godot units with:
-##     world = HOME_PLATE + (park_x * H, park_z * V, -park_y * H)
-## where
-##     HOME_PLATE = C.HOME_PLATE = (0, 0.08, 18)
-##     H = ParkGeometry.HORIZONTAL_WORLD_PER_FOOT = 0.155  (u/ft, lateral + depth)
-##     V = ParkGeometry.VERTICAL_WORLD_PER_FOOT   = 0.3048 (u/ft, height)
-## Axes in park feet: +x -> first base (right), +y -> center field (depth), +z up.
-## In Godot stage units that becomes: +X -> first base, -Z -> center field,
-## +Y -> up. Home plate sits at Z=+18, the mound at ~Z=+8.6 (actors are placed a
-## touch flatter, mound at Z=0). The outfield wall lands near Z=-44 (CF ~401 ft).
-##
-## NOTE ON SCALE: this is a *compressed* stage - depth uses 0.155 u/ft while
-## height uses 0.3048 u/ft, so a literal 393 ft center-field camera sits only
-## ~61 u out. At that distance a broadcast FOV (~52 deg) renders the battery a
-## few pixels tall. The center-field broadcast cam below therefore keeps the UE
-## vantage (out toward CF, a hair to the 3B side, low, looking back at the plate,
-## a whisper of up-tilt) but uses a telephoto FOV to compress and frame the
-## pitcher/batter/catcher/umpire - exactly how a real MLB center-field lens works
-## from 400 ft. The live-play (PlayCam) sky cam converts the UE follow law from
-## park feet through the mapping above, using H for its height so the overhead
-## framing stays proportional to the compressed field footprint.
-const FT_H := ParkGeometry.HORIZONTAL_WORLD_PER_FOOT
-const FT_V := ParkGeometry.VERTICAL_WORLD_PER_FOOT
-
-# Plate-local dimensions use the vertical (true-foot) scale. The field depth is
-# compressed for presentation, but players, the baseball, and the rulebook zone
-# remain human-scale at home plate.
-const PLATE_WORLD_PER_FOOT := FT_V
+const DESIGN_SIZE := Vector2(320, 180)
+const FRAMEBUFFER_SIZE := Vector2(1280, 720)
+const GRID_PIXEL_SIZE := 4
+# Kept for consumers that use "logical" to mean the root rendering size.
+const LOGICAL_SIZE := FRAMEBUFFER_SIZE
+const PLATE_WORLD_PER_FOOT := ParkGeometry.VERTICAL_WORLD_PER_FOOT
 const STRIKE_ZONE_HALF_WIDTH_FT := 17.0 / 24.0
 const STRIKE_ZONE_BOTTOM_FT := 1.5
 const STRIKE_ZONE_TOP_FT := 3.5
@@ -47,121 +30,30 @@ const MODE_BATTING := "batting"
 const MODE_DUGOUT := "dugout"
 const GAMEPLAY_MODES := [MODE_PITCHING, MODE_FIELDING, MODE_BATTING]
 
-## When set, the broadcast camera is parented into that SubViewport so the
-## 3D world renders at the fixed logical resolution while this director node
-## keeps authoring motion in the main scene tree.
-@export var world_viewport_path: NodePath
-## Vertical logical pixel count of the world render target. Orthographic
-## plate cameras snap position and shake in world increments derived from
-## this so pixels never crawl at subpixel offsets. Must match the
-## WorldViewport height.
 @export var logical_vertical_pixels := 720
 
-# --- Camera juice (matches PixCameraJuiceComponent) ---------------------------
-const TRAUMA_DECAY := 3.4
-## UE amplitude is ~6.0 world-cm; scaled into this compressed stage's units so a
-## full-trauma contact reads without launching the frame off the rails.
-const TRAUMA_SHAKE := 0.16
-const CONTACT_FADE_FROM := 0.35
-const CONTACT_FADE_SEC := 0.12
-const HITSTOP_SCALE := 0.08
-
-var camera: Camera3D
 var mode := MODE_INTRO
-var target_node: Node3D
-var desired_position := Vector3(19, 12, 31)
-var desired_target := Vector3(0, 2.5, 3)
-var _look_target := Vector3(0, 2.5, 3)
-var _shake_strength := 0.0
-var _intro_time := 0.0
-var _anim_time := 0.0
-var _snap_requested := false
-
+var target_node
 var _trauma := 0.0
-var _flash_time := 0.0
+var _anim_time := 0.0
 var _hitstop_frames := 0
-var _flash_layer: CanvasLayer
-var _flash_rect: ColorRect
-var _broadcast_fill: DirectionalLight3D
+var _pixel_shake := Vector2.ZERO
 
 
 func _ready() -> void:
-	camera = Camera3D.new()
-	camera.name = "BroadcastCamera"
-	camera.current = true
-	camera.fov = 46.0
-	camera.near = 0.08
-	camera.far = 260.0
-	var render_viewport := get_node_or_null(world_viewport_path) as SubViewport
-	if render_viewport != null:
-		render_viewport.add_child(camera)
-	else:
-		add_child(camera)
-	# A restrained camera-axis fill preserves faces, gloves, and jersey numbers
-	# against the bright field and waterfront. It carries no shadows and never
-	# replaces the stadium key; it only restores the readable value hierarchy
-	# expected from a real broadcast lens.
-	_broadcast_fill = DirectionalLight3D.new()
-	_broadcast_fill.name = "BroadcastFill"
-	_broadcast_fill.light_color = Color("ffe6c2")
-	_broadcast_fill.light_energy = 0.18
-	_broadcast_fill.light_cull_mask = BallplayerActor.CHARACTER_RENDER_LAYER
-	_broadcast_fill.shadow_enabled = false
-	add_child(_broadcast_fill)
-	global_position = desired_position
-	look_at(desired_target, Vector3.UP)
-	_build_flash()
-	_sync_render_camera()
+	add_to_group("pixiball_pixel_projector")
+	set_process(true)
+	_sync_world_mode()
 
 
-func set_mode(next_mode: String, focus: Node3D = null) -> void:
+func set_mode(next_mode: String, focus = null) -> void:
+	if next_mode not in [MODE_INTRO, MODE_PITCHING, MODE_FIELDING, MODE_BATTING, MODE_DUGOUT]:
+		push_warning("Unknown Pixiball pixel view: %s" % next_mode)
+		return
 	mode = next_mode
 	target_node = focus
-	match mode:
-		MODE_INTRO:
-			_broadcast_fill.light_energy = 0.16
-			camera.projection = Camera3D.PROJECTION_PERSPECTIVE
-			desired_position = Vector3(19, 12, 31)
-			desired_target = Vector3(0, 2.5, 2)
-			camera.fov = 45.0
-		MODE_PITCHING:
-			# Long center-field broadcast lens, just to the third-base side.
-			_broadcast_fill.light_energy = 0.44
-			camera.projection = Camera3D.PROJECTION_PERSPECTIVE
-			camera.fov = 8.0
-			# The first-base-side offset places the plate group on the left and the
-			# pitcher on the right, matching the approved gameplay composition.
-			desired_position = Vector3(3.2, 1.9, -28.0)
-			desired_target = Vector3(0.0, 2.0, 16.5)
-		MODE_BATTING:
-			_broadcast_fill.light_energy = 0.28
-			# Competitive zone-hitting view from the clear backstop corridor. The
-			# physical rulebook zone stays large in the lower center while the
-			# elevated look point keeps the pitcher's full delivery in frame. Its
-			# size comes from projection, not an independently enlarged HUD rectangle.
-			camera.projection = Camera3D.PROJECTION_PERSPECTIVE
-			camera.fov = 15.0
-			desired_position = Vector3(0.0, 2.4, 27.0)
-			desired_target = plate_location_world(0.0, 4.15)
-		MODE_FIELDING:
-			_broadcast_fill.light_energy = 0.18
-			# UE PlayCam: overhead live-play sky cam, driven by the follow law
-			# below every frame. Fixed FOV 52 and a fixed -58 deg downward pitch.
-			camera.projection = Camera3D.PROJECTION_PERSPECTIVE
-			camera.fov = 52.0
-			_drive_playcam()
-		MODE_DUGOUT:
-			_broadcast_fill.light_energy = 0.22
-			camera.projection = Camera3D.PROJECTION_PERSPECTIVE
-			desired_position = Vector3(-25, 5.5, 18)
-			desired_target = Vector3(0, 2.0, 5)
-			camera.fov = 44.0
-		_:
-			push_warning("Unknown Pixiball camera mode: %s" % mode)
-			return
-	if mode in GAMEPLAY_MODES:
-		_snap_requested = true
-		_apply_requested_cut()
+	_pixel_shake = Vector2.ZERO
+	_sync_world_mode()
 
 
 func plate_location_world(lateral_ft: float, height_ft: float) -> Vector3:
@@ -173,175 +65,203 @@ func plate_location_world(lateral_ft: float, height_ft: float) -> Vector3:
 
 
 func projected_strike_zone() -> Rect2:
-	if not is_instance_valid(camera) or not camera.is_inside_tree():
-		return Rect2()
-	var corners := [
-		plate_location_world(-STRIKE_ZONE_HALF_WIDTH_FT, STRIKE_ZONE_TOP_FT),
-		plate_location_world(STRIKE_ZONE_HALF_WIDTH_FT, STRIKE_ZONE_TOP_FT),
-		plate_location_world(-STRIKE_ZONE_HALF_WIDTH_FT, STRIKE_ZONE_BOTTOM_FT),
-		plate_location_world(STRIKE_ZONE_HALF_WIDTH_FT, STRIKE_ZONE_BOTTOM_FT),
-	]
-	var minimum := Vector2(INF, INF)
-	var maximum := Vector2(-INF, -INF)
-	for corner in corners:
-		if camera.is_position_behind(corner):
+	# Authored design-grid regions remain legible at native 720p. They represent
+	# the exact rulebook proportions; only their presentation scale changes per
+	# fixed view, just like a hand-authored pixel room.
+	match mode:
+		MODE_BATTING:
+			return Rect2(137, 91, 46, 56)
+		MODE_PITCHING:
+			return Rect2(82, 62, 30, 38)
+		_:
 			return Rect2()
-		var screen_point := camera.unproject_position(corner)
-		minimum = minimum.min(screen_point)
-		maximum = maximum.max(screen_point)
-	return Rect2(minimum, maximum - minimum)
+
+
+func projected_strike_zone_native() -> Rect2:
+	var design_rect := projected_strike_zone()
+	return Rect2(design_rect.position * GRID_PIXEL_SIZE, design_rect.size * GRID_PIXEL_SIZE)
 
 
 func plate_lateral_screen_sign() -> float:
-	if not is_instance_valid(camera) or not camera.is_inside_tree():
-		return 1.0
-	var center_screen := camera.unproject_position(plate_location_world(0.0, 2.5))
-	var positive_screen := camera.unproject_position(plate_location_world(1.0, 2.5))
-	var delta_x := positive_screen.x - center_screen.x
-	return signf(delta_x) if not is_zero_approx(delta_x) else 1.0
+	return -1.0 if mode == MODE_PITCHING else 1.0
+
+
+func project_world(value: Vector3) -> Vector2:
+	# Return design-grid coordinates because every world presenter is parented
+	# beneath PixelScene's exact 4x transform.
+	var result := Vector2.ZERO
+	match mode:
+		MODE_PITCHING:
+			result = _project_pitching(value)
+		MODE_BATTING:
+			result = _project_batting(value)
+		MODE_FIELDING:
+			result = _project_fielding(value)
+		MODE_DUGOUT:
+			result = _project_dugout(value)
+		_:
+			result = _project_intro(value)
+	result += _pixel_shake
+	return Vector2(roundi(result.x), roundi(result.y))
+
+
+func project_world_native(value: Vector3) -> Vector2:
+	return project_world(value) * GRID_PIXEL_SIZE
+
+
+func actor_lod(value: Vector3, _role := "fielder") -> String:
+	match mode:
+		MODE_PITCHING:
+			if value.z <= 5.0:
+				return "large"
+			if value.z <= 24.0:
+				return "small"
+			return "tiny"
+		MODE_BATTING:
+			return "large" if value.z >= 12.0 else "small"
+		MODE_FIELDING:
+			return "tiny"
+		MODE_DUGOUT:
+			return "large"
+		_:
+			return "small" if value.z > 8.0 else "large"
+
+
+func actor_visible(value: Vector3, role := "fielder") -> bool:
+	# Fixed-room composition is intentionally selective. A center-field pitch
+	# view needs four readable silhouettes, not nine distant figures collapsing
+	# into the same twenty-pixel patch.
+	match mode:
+		MODE_PITCHING:
+			return role in ["pitcher", "batter", "catcher", "umpire"]
+		MODE_BATTING:
+			return role in ["pitcher", "batter"]
+		MODE_DUGOUT:
+			return value.z > 8.0
+		_:
+			return true
+
+
+func actor_screen_offset(_value: Vector3, role := "fielder") -> Vector2:
+	if mode == MODE_PITCHING:
+		match role:
+			"batter":
+				return Vector2(-8, 1)
+			"catcher":
+				return Vector2(3, 3)
+			"umpire":
+				return Vector2(10, 1)
+	elif mode == MODE_BATTING and role == "batter":
+		return Vector2(-22, -1)
+	return Vector2.ZERO
+
+
+func depth_order(value: Vector3) -> int:
+	if mode == MODE_FIELDING:
+		return 40 + int(project_world(value).y)
+	return 30 + int(project_world(Vector3(value.x, 0.08, value.z)).y)
 
 
 func shake(strength := 0.3) -> void:
 	_trauma = minf(1.0, _trauma + strength)
 
 
-## Contact juice: hitstop + trauma shake + white flash, scaled by exit velocity,
-## mirroring PixCameraJuiceComponent's contact beat.
 func contact_juice(exit_velocity_mph: float) -> void:
-	var ev01 := clampf((exit_velocity_mph - 60.0) / 55.0, 0.0, 1.0)
-	_hitstop_frames = 4 if ev01 > 0.75 else (3 if ev01 > 0.45 else 2)
-	_trauma = minf(1.0, _trauma + sqrt((1.0 + 3.0 * ev01) / 6.0))
-	_flash_time = CONTACT_FADE_SEC
+	# Impact read is the local contact burst (bible 9.3) plus hitstop and
+	# whole-pixel shake here; never a screen flash (bible 11.5).
+	var force := clampf((exit_velocity_mph - 60.0) / 55.0, 0.0, 1.0)
+	_hitstop_frames = 3 if force > 0.65 else 2
+	_trauma = minf(1.0, _trauma + 0.45 + force * 0.4)
 
 
 func _process(delta: float) -> void:
-	_intro_time += delta
 	_anim_time += delta
-
-	if mode == MODE_INTRO:
-		var angle := _intro_time * 0.055
-		desired_position = Vector3(19.0 + sin(angle) * 5.0, 12.0 + sin(angle * 2.0), 31.0 - cos(angle) * 4.0)
-	elif mode == MODE_FIELDING and is_instance_valid(target_node):
-		_drive_playcam()
-
-	if _snap_requested:
-		_apply_requested_cut()
-	else:
-		# UE ease: K = 1 - exp(-dt * 4.5).
-		global_position = global_position.lerp(desired_position, 1.0 - exp(-4.5 * delta))
-		_look_target = _look_target.lerp(desired_target, 1.0 - exp(-5.5 * delta))
-
-	global_position += _trauma_offset(delta)
-	look_at(_look_target, Vector3.UP)
+	_update_trauma(delta)
 	_update_hitstop()
-	_update_flash(delta)
-	_sync_render_camera()
+	if mode == MODE_FIELDING and is_instance_valid(target_node):
+		var target_position := _world_position_of(target_node)
+		for world in get_tree().get_nodes_in_group("pixiball_pixel_world"):
+			if world.has_method("set_field_focus"):
+				world.call("set_field_focus", target_position)
 
 
-func _apply_requested_cut() -> void:
-	global_position = desired_position
-	_look_target = desired_target
-	_snap_requested = false
-	look_at(_look_target, Vector3.UP)
-	_sync_render_camera()
+func _project_pitching(value: Vector3) -> Vector2:
+	var depth := clampf((value.z + 5.0) / 25.0, 0.0, 1.0)
+	var lane := Vector2(226, 145).lerp(Vector2(103, 87), depth)
+	var lateral_scale := lerpf(3.1, 1.25, depth)
+	return lane + Vector2(value.x * lateral_scale, -value.y * lerpf(4.0, 2.4, depth))
 
 
-## UE PlayCam DriveCamera: clamp the ball to park bounds, ease a fixed-orientation
-## sky camera toward a depth/lateral-compressed target.
-func _drive_playcam() -> void:
-	var ball := target_node.global_position if is_instance_valid(target_node) else C.HOME_PLATE
-	# Godot stage world -> park feet (inverse of _field_state_to_world).
-	var cx := clampf(ball.x / FT_H, -240.0, 240.0)
-	var cy := clampf((C.HOME_PLATE.z - ball.z) / FT_H, 30.0, 420.0)
-	var depth_t := clampf((cy - 30.0) / 390.0, 0.0, 1.0)
-	var back_off := lerpf(60.0, 100.0, depth_t)
-	var height_ft := lerpf(260.0, 330.0, depth_t)
-	var cam_depth := cy * 0.35 - back_off
-	var cam_lat := cx * 0.55
-	# Height uses the horizontal scale so the overhead framing matches the
-	# compressed depth footprint instead of towering twice as high.
-	desired_position = C.HOME_PLATE + Vector3(cam_lat * FT_H, height_ft * FT_H, -cam_depth * FT_H)
-	# Fixed orientation: yaw 0 (face center field, -Z) pitched -58 deg down.
-	var pitch := deg_to_rad(58.0)
-	var dir := Vector3(0.0, -sin(pitch), -cos(pitch))
-	desired_target = desired_position + dir * 20.0
+func _project_batting(value: Vector3) -> Vector2:
+	var depth := clampf((C.HOME_PLATE.z - value.z) / 18.0, 0.0, 1.0)
+	var lane := Vector2(160, 154).lerp(Vector2(160, 76), depth)
+	var lateral_scale := lerpf(4.2, 1.9, depth)
+	return lane + Vector2(value.x * lateral_scale, -value.y * lerpf(4.2, 2.4, depth))
 
 
-func _trauma_offset(delta: float) -> Vector3:
-	var offset := Vector3.ZERO
-	if _trauma > 0.0005:
-		var amp := _trauma * _trauma * TRAUMA_SHAKE
-		var t := _anim_time * 60.0
-		# Vertical (Y) full, lateral (X) reduced - the impact reads mostly as a
-		# vertical kick on the center-field lens (UE: Y full / cross-axis 0.6x).
-		offset = Vector3(_noise(t, 3.0) * amp * 0.6, _noise(t, 11.0) * amp, 0.0)
-		_trauma = maxf(0.0, _trauma - TRAUMA_DECAY * delta)
-	return offset
+func _project_fielding(value: Vector3) -> Vector2:
+	var focus_shift := Vector2.ZERO
+	if is_instance_valid(target_node):
+		var focus := _world_position_of(target_node)
+		focus_shift.x = clampf(focus.x * -0.35, -22.0, 22.0)
+		focus_shift.y = clampf((focus.z + 4.0) * -0.18, -14.0, 14.0)
+	return Vector2(
+		160.0 + value.x * 3.15,
+		155.0 + (value.z - C.HOME_PLATE.z) * 2.0 - value.y * 2.7
+	) + focus_shift
+
+
+func _project_intro(value: Vector3) -> Vector2:
+	var depth := clampf((value.z + 10.0) / 32.0, 0.0, 1.0)
+	return Vector2(208, 145).lerp(Vector2(116, 92), depth) + Vector2(value.x * lerpf(2.7, 1.3, depth), -value.y * 3.0)
+
+
+func _project_dugout(value: Vector3) -> Vector2:
+	return Vector2(160 + value.x * 3.0, 142 + (value.z - 10.0) * 0.7 - value.y * 4.0)
+
+
+func _update_trauma(delta: float) -> void:
+	if _trauma <= 0.001:
+		_trauma = 0.0
+		_pixel_shake = Vector2.ZERO
+		return
+	var amplitude := _trauma * _trauma * 3.0
+	var tick: float = floorf(_anim_time * 30.0)
+	_pixel_shake = Vector2(
+		roundi(_noise(tick, 3.0) * amplitude),
+		roundi(_noise(tick, 11.0) * amplitude),
+	)
+	_trauma = maxf(0.0, _trauma - delta * 3.8)
 
 
 func _update_hitstop() -> void:
-	if _hitstop_frames > 0:
-		Engine.time_scale = HITSTOP_SCALE
-		_hitstop_frames -= 1
-		if _hitstop_frames <= 0:
-			Engine.time_scale = 1.0
-
-
-func _update_flash(delta: float) -> void:
-	if _flash_rect == null:
+	if _hitstop_frames <= 0:
 		return
-	if _flash_time > 0.0:
-		_flash_time = maxf(0.0, _flash_time - delta)
-		_flash_rect.color.a = CONTACT_FADE_FROM * (_flash_time / CONTACT_FADE_SEC)
-		_flash_rect.visible = true
-	elif _flash_rect.visible:
-		_flash_rect.color.a = 0.0
-		_flash_rect.visible = false
-
-
-func _build_flash() -> void:
-	_flash_layer = CanvasLayer.new()
-	_flash_layer.name = "ContactFlash"
-	_flash_layer.layer = 40
-	add_child(_flash_layer)
-	_flash_rect = ColorRect.new()
-	_flash_rect.color = Color(1, 1, 1, 0)
-	_flash_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_flash_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_flash_rect.visible = false
-	_flash_layer.add_child(_flash_rect)
-
-
-func _exit_tree() -> void:
-	# Never leave the global clock stuck if we tear down mid-hitstop.
-	if _hitstop_frames > 0:
-		_hitstop_frames = 0
+	Engine.time_scale = 0.08
+	_hitstop_frames -= 1
+	if _hitstop_frames <= 0:
 		Engine.time_scale = 1.0
 
 
+func _sync_world_mode() -> void:
+	for world in get_tree().get_nodes_in_group("pixiball_pixel_world"):
+		if world.has_method("set_view_mode"):
+			world.call("set_view_mode", mode)
+
+
+func _world_position_of(node: Variant) -> Vector3:
+	if node == null:
+		return C.HOME_PLATE
+	var value: Variant = node.get("global_position")
+	return value if value is Vector3 else C.HOME_PLATE
+
+
 func _noise(a: float, b: float) -> float:
-	var v := sin(a * 12.9898 + b * 78.233) * 43758.5453
-	return (v - floor(v)) * 2.0 - 1.0
+	var value := sin(a * 12.9898 + b * 78.233) * 43758.5453
+	return (value - floor(value)) * 2.0 - 1.0
 
 
-func _sync_render_camera() -> void:
-	if camera == null or camera.get_parent() == self:
-		# Legacy fallback: the camera inherits this node's transform directly.
-		return
-	var render_transform := global_transform
-	if camera.projection == Camera3D.PROJECTION_ORTHOGONAL and logical_vertical_pixels > 0:
-		# One world-unit step per logical pixel keeps the ortho plate view,
-		# its motion, and its shake locked to the render grid. The smooth
-		# transform stays on this node, so snapping never feeds back into
-		# the motion lerp. (Perspective broadcast/PlayCam modes skip this.)
-		var pixel := camera.size / float(logical_vertical_pixels)
-		var origin := render_transform.origin
-		var snapped_right := snappedf(origin.dot(render_transform.basis.x), pixel)
-		var snapped_up := snappedf(origin.dot(render_transform.basis.y), pixel)
-		var depth := origin.dot(render_transform.basis.z)
-		render_transform.origin = (
-			render_transform.basis.x * snapped_right
-			+ render_transform.basis.y * snapped_up
-			+ render_transform.basis.z * depth
-		)
-	camera.global_transform = render_transform
+func _exit_tree() -> void:
+	if _hitstop_frames > 0 or not is_equal_approx(Engine.time_scale, 1.0):
+		_hitstop_frames = 0
+		Engine.time_scale = 1.0

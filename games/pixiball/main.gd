@@ -1,4 +1,4 @@
-extends Node3D
+extends Node
 
 ## Pixiball: Harbor League
 ##
@@ -26,6 +26,8 @@ const PITCH_ARC_LIFT_FT := 2.2
 const AIM_LATERAL_FT := 1.35
 const AIM_VERTICAL_FT := 1.55
 const AIM_CENTER_HEIGHT_FT := 2.5
+const NATIVE_FRAMEBUFFER_SIZE := Vector2i(1280, 720)
+const PIXEL_GRID_SIZE := 4
 
 var sim: PixiballSim
 var stadium: VoxelStadium
@@ -35,7 +37,7 @@ var ball: BaseballVisual
 var audio_director: PixiballAudioDirector
 var live_play: PixiballLivePlayController
 var haptic_director: PixiballHapticDirector
-var cast_root: Node3D
+var cast_root: Node
 var content_catalog: PixiballContentCatalog
 var pitch_model: PixPitchModel
 var pitch_intel_panel: PixiballPitchIntelPanel
@@ -85,11 +87,25 @@ var _pending_pitch_report: Dictionary = {}
 
 
 func _enter_tree() -> void:
+	_configure_native_framebuffer()
 	add_to_group(DRIVER_GROUP)
+
+
+func _configure_native_framebuffer() -> void:
+	# The game renders straight into a 720p root. PixelScene's 4x CanvasItem
+	# transform expands one authored design unit into one 4x4 native pixel block;
+	# there is deliberately no 320x180 SubViewport or sampled intermediate.
+	var game_window := get_window()
+	game_window.content_scale_size = NATIVE_FRAMEBUFFER_SIZE
+	game_window.content_scale_mode = Window.CONTENT_SCALE_MODE_VIEWPORT
+	game_window.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
+	game_window.content_scale_stretch = Window.CONTENT_SCALE_STRETCH_INTEGER
+	game_window.canvas_item_default_texture_filter = Viewport.DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_NEAREST
 
 
 func _ready() -> void:
 	_visual_rng.seed = 0x50cce5
+	_configure_pixel_scene_grid()
 	_ensure_input_actions()
 	_build_world()
 	sim = SimScript.new(20260710, 3, 0.55)
@@ -102,6 +118,16 @@ func _ready() -> void:
 	_show_landing()
 	if "--autoplay" in OS.get_cmdline_user_args():
 		call_deferred("_start_command_line_autoplay")
+
+
+func _configure_pixel_scene_grid() -> void:
+	var pixel_scene := get_node_or_null("PixelScene") as Node2D
+	if pixel_scene == null:
+		push_error("Pixiball native renderer requires the PixelScene CanvasItem host.")
+		return
+	pixel_scene.position = Vector2.ZERO
+	pixel_scene.scale = Vector2.ONE * PIXEL_GRID_SIZE
+	pixel_scene.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 
 
 func _start_command_line_autoplay() -> void:
@@ -146,7 +172,7 @@ func _advance_to_bottom_for_capture() -> void:
 
 func _build_world() -> void:
 	stadium = get_node("World/Stadium") as VoxelStadium
-	cast_root = get_node("Actors/Ballplayers") as Node3D
+	cast_root = get_node("Actors/Ballplayers") as Node
 	ball = get_node("Presentation/Baseball") as BaseballVisual
 	broadcast_camera = get_node("Presentation/CameraDirector") as PixiballBroadcastCamera
 	live_play = get_node("Systems/LivePlayController") as PixiballLivePlayController
@@ -154,6 +180,7 @@ func _build_world() -> void:
 	haptic_director = get_node("Systems/HapticDirector") as PixiballHapticDirector
 	hud = get_node("PixiballHUD") as PixiballHUD
 	pitch_intel_panel = get_node("PitchIntelLayer/PitchIntelPanel") as PixiballPitchIntelPanel
+	stadium.set_mood("day")
 	if not live_play.completed.is_connected(_on_live_play_completed):
 		live_play.completed.connect(_on_live_play_completed)
 	if not live_play.phase_changed.is_connected(_on_live_play_phase_changed):
@@ -307,7 +334,9 @@ func _set_gameplay_view(user_batting: bool) -> void:
 func _sync_strike_zone_projection() -> void:
 	if hud == null or broadcast_camera == null:
 		return
-	var projected := broadcast_camera.projected_strike_zone()
+	# HUD controls live directly in the native 1280x720 root rather than under
+	# PixelScene, so hand off the projector's explicitly converted native rect.
+	var projected := broadcast_camera.projected_strike_zone_native()
 	if projected.size.x > 1.0 and projected.size.y > 1.0:
 		hud.set_strike_zone_rect(projected)
 		hud.set_strike_zone_lateral_sign(broadcast_camera.plate_lateral_screen_sign())
@@ -1207,12 +1236,16 @@ func _refresh_hud() -> void:
 		"pitcher_throws": active_pitcher.get("throws", "R"),
 	})
 	var condition := _hud_pitcher_condition(state)
+	var stamina_fraction := 1.0
+	var stamina_tier := ""
 	if not condition.is_empty():
-		hud.set_stamina(float(condition.get("stamina_fraction", condition.get("energy", 1.0))), String(condition.get("tier", condition.get("status", ""))))
+		stamina_fraction = float(condition.get("stamina_fraction", condition.get("energy", 1.0)))
+		stamina_tier = String(condition.get("tier", condition.get("status", "")))
 	elif state.has("stamina"):
-		hud.set_stamina(float(state.get("stamina", 1.0)))
-	else:
-		hud.set_stamina(1.0)
+		stamina_fraction = float(state.get("stamina", 1.0))
+	hud.set_stamina(stamina_fraction, stamina_tier)
+	if defenders.has("pitcher"):
+		(defenders["pitcher"] as BallplayerActor).set_stamina(stamina_fraction)
 	if sim.replica_enabled():
 		var current_pitcher := sim.user_pitcher()
 		var current_id := int(current_pitcher.get("id", -1))
@@ -1250,6 +1283,7 @@ func _publish_new_events() -> void:
 		if sequence <= _last_published_event_seq:
 			continue
 		var type := String(event.get("type", "event"))
+		_apply_cast_presentation_event(type, event)
 		if type == "play_result":
 			hud.push_event(String(event.get("classification", "play")).replace("_", " "), Color("9fb4c5"))
 		elif type == "plate_result" and String(event.get("outcome", "")) == "strikeout" and match_mode == "endless":
@@ -1264,6 +1298,20 @@ func _publish_new_events() -> void:
 		elif type == "manager_substitute":
 			hud.push_event("PITCHING CHANGE: %s" % String(event.get("pitcher_name", event.get("name", "RELIEVER"))), Color("44d7b6"))
 		_last_published_event_seq = maxi(_last_published_event_seq, sequence)
+
+
+func _apply_cast_presentation_event(type: String, payload: Dictionary) -> void:
+	# Pocket Giants consume the simulator's existing event stream strictly as a
+	# presentation channel. This does not add gameplay signals or mutate state.
+	for actor_value in defenders.values():
+		var actor := actor_value as BallplayerActor
+		if actor != null:
+			actor.apply_sim_event(type, payload)
+	if batter != null:
+		batter.apply_sim_event(type, payload)
+	for runner in runners:
+		if runner != null:
+			runner.apply_sim_event(type, payload)
 
 
 func _prepare_offense_running() -> void:
@@ -1330,8 +1378,12 @@ func _sync_runner_visuals() -> void:
 func _cycle_mood() -> void:
 	_mood_index = (_mood_index + 1) % 3
 	var moods := ["day", "golden", "night"]
-	stadium.set_mood(moods[_mood_index])
+	_set_visual_mood(moods[_mood_index])
 	hud.push_event("STADIUM MOOD: %s" % moods[_mood_index], Color("ffd166"))
+
+
+func _set_visual_mood(mood: String) -> void:
+	stadium.set_mood(mood)
 
 
 func _contact_detail(trajectory: Dictionary) -> String:
@@ -1366,24 +1418,8 @@ func _ordinal(value: int) -> String:
 func _burst(at: Vector3, color: Color, count: int) -> void:
 	if headless_fast_forward:
 		return
-	for i in range(count):
-		var spark := MeshInstance3D.new()
-		var mesh := BoxMesh.new()
-		mesh.size = Vector3.ONE * _visual_rng.randf_range(0.07, 0.16)
-		spark.mesh = mesh
-		var material := StandardMaterial3D.new()
-		material.albedo_color = color
-		material.emission_enabled = true
-		material.emission = color
-		material.emission_energy_multiplier = 2.2
-		spark.material_override = material
-		add_child(spark)
-		spark.global_position = at
-		var direction := Vector3(_visual_rng.randf_range(-1, 1), _visual_rng.randf_range(0.2, 1.3), _visual_rng.randf_range(-1, 1)).normalized()
-		var tween := create_tween().set_parallel(true)
-		tween.tween_property(spark, "global_position", at + direction * _visual_rng.randf_range(0.8, 2.1), 0.42).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-		tween.tween_property(spark, "scale", Vector3.ZERO, 0.42).set_delay(0.12)
-		tween.chain().tween_callback(spark.queue_free)
+	if stadium != null and stadium.has_method("burst"):
+		stadium.burst(at, color, count)
 
 
 func _fireworks() -> void:
@@ -1728,7 +1764,7 @@ func _drain_intents() -> void:
 				var mood := String(params.get("mood", "day"))
 				if mood in ["day", "golden", "night"]:
 					_mood_index = ["day", "golden", "night"].find(mood)
-					stadium.set_mood(mood)
+					_set_visual_mood(mood)
 
 
 func _ensure_input_actions() -> void:

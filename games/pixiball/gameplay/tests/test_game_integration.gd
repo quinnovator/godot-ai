@@ -14,18 +14,30 @@ func _run() -> void:
 	root.add_child(game)
 	# Let the complete generated hierarchy enter the tree and receive _ready.
 	await process_frame
+	await process_frame
+	var pixel_scene := game.get_node_or_null("PixelScene") as Node2D
+	_check(pixel_scene != null, "game must expose the native PixelScene")
+	if pixel_scene != null:
+		_check(pixel_scene.texture_filter == CanvasItem.TEXTURE_FILTER_NEAREST, "game PixelScene must use nearest filtering")
 	var sample_aim := Vector2(0.62, -0.37)
 	_check(game._plate_feet_to_aim(game._aim_to_plate_feet(sample_aim)).is_equal_approx(sample_aim), "aim and plate-feet presentation mapping must round-trip")
 	_check(game._plate_pitch_world(Vector2(0.0, 1.5)).is_equal_approx(game.broadcast_camera.plate_location_world(0.0, 1.5)), "pitch endpoint and projected strike zone must share one world mapping")
 	_check(game.batter is BallplayerActor, "playable batter should use BallplayerActor")
-	_check(game.batter.get_model_kind() == "rigged_glb", "playable batter should load the rigged GLB")
-	_check(not game.batter.is_using_fallback(), "playable batter did not load the Blender model")
-	_check(game.batter.get_socket_node("bat_grip") != null, "playable batter should expose its imported bat socket")
+	_check(game.batter.get_model_kind() == "native_pixel_sprite", "playable batter should use the native pixel model")
+	_check(not game.batter.is_using_fallback(), "playable batter reported a fallback model")
+	_check(is_instance_valid(game.batter.get_pixel_sprite()) and game.batter.get_pixel_sprite().get_parent() == pixel_scene, "playable batter did not attach to PixelScene")
+	var batter_grip: Vector3 = game.batter.get_socket_position("bat_grip")
+	_check(is_finite(batter_grip.x) and is_finite(batter_grip.y) and is_finite(batter_grip.z), "playable batter should expose a finite simulation bat socket")
 	for defender_value in game.defenders.values():
 		var defender := defender_value as BallplayerActor
 		_check(defender != null, "every playable defender should use BallplayerActor")
 		if defender != null:
-			_check(not defender.is_using_fallback(), "playable defender did not load the Blender model")
+			_check(defender.get_model_kind() == "native_pixel_sprite", "playable defender should use the native pixel model")
+			_check(not defender.is_using_fallback(), "playable defender reported a fallback model")
+			_check(is_instance_valid(defender.get_pixel_sprite()) and defender.get_pixel_sprite().get_parent() == pixel_scene, "playable defender did not attach to PixelScene")
+			var defender_socket: Vector3 = defender.get_socket_position("throw_hand")
+			_check(is_finite(defender_socket.x) and is_finite(defender_socket.y) and is_finite(defender_socket.z), "playable defender should expose a finite simulation throw socket")
+	_check(is_instance_valid(game.ball.get_pixel_sprite()) and game.ball.get_pixel_sprite().get_parent() == pixel_scene, "playable baseball did not attach to PixelScene")
 	_check(game._validate_agent_intent("start_match", {"seed": 4242.0, "innings": 1.0}).is_empty(), "JSON-RPC integral floats should satisfy integer fields")
 	_check(game._validate_agent_intent("select_pitcher", {"index": 1.0}).is_empty(), "JSON-RPC integral pitcher index should be accepted")
 	_check(game._validate_agent_intent("select_pitch", {"slot": 5.0}).is_empty(), "JSON-RPC integral pitch slot should be accepted")

@@ -1,6 +1,18 @@
 extends SceneTree
 
-const BALLPLAYER_SCENE = preload("res://characters/ballplayer_actor.tscn")
+const BALLPLAYER_SCENE := preload("res://characters/ballplayer_actor.tscn")
+const ALL_LAYERS := [
+	"TeamMark", "JerseyNumberFront", "BattingHelmet", "Bat",
+	"CatcherMask", "CatcherChestProtector", "CatcherShinGuardL",
+	"CatcherShinGuardR", "UmpireMask", "UmpireProtector", "Glove",
+]
+const ROLE_LAYERS := {
+	"batter": ["TeamMark", "JerseyNumberFront", "BattingHelmet", "Bat"],
+	"catcher": ["TeamMark", "JerseyNumberFront", "CatcherMask", "CatcherChestProtector", "CatcherShinGuardL", "CatcherShinGuardR", "Glove"],
+	"umpire": ["UmpireMask", "UmpireProtector"],
+	"pitcher": ["TeamMark", "JerseyNumberFront", "Glove"],
+	"fielder": ["TeamMark", "JerseyNumberFront", "Glove"],
+}
 
 var _failures: Array[String] = []
 
@@ -10,258 +22,155 @@ func _initialize() -> void:
 
 
 func _run() -> void:
-	var batter := _actor({
-		"seed": 7,
-		"role": "batter",
-		"number": 7,
-		"player_name": "Maya Okafor",
-		"mark": "H",
-		"bats": "left",
-		"helmet": true,
-		"bat": true,
-		"glove": false,
-		"primary_color": Color("813348"),
-		"secondary_color": Color("e8dfcb"),
-		"accent_color": Color("dfad3e"),
-	})
+	var pixel_scene := Node2D.new()
+	pixel_scene.name = "TemporaryEquipmentPixelScene"
+	root.add_child(pixel_scene)
+	pixel_scene.add_to_group("pixiball_pixel_scene")
+
+	var specs := {
+		"batter": _spec("batter", 11, "H", 27, "Maya Rodriguez", Color("813348"), Color("e8dfcb"), Color("dfad3e")),
+		"catcher": _spec("catcher", 22, "C", 8, "Jun Park", Color("185f73"), Color("f4e8cf"), Color("e45858")),
+		"umpire": _spec("umpire", 33, "U", 0, "Crew Chief", Color("252f3d"), Color("d8e2e8"), Color("84a0af")),
+		"pitcher": _spec("pitcher", 44, "P", 41, "Amara Stone", Color("245347"), Color("f4f0dd"), Color("e1a72f")),
+		"fielder": _spec("fielder", 55, "F", 12, "Niko Bell", Color("5d275d"), Color("efe5d2"), Color("55c9b8")),
+	}
+	var actors: Dictionary = {}
+	for role in ROLE_LAYERS:
+		var actor := BALLPLAYER_SCENE.instantiate() as BallplayerActor
+		actor.name = "%sActor" % String(role).capitalize()
+		actor.configure(specs[role])
+		actors[role] = actor
+		root.add_child(actor)
 	await process_frame
-	_expect_pieces(batter, ["BattingHelmet", "TeamMark", "JerseyNumberFront", "JerseyNameBack", "JerseyNumberBack"])
-	_expect(_label_text(batter, "TeamMark") == "H", "batter team mark was not installed")
-	_expect(_label_text(batter, "JerseyNumberFront") == "7", "one-digit jersey number was not preserved")
-	_expect(_label_text(batter, "JerseyNumberBack") == "7", "one-digit back number was not preserved")
-	_expect(_label_text(batter, "JerseyNameBack") == "OKAFOR", "surname was not extracted for the back nameplate")
-	_expect_identity_label(batter, "TeamMark", "front")
-	_expect_identity_label(batter, "JerseyNumberFront", "front")
-	_expect_identity_label(batter, "JerseyNumberBack", "back")
-	_expect_identity_label(batter, "JerseyNameBack", "back")
-	_expect_identity_surface(batter, "JerseyIdentityFront")
-	_expect_identity_surface(batter, "JerseyIdentityBack")
-	var equipment_meshes: Array[MeshInstance3D] = []
-	_collect_meshes(batter.get_node_or_null("Equipment"), equipment_meshes)
-	_expect(equipment_meshes.is_empty(), "equipment controller created runtime character geometry")
-	_expect(_mesh_visible(batter, "Bat_Skinned"), "batter lost imported bat visibility")
-	_expect(not _mesh_visible(batter, "Glove_Skinned"), "batter unexpectedly shows imported glove")
-	_expect(not _mesh_visible(batter, "Cap_Skinned"), "batting helmet did not replace imported cap")
-	_expect(_piece_is_blender_mesh(batter, "BattingHelmet", "Gear_BattingHelmet"), "batting helmet is not the authored Blender mesh")
-
-	var recolor := Color("245ca8")
-	batter.set_uniform_colors(recolor, Color("f5eee0"), Color("e5a333"))
-	_expect(_piece_material_color(batter, "BattingHelmet", "TEAM_Primary").is_equal_approx(recolor), "helmet did not follow the team palette")
-	batter.set_team_mark("R")
-	_expect(_label_text(batter, "TeamMark") == "R", "live team-mark update did not reach equipment")
-	batter.set_player_name("Nia Rodriguez")
-	batter.set_jersey_number(27)
-	_expect(_label_text(batter, "JerseyNameBack") == "RODRIGUEZ", "live player-name update did not reach equipment")
-	_expect(_label_text(batter, "JerseyNumberBack") == "27", "live jersey-number update did not reach equipment")
-	_expect(_canvas_label_text(batter, "JerseyIdentityBackViewport/BackIdentityCanvas/SurnameLabel") == "RODRIGUEZ", "back viewport did not redraw the live surname")
-	_expect(_canvas_label_text(batter, "JerseyIdentityBackViewport/BackIdentityCanvas/BackNumberLabel") == "27", "back viewport did not redraw the live number")
-
-	var catcher := _actor({
-		"seed": 12,
-		"role": "catcher",
-		"number": 12,
-		"player_name": "Luis Chen",
-		"mark": "C",
-		"primary_color": Color("17604e"),
-		"secondary_color": Color("e7debc"),
-		"accent_color": Color("e46c35"),
-	})
 	await process_frame
-	_expect_pieces(catcher, ["CatcherMask", "CatcherChestProtector", "CatcherShinGuardL", "CatcherShinGuardR", "TeamMark", "JerseyNumberFront", "JerseyNameBack", "JerseyNumberBack"])
-	_expect(_label_text(catcher, "JerseyNumberFront") == "12", "two-digit front number was not preserved")
-	_expect(_label_text(catcher, "JerseyNumberBack") == "12", "two-digit jersey number was not preserved")
-	_expect(_mesh_visible(catcher, "Glove_Skinned"), "catcher lost imported mitt visibility")
-	_expect(not _mesh_visible(catcher, "Bat_Skinned"), "catcher unexpectedly shows imported bat")
-	for piece_name in ["CatcherMask", "CatcherChestProtector", "CatcherShinGuardL", "CatcherShinGuardR"]:
-		_expect(_piece_is_blender_mesh(catcher, piece_name, {
-			"CatcherMask": "Gear_CatcherMask",
-			"CatcherChestProtector": "Gear_CatcherChest",
-			"CatcherShinGuardL": "Gear_CatcherShinL",
-			"CatcherShinGuardR": "Gear_CatcherShinR",
-		}[piece_name]), "%s is not an authored skinned mesh" % piece_name)
 
-	var mask := catcher.get_equipment_piece("CatcherMask")
-	var mask_local := mask.transform
-	catcher.play_action("catch")
-	var catcher_player := _first_animation_player(catcher)
-	_expect(catcher_player != null, "catcher has no imported AnimationPlayer")
-	if catcher_player != null:
-		catcher_player.advance(0.42)
-		catcher._physics_process(0.42)
+	for role in ROLE_LAYERS:
+		var actor: BallplayerActor = actors[role]
+		_validate_profile(actor, String(role), ROLE_LAYERS[role])
+		_validate_attachment(actor, pixel_scene)
+		_expect(_count_3d_nodes(actor) == 0, "%s actor contains a 3D descendant" % role)
+
+	var batter: BallplayerActor = actors.batter
+	var original_signature := batter.get_generation_signature()
+	var duplicate := BALLPLAYER_SCENE.instantiate() as BallplayerActor
+	duplicate.configure(specs.batter.duplicate(true))
+	_expect(duplicate.get_generation_signature() == original_signature, "same equipment spec produced a different signature")
+	_expect((duplicate.get_pixel_palette().skin as Color).is_equal_approx(batter.get_pixel_palette().skin), "same seed produced a different skin palette")
+	_expect((duplicate.get_pixel_palette().hair as Color).is_equal_approx(batter.get_pixel_palette().hair), "same seed produced a different hair palette")
+	duplicate.free()
+
+	_validate_recoloring(batter)
+	_validate_identity(batter)
+	_validate_umpire_identity(actors.umpire)
+
+	_expect(_count_3d_nodes(pixel_scene) == 0, "equipment pixel scene contains a 3D descendant")
+	for actor_value in actors.values():
+		(actor_value as BallplayerActor).queue_free()
 	await process_frame
-	_expect(mask.transform.is_equal_approx(mask_local), "catcher mask drifted from its attachment")
-	_expect(mask is MeshInstance3D and (mask as MeshInstance3D).skin != null, "catcher mask lost its shared skin during animation")
-
-	var umpire := _actor({
-		"seed": 9001,
-		"role": "umpire",
-		"number": 0,
-		"mark": "",
-		"primary_color": Color("151922"),
-		"secondary_color": Color("252c38"),
-		"accent_color": Color("d9e2ea"),
-		"glove": false,
-	})
+	pixel_scene.queue_free()
 	await process_frame
-	_expect_pieces(umpire, ["UmpireMask", "UmpireProtector"])
-	_expect(umpire.get_equipment_piece("TeamMark") == null, "umpire unexpectedly received player identity")
-	_expect(not _mesh_visible(umpire, "Bat_Skinned"), "umpire unexpectedly shows imported bat")
-	_expect(not _mesh_visible(umpire, "Glove_Skinned"), "umpire unexpectedly shows imported glove")
-	_expect(not _mesh_visible(umpire, "Cap_Skinned"), "umpire mask did not replace imported cap")
+	_finish()
 
-	var fielder := _actor({"seed": 18, "role": "fielder", "number": 18, "mark": "F", "player_name": "Ari Vega"})
-	await process_frame
-	_expect_pieces(fielder, ["TeamMark", "JerseyNumberFront", "JerseyNameBack", "JerseyNumberBack"])
-	_expect(fielder.get_equipment_piece("BattingHelmet") == null, "fielder unexpectedly received a helmet")
-	_expect(fielder.get_equipment_piece("CatcherMask") == null, "fielder unexpectedly received catcher gear")
-	_expect(_mesh_visible(fielder, "Glove_Skinned"), "fielder lost imported glove visibility")
-	_expect(_mesh_visible(fielder, "Cap_Skinned"), "fielder lost imported cap visibility")
 
-	# Batters can bat and throw from opposite sides. Those actions change the
-	# imported model root's X sign, but must never reflect attached identity.
-	var switch_hitter := _actor({
-		"seed": 42,
-		"role": "batter",
-		"number": 42,
-		"player_name": "Sam Rivera",
-		"mark": "S",
-		"bats": "left",
+func _spec(role: String, seed_value: int, mark: String, number: int, player_name: String, primary: Color, secondary: Color, accent: Color) -> Dictionary:
+	return {
+		"role": role,
+		"seed": seed_value,
+		"mark": mark,
+		"number": number,
+		"player_name": player_name,
 		"throws": "right",
-	})
-	await process_frame
-	var switch_root := switch_hitter.get_node_or_null("RiggedBallplayer") as Node3D
-	_expect(is_instance_valid(switch_root) and switch_root.scale.x < 0.0, "mixed-hand batter did not start in its left batting orientation")
-	_expect_identity_handedness(switch_hitter, "left-handed idle")
-	switch_hitter.play_action("field_throw")
-	_expect(is_instance_valid(switch_root) and switch_root.scale.x > 0.0, "mixed-hand batter did not enter its right throwing orientation")
-	_expect_identity_handedness(switch_hitter, "right-handed throw")
-	switch_hitter.play_action("swing")
-	_expect(is_instance_valid(switch_root) and switch_root.scale.x < 0.0, "mixed-hand batter did not restore its left batting orientation")
-	_expect_identity_handedness(switch_hitter, "left-handed swing")
-	_expect(_label_text(switch_hitter, "JerseyNumberFront") == "42", "hand switch changed the front jersey number")
-	_expect(_label_text(switch_hitter, "JerseyNumberBack") == "42", "hand switch changed the back jersey number")
-	_expect(_label_text(switch_hitter, "JerseyNameBack") == "RIVERA", "hand switch changed the back jersey name")
-
-	if _failures.is_empty():
-		print("PIXIBALL_EQUIPMENT_OK blender_gear=verified identity=viewport_texture name+number=live")
-		quit(0)
-		return
-	for failure in _failures:
-		push_error("PIXIBALL_EQUIPMENT: %s" % failure)
-	quit(1)
+		"bats": "left" if role == "batter" else "right",
+		"primary_color": primary,
+		"secondary_color": secondary,
+		"accent_color": accent,
+		"pants_color": Color("eee9dc"),
+	}
 
 
-func _actor(spec: Dictionary) -> BallplayerActor:
-	var actor := BALLPLAYER_SCENE.instantiate() as BallplayerActor
-	actor.configure(spec)
-	root.add_child(actor)
-	return actor
-
-
-func _expect_pieces(actor: BallplayerActor, expected: Array[String]) -> void:
+func _validate_profile(actor: BallplayerActor, role: String, expected_layers: Array) -> void:
 	var profile := actor.get_equipment_profile()
-	var pieces: PackedStringArray = profile.get("pieces", PackedStringArray())
-	for piece_name in expected:
-		_expect(piece_name in pieces, "%s is missing %s" % [actor.name, piece_name])
+	_expect(String(profile.get("role", "")) == role, "%s profile reported the wrong role" % role)
+	_expect(String(profile.get("pipeline", "")) == "native_pixel_layers", "%s profile is not using native pixel layers" % role)
+	var layers: PackedStringArray = profile.get("pieces", PackedStringArray())
+	_expect(layers.size() == expected_layers.size(), "%s profile layer count changed: %d" % [role, layers.size()])
+	for layer in expected_layers:
+		_expect(String(layer) in layers, "%s profile is missing layer %s" % [role, layer])
+		_expect(actor.get_equipment_piece(String(layer)) == actor.get_pixel_sprite(), "%s layer %s is not owned by the pixel presenter" % [role, layer])
+	for layer in ALL_LAYERS:
+		if layer not in expected_layers:
+			_expect(actor.get_equipment_piece(layer) == null, "%s unexpectedly exposes layer %s" % [role, layer])
+	_expect(bool(profile.get("helmet", false)) == (role == "batter"), "%s helmet profile flag is wrong" % role)
+	_expect(bool(profile.get("bat", false)) == (role == "batter"), "%s bat profile flag is wrong" % role)
+	_expect(bool(profile.get("glove", false)) == (role in ["pitcher", "catcher", "fielder"]), "%s glove profile flag is wrong" % role)
 
 
-func _label_text(actor: BallplayerActor, piece_name: String) -> String:
-	var piece := actor.get_equipment_piece(piece_name) as Node3D
-	if not is_instance_valid(piece):
-		return ""
-	return String(piece.get_meta("identity_text", ""))
+func _validate_attachment(actor: BallplayerActor, pixel_scene: Node2D) -> void:
+	var sprite := actor.get_pixel_sprite()
+	_expect(is_instance_valid(sprite), "%s did not attach a pixel presenter" % actor.get_role())
+	if is_instance_valid(sprite):
+		_expect(sprite is Node2D, "%s presenter is not a Node2D" % actor.get_role())
+		_expect(sprite.get_parent() == pixel_scene, "%s presenter is outside pixiball_pixel_scene" % actor.get_role())
+		_expect(sprite.texture_filter == CanvasItem.TEXTURE_FILTER_NEAREST, "%s presenter is not nearest-filtered" % actor.get_role())
 
 
-func _expect_identity_label(actor: BallplayerActor, piece_name: String, surface_name: String) -> void:
-	var piece := actor.get_equipment_piece(piece_name) as Node3D
-	_expect(is_instance_valid(piece), "%s identity lettering is missing" % piece_name)
-	if not is_instance_valid(piece):
-		return
-	_expect(String(piece.get_meta("identity_style", "")) == "screen_printed_viewport_texture", "%s did not use the roster texture system" % piece_name)
-	_expect(String(piece.get_meta("identity_surface", "")) == surface_name, "%s targets the wrong Blender UV surface" % piece_name)
-	_expect(piece.get_child_count() == 0, "%s created runtime identity geometry" % piece_name)
-	_expect(piece.global_transform.basis.determinant() > 0.0, "%s basis reflects its lettering" % piece_name)
+func _validate_recoloring(actor: BallplayerActor) -> void:
+	var primary := Color("146c94")
+	var secondary := Color("f6f1db")
+	var accent := Color("ffb703")
+	var pants := Color("264653")
+	var before := actor.get_pixel_palette()
+	actor.set_uniform_colors(primary, secondary, accent, pants)
+	var after := actor.get_pixel_palette()
+	_expect((after.primary as Color).is_equal_approx(primary), "primary palette recolor failed")
+	_expect((after.secondary as Color).is_equal_approx(secondary), "secondary palette recolor failed")
+	_expect((after.accent as Color).is_equal_approx(accent), "accent palette recolor failed")
+	_expect((after.pants as Color).is_equal_approx(pants), "pants palette recolor failed")
+	_expect(not (after.primary_shadow as Color).is_equal_approx(before.primary_shadow), "primary shadow did not follow recoloring")
+	_expect(not (after.pants_shadow as Color).is_equal_approx(before.pants_shadow), "pants shadow did not follow recoloring")
+	actor.set_highlighted(true)
+	_expect(bool(actor.get_pixel_pose().highlighted), "highlight state did not reach the pixel pose")
+	actor.set_highlighted(false)
+	_expect(not bool(actor.get_pixel_pose().highlighted), "highlight state did not clear")
 
 
-func _expect_identity_surface(actor: BallplayerActor, mesh_name: String) -> void:
-	var mesh_instance := actor.get_imported_mesh(mesh_name)
-	_expect(is_instance_valid(mesh_instance), "%s Blender UV surface is missing" % mesh_name)
-	if not is_instance_valid(mesh_instance):
-		return
-	_expect(mesh_instance.mesh is ArrayMesh, "%s is not imported authored geometry" % mesh_name)
-	_expect(mesh_instance.skin != null, "%s is not skinned with the jersey" % mesh_name)
-	var material := mesh_instance.get_active_material(0) as StandardMaterial3D
-	_expect(material != null, "%s has no runtime identity material" % mesh_name)
-	if material != null:
-		_expect(material.albedo_texture is ViewportTexture, "%s is not driven by the high-resolution roster viewport" % mesh_name)
+func _validate_identity(actor: BallplayerActor) -> void:
+	_expect(actor.get_team_mark() == "H", "configured team mark was not retained")
+	_expect(actor.get_jersey_number() == 27, "configured jersey number was not retained")
+	_expect(actor.get_player_name() == "Maya Rodriguez", "configured player name was not retained")
+	actor.set_team_mark("river")
+	actor.set_jersey_number(68)
+	actor.set_player_name("  River Stone  ")
+	_expect(actor.get_team_mark() == "R", "live team mark was not normalized")
+	_expect(actor.get_jersey_number() == 68, "live jersey number update failed")
+	_expect(actor.get_player_name() == "River Stone", "live player name was not normalized")
+	var layers: PackedStringArray = actor.get_equipment_profile().pieces
+	_expect("TeamMark" in layers and "JerseyNumberFront" in layers, "player identity layers disappeared")
 
 
-func _expect_identity_handedness(actor: BallplayerActor, context: String) -> void:
-	for piece_name in ["TeamMark", "JerseyNumberFront", "JerseyNameBack", "JerseyNumberBack"]:
-		var piece := actor.get_equipment_piece(piece_name) as Node3D
-		_expect(is_instance_valid(piece), "%s lost %s" % [context, piece_name])
-		if is_instance_valid(piece):
-			_expect(piece.global_transform.basis.determinant() > 0.0, "%s reflected %s" % [context, piece_name])
-	var expected_u_scale := -1.0 if actor.is_model_mirrored() else 1.0
-	for mesh_name in ["JerseyIdentityFront", "JerseyIdentityBack"]:
-		var mesh_instance := actor.get_imported_mesh(mesh_name)
-		var material := mesh_instance.get_active_material(0) as StandardMaterial3D if is_instance_valid(mesh_instance) else null
-		_expect(material != null and is_equal_approx(material.uv1_scale.x, expected_u_scale), "%s gave %s mirrored lettering" % [context, mesh_name])
+func _validate_umpire_identity(actor: BallplayerActor) -> void:
+	var layers: PackedStringArray = actor.get_equipment_profile().pieces
+	_expect("TeamMark" not in layers, "umpire unexpectedly exposes a team-mark layer")
+	_expect("JerseyNumberFront" not in layers, "umpire unexpectedly exposes a jersey-number layer")
 
 
-func _piece_is_blender_mesh(actor: BallplayerActor, piece_name: String, mesh_name: String) -> bool:
-	var piece := actor.get_equipment_piece(piece_name)
-	var imported := actor.get_imported_mesh(mesh_name)
-	return is_instance_valid(piece) and piece == imported and imported.mesh is ArrayMesh and imported.skin != null
-
-
-func _piece_material_color(actor: BallplayerActor, piece_name: String, material_name: String) -> Color:
-	var piece := actor.get_equipment_piece(piece_name)
-	var meshes: Array[MeshInstance3D] = []
-	_collect_meshes(piece, meshes)
-	for mesh_instance in meshes:
-		if mesh_instance.mesh == null:
-			continue
-		for surface in range(mesh_instance.mesh.get_surface_count()):
-			var material := mesh_instance.get_active_material(surface) as BaseMaterial3D
-			if material != null and material.resource_name == material_name:
-				return material.albedo_color
-	return Color.TRANSPARENT
-
-
-func _canvas_label_text(actor: BallplayerActor, relative_path: String) -> String:
-	var label := actor.get_node_or_null("Equipment/" + relative_path) as Label
-	return label.text if is_instance_valid(label) else ""
-
-
-func _mesh_visible(actor: BallplayerActor, mesh_name: String) -> bool:
-	var meshes: Array[MeshInstance3D] = []
-	_collect_meshes(actor, meshes)
-	for mesh_instance in meshes:
-		if mesh_instance.name == mesh_name:
-			return mesh_instance.visible
-	return false
-
-
-func _collect_meshes(node: Node, output: Array[MeshInstance3D]) -> void:
-	if node == null:
-		return
-	if node is MeshInstance3D:
-		output.append(node as MeshInstance3D)
+func _count_3d_nodes(node: Node) -> int:
+	var count := 1 if node is Node3D else 0
 	for child in node.get_children():
-		_collect_meshes(child, output)
-
-
-func _first_animation_player(node: Node) -> AnimationPlayer:
-	if node is AnimationPlayer:
-		return node as AnimationPlayer
-	for child in node.get_children():
-		var found := _first_animation_player(child)
-		if found != null:
-			return found
-	return null
+		count += _count_3d_nodes(child)
+	return count
 
 
 func _expect(condition: bool, message: String) -> void:
 	if not condition:
 		_failures.append(message)
+
+
+func _finish() -> void:
+	if _failures.is_empty():
+		print("PIXIBALL_NATIVE_PIXEL_EQUIPMENT_OK roles=5 layers=verified palette=live identity=live")
+		quit(0)
+		return
+	for failure in _failures:
+		push_error("PIXIBALL_NATIVE_PIXEL_EQUIPMENT: %s" % failure)
+	quit(1)

@@ -104,6 +104,10 @@ func _test_hud_contract() -> void:
 	await process_frame
 	hud.show_landing({"best_endless_strikeouts": 12, "versus_wins": 3, "versus_losses": 2}, 1)
 	_check(hud.landing_layer.visible and not hud.pitcher_layer.visible, "Landing must be a dedicated visible shell layer")
+	var harbor_backdrop := hud.landing_layer.get_node_or_null("HarborBackdrop") as TextureRect
+	_check(harbor_backdrop != null and harbor_backdrop.texture != null, "Landing must paint the shared production harbor panorama")
+	_check(hud.landing_layer.has_node("PixelAtmosphere"), "Landing must retain the deterministic pixel-atmosphere overlay")
+	_check(hud.game_layer.texture_filter == CanvasItem.TEXTURE_FILTER_NEAREST, "Native game HUD must preserve crisp nearest-filtered pixel chrome")
 	_check("12 K" in hud.landing_stat_lines[0].text and "3–2" in hud.landing_stat_lines[1].text, "Landing mode cards must display saved records")
 	_check("PRESS START" in hud.landing_prompt.text, "Landing must retain the reference insert-coin footer")
 	_check((hud.landing_card_ctas[1].get_theme_stylebox("panel") as StyleBoxFlat).bg_color == Color("e64539"), "Landing CTA stitch must follow focused mode")

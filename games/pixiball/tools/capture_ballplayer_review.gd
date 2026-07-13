@@ -1,105 +1,117 @@
 extends SceneTree
-## Captures deterministic in-engine review renders of the production
-## ballplayer, including the per-team PBR palette and viewport-rendered roster
-## identity that only exist at runtime (the Blender QA renders cannot show
-## either). Run WITHOUT --headless so the viewport renders:
-##
-##   godot --path games/pixiball \
-##     --script res://tools/capture_ballplayer_review.gd -- --output-dir DIR
 
-const REVIEW_SHOTS := [
-	{"name": "engine_rest_front", "camera": Vector3(0.0, 1.45, -3.6), "target": Vector3(0.0, 1.02, 0.0)},
-	{"name": "engine_rest_three_quarter", "camera": Vector3(-2.5, 1.7, -2.7), "target": Vector3(0.0, 1.02, 0.0)},
-	{"name": "engine_rest_back", "camera": Vector3(0.0, 1.45, 3.6), "target": Vector3(0.0, 1.02, 0.0)},
-	{"name": "engine_back_number_closeup", "camera": Vector3(0.0, 1.42, 1.7), "target": Vector3(0.0, 1.30, 0.0)},
-	{"name": "engine_face_closeup", "camera": Vector3(0.0, 1.74, -1.0), "target": Vector3(0.0, 1.71, 0.0)},
-]
+## Native 1280x720 action/role review for the model-free actor pipeline.
+## Run without --headless so the canvas can be read back.
 
-var _failures: Array[String] = []
+const ACTOR_SCENE := preload("res://characters/ballplayer_actor.tscn")
+const VIEW_DIRECTOR := preload("res://presentation/broadcast_camera.gd")
 
 
 func _initialize() -> void:
-	call_deferred("_run")
+	call_deferred("_capture")
 
 
-func _run() -> void:
-	var output_dir := _parse_output_dir()
-	DirAccess.make_dir_recursive_absolute(output_dir)
-	root.size = Vector2i(768, 768)
+func _capture() -> void:
+	root.size = Vector2i(1280, 720)
+	var scene := Node.new()
+	root.add_child(scene)
 
-	var stage := Node3D.new()
-	root.add_child(stage)
+	var pixel_scene := Node2D.new()
+	pixel_scene.name = "PixelScene"
+	pixel_scene.add_to_group("pixiball_pixel_scene")
+	pixel_scene.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	pixel_scene.scale = Vector2(4, 4)
+	scene.add_child(pixel_scene)
+	var background := ColorRect.new()
+	background.position = Vector2.ZERO
+	background.size = Vector2(320, 180)
+	background.color = Color("101827")
+	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pixel_scene.add_child(background)
+	for y in [44, 89, 134]:
+		var rail := ColorRect.new()
+		rail.position = Vector2(0, y)
+		rail.size = Vector2(320, 1)
+		rail.color = Color("263a4b")
+		pixel_scene.add_child(rail)
 
-	var environment := Environment.new()
-	environment.background_mode = Environment.BG_COLOR
-	environment.background_color = Color("343841")
-	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = Color("b8bfcc")
-	environment.ambient_light_energy = 0.58
-	environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	var world_environment := WorldEnvironment.new()
-	world_environment.environment = environment
-	stage.add_child(world_environment)
+	var director := VIEW_DIRECTOR.new()
+	scene.add_child(director)
+	director.set_mode("dugout")
 
-	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-35.0, 28.0, 0.0)
-	sun.light_energy = 0.75
-	stage.add_child(sun)
+	var actors := Node.new()
+	scene.add_child(actors)
+	var specs := [
+		{"role": "pitcher", "action": "pitch", "x": -42.0, "seed": 11, "mark": "P"},
+		{"role": "batter", "action": "swing", "x": -21.0, "seed": 23, "mark": "B", "bats": "left"},
+		{"role": "catcher", "action": "catch", "x": 0.0, "seed": 37, "mark": "C"},
+		{"role": "fielder", "action": "field_ready", "x": 21.0, "seed": 51, "mark": "F"},
+		{"role": "umpire", "action": "field_ready", "x": 42.0, "seed": 71, "mark": ""},
+	]
+	for index in range(specs.size()):
+		var spec: Dictionary = specs[index]
+		var actor := ACTOR_SCENE.instantiate() as BallplayerActor
+		actor.name = String(spec.role).capitalize()
+		actor.configure({
+			"role": spec.role,
+			"seed": spec.seed,
+			"mark": spec.mark,
+			"number": 10 + index,
+			"bats": spec.get("bats", "right"),
+			"primary_color": [Color("44d7b6"), Color("ff6b5e"), Color("4d78b9"), Color("d2a64b"), Color("202a38")][index],
+			"secondary_color": Color("f5ead7"),
+			"accent_color": Color("ffd166"),
+		})
+		actor.global_position = Vector3(float(spec.x), 0.08, 10.0)
+		actors.add_child(actor)
+		actor.hold_action_pose(String(spec.action), 0.55)
 
-	var camera := Camera3D.new()
-	camera.fov = 32.0
-	stage.add_child(camera)
-	camera.make_current()
+	var labels := Node2D.new()
+	labels.name = "ReviewLabels"
+	labels.scale = Vector2(4, 4)
+	labels.z_index = 4096
+	labels.z_as_relative = false
+	scene.add_child(labels)
+	var title := Label.new()
+	title.text = "NATIVE PIXEL CAST  /  10 FPS POSES"
+	title.position = Vector2(6, 4)
+	title.size = Vector2(308, 12)
+	title.add_theme_font_size_override("font_size", 7)
+	title.add_theme_color_override("font_color", Color("ffd166"))
+	labels.add_child(title)
+	for index in range(specs.size()):
+		var label := Label.new()
+		label.text = String((specs[index] as Dictionary).role).to_upper()
+		label.position = Vector2(3 + index * 63, 157)
+		label.size = Vector2(62, 10)
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.add_theme_font_size_override("font_size", 5)
+		label.add_theme_color_override("font_color", Color("d7e4ee"))
+		labels.add_child(label)
 
-	var actor := (load("res://characters/ballplayer_actor.tscn") as PackedScene).instantiate()
-	actor.configure({
-		"seed": 2,
-		"role": "pitcher",
-		"number": 27,
-		"player_name": "Maya Rodriguez",
-		"mark": "P",
-		"build": "balanced",
-		"throws": "right",
-		"skin_tone": Color("de8b50"),
-		"hair_color": Color("3e1a0b"),
-		"primary_color": Color("3a7c8b"),
-		"secondary_color": Color("d84936"),
-		"accent_color": Color("e8a03c"),
-		"pants_color": Color("ead8c3"),
-	})
-	stage.add_child(actor)
-	if actor.get_model_kind() != "rigged_glb":
-		_failures.append("authored Blender actor did not load; nothing to review")
-
-	for shot in REVIEW_SHOTS:
-		camera.position = shot["camera"] as Vector3
-		camera.look_at_from_position(camera.position, shot["target"] as Vector3, Vector3.UP)
-		# Key the viewed side: aim the sun from just above and beside the
-		# camera so every shot reviews lit surfaces instead of ambient fill.
-		var camera_yaw := rad_to_deg(atan2(camera.position.x, camera.position.z))
-		sun.rotation_degrees = Vector3(-40.0, camera_yaw + 22.0, 0.0)
-		for frame in range(6):
-			await process_frame
-		var image := root.get_viewport().get_texture().get_image()
-		if image == null or image.is_empty():
-			_failures.append("%s produced no image" % shot["name"])
-			continue
-		var path := output_dir.path_join(String(shot["name"]) + ".png")
-		if image.save_png(path) != OK:
-			_failures.append("%s could not be saved" % shot["name"])
-
-	if _failures.is_empty():
-		print("PIXIBALL_BALLPLAYER_REVIEW_OK shots=%d dir=%s" % [REVIEW_SHOTS.size(), output_dir])
-		quit(0)
+	for unused in range(12):
+		await process_frame
+	await RenderingServer.frame_post_draw
+	await RenderingServer.frame_post_draw
+	var image := root.get_viewport().get_texture().get_image()
+	if image == null or image.is_empty() or image.get_size() != Vector2i(1280, 720):
+		push_error("Native actor review did not produce a 1280x720 image")
+		quit(2)
 		return
-	for failure in _failures:
-		push_error("PIXIBALL_BALLPLAYER_REVIEW: %s" % failure)
-	quit(1)
+	var output := _output_path()
+	var absolute := ProjectSettings.globalize_path(output)
+	DirAccess.make_dir_recursive_absolute(absolute.get_base_dir())
+	var error := image.save_png(absolute)
+	if error != OK:
+		push_error("Could not save native actor review: %s" % error_string(error))
+		quit(3)
+		return
+	print("PIXIBALL_PIXEL_ACTOR_REVIEW_OK path=%s size=1280x720 grid=4px roles=5" % output)
+	quit()
 
 
-func _parse_output_dir() -> String:
-	var args := OS.get_cmdline_user_args()
-	for index in range(args.size() - 1):
-		if args[index] == "--output-dir":
-			return args[index + 1]
-	return ProjectSettings.globalize_path("user://ballplayer_review")
+func _output_path() -> String:
+	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--output="):
+			return argument.trim_prefix("--output=")
+	return "res://.godot/visual-qa/native-720/actor-review.png"

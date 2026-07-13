@@ -37,8 +37,7 @@ uvx --from 'clang-format==22.1.5' clang-format --dry-run --Werror \
 	tests/editor/test_editor_external_changes.cpp
 uvx --from 'ruff==0.15.21' ruff check --no-fix agent tools/godot-ai/*.py \
 	examples/blender_asset/build_beacon.py \
-	games/pixiball/assets/blender/*.py \
-	games/pixiball/tools/blender/build_candidate.py \
+	games/pixiball/tools/validate_native_pixel_art.py \
 	modules/godot_agent/config.py
 uvx --from 'mypy==1.19.1' mypy agent/godot_agent
 tools/godot-ai/build-macos.sh tests=yes
@@ -71,10 +70,4 @@ rm -f "$pixiball_pack"
 uv run --locked --project agent python -m unittest discover -s agent/tests -v
 uv run --locked --project agent python -m py_compile \
 	examples/blender_asset/build_beacon.py \
-	games/pixiball/assets/blender/build_ballplayer.py \
-	games/pixiball/assets/blender/render_ballplayer_qa.py \
-	games/pixiball/tools/blender/build_candidate.py
-uv run --locked --project agent python -m godot_agent \
-	--project games/pixiball --compact \
-	blender-batch res://tools/blender/player_equipment_candidates.batch.json \
-	--dry-run >/dev/null
+	games/pixiball/tools/validate_native_pixel_art.py

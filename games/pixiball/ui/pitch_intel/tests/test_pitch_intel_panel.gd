@@ -15,8 +15,11 @@ func _run() -> void:
 	await process_frame
 
 	_check(not panel.visible, "the reusable panel should start hidden")
-	_check(panel.get_combined_minimum_size().x <= 320.0, "panel must fit one half of a 640-wide viewport")
-	_check(panel.get_combined_minimum_size().y <= 360.0, "panel must fit a 360-high viewport")
+	_check(panel.get_combined_minimum_size().x <= 384.0, "panel must fit its native 384px HUD rail")
+	_check(panel.get_combined_minimum_size().y <= 432.0, "panel must fit its native 432px HUD rail")
+	_check(panel.size.is_equal_approx(Vector2(384, 432)), "panel must instantiate at direct native size")
+	_check(panel.scale.is_equal_approx(Vector2.ONE), "panel must not rely on Control scaling")
+	_check((panel.get_node("Frame/Title") as Label).get_theme_font_size("font_size") == 24, "visible panel type must rasterize at native size")
 
 	panel.present({
 		"code": "SL",

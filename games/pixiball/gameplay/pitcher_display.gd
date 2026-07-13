@@ -4,6 +4,9 @@ extends RefCounted
 ## Exact card-rating port from:
 ##   ../pixiball-ue/Source/PixCore/Sim/PitcherDisplay.cpp
 ## OVR is gameplay data: PixiballTeams uses it to rank the versus draft.
+## Every card field — including the era/k9 display strings — is golden-pinned
+## by gameplay/tests/test_versus_sim.gd. Signage styling of these readouts
+## belongs in ui/pixiball_hud.gd; this file must stay presentation-free.
 
 const FASTBALL_CODES := ["FF", "SI", "FC", "FA"]
 const BREAKING_CODES := ["SL", "ST", "SV", "CU", "KC", "KN", "SW", "CS"]

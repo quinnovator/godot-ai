@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://ui/pitch_intel/pitch_intel_panel.gd" id="1_panel"]
 [ext_resource type="Script" path="res://ui/pitch_intel/pitch_intel_diagram.gd" id="2_diagram"]
@@ -6,504 +6,310 @@
 
 [sub_resource type="StyleBoxFlat" id="PanelStyle"]
 bg_color = Color(0.063, 0.071, 0.114, 0.97)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.102, 0.11, 0.173, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.451, 0.937, 0.969, 1)
 anti_aliasing = false
-shadow_color = Color(0.102, 0.11, 0.173, 0.45)
-shadow_size = 4
-shadow_offset = Vector2(4, 4)
 
 [sub_resource type="StyleBoxFlat" id="BarBackground"]
-bg_color = Color(0.063, 0.071, 0.114, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.102, 0.11, 0.173, 1)
+bg_color = Color(0.102, 0.11, 0.173, 1)
 
-[sub_resource type="StyleBoxFlat" id="StageFill"]
+[sub_resource type="StyleBoxFlat" id="BarFill"]
 bg_color = Color(0.451, 0.937, 0.969, 1)
 
-[sub_resource type="StyleBoxFlat" id="ContactFill"]
-bg_color = Color(0.902, 0.271, 0.224, 1)
-
-[sub_resource type="StyleBoxFlat" id="ErvStyle"]
-bg_color = Color(0.045, 0.082, 0.12, 0.95)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.102, 0.11, 0.173, 1)
-content_margin_left = 5.0
-content_margin_top = 2.0
-content_margin_right = 5.0
-content_margin_bottom = 2.0
-
 [node name="PitchIntelPanel" type="Control"]
-custom_minimum_size = Vector2(316, 348)
-layout_mode = 3
-anchors_preset = 0
-offset_right = 316.0
-offset_bottom = 348.0
+custom_minimum_size = Vector2(384, 432)
+offset_right = 384.0
+offset_bottom = 432.0
 mouse_filter = 2
+clip_contents = true
+texture_filter = 1
 script = ExtResource("1_panel")
 
 [node name="Frame" type="Panel" parent="."]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
+layout_mode = 0
+offset_right = 384.0
+offset_bottom = 432.0
+mouse_filter = 2
 theme_override_styles/panel = SubResource("PanelStyle")
 
-[node name="Margin" type="MarginContainer" parent="Frame"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 8.0
-offset_top = 7.0
-offset_right = -8.0
-offset_bottom = -7.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="Layout" type="VBoxContainer" parent="Frame/Margin"]
-layout_mode = 2
-theme_override_constants/separation = 3
-
-[node name="Header" type="HBoxContainer" parent="Frame/Margin/Layout"]
-layout_mode = 2
-theme_override_constants/separation = 5
-
-[node name="Section" type="Label" parent="Frame/Margin/Layout/Header"]
-layout_mode = 2
+[node name="Title" type="Label" parent="Frame"]
+offset_left = 16.0
+offset_top = 8.0
+offset_right = 224.0
+offset_bottom = 40.0
 theme_override_colors/font_color = Color(1, 0.804, 0.459, 1)
-theme_override_font_sizes/font_size = 10
+theme_override_font_sizes/font_size = 24
 text = "PITCH INTEL"
 
-[node name="Spacer" type="Control" parent="Frame/Margin/Layout/Header"]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="Rank" type="Label" parent="Frame/Margin/Layout/Header"]
-unique_name_in_owner = true
-layout_mode = 2
+[node name="CardRank" type="Label" parent="Frame"]
+offset_left = 228.0
+offset_top = 8.0
+offset_right = 368.0
+offset_bottom = 40.0
 theme_override_colors/font_color = Color(0.58, 0.69, 0.77, 1)
-theme_override_font_sizes/font_size = 8
-text = "CALL —/—"
+theme_override_font_sizes/font_size = 20
+text = "--/--"
+horizontal_alignment = 2
 
-[node name="Tag" type="Label" parent="Frame/Margin/Layout/Header"]
-unique_name_in_owner = true
-layout_mode = 2
+[node name="CardCode" type="Label" parent="Frame"]
+offset_left = 16.0
+offset_top = 48.0
+offset_right = 92.0
+offset_bottom = 108.0
 theme_override_colors/font_color = Color(0.451, 0.937, 0.969, 1)
-theme_override_font_sizes/font_size = 8
-text = "MODEL READY"
-
-[node name="Pitch" type="HBoxContainer" parent="Frame/Margin/Layout"]
-layout_mode = 2
-theme_override_constants/separation = 4
-
-[node name="PitchCode" type="Label" parent="Frame/Margin/Layout/Pitch"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(30, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.451, 0.937, 0.969, 1)
-theme_override_font_sizes/font_size = 16
+theme_override_font_sizes/font_size = 44
 text = "--"
 
-[node name="PitchName" type="Label" parent="Frame/Margin/Layout/Pitch"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
+[node name="CardName" type="Label" parent="Frame"]
+offset_left = 100.0
+offset_top = 52.0
+offset_right = 268.0
+offset_bottom = 100.0
 theme_override_colors/font_color = Color(0.957, 0.941, 0.882, 1)
-theme_override_font_sizes/font_size = 9
-text = "AWAITING PITCH"
-vertical_alignment = 2
+theme_override_font_sizes/font_size = 24
+text = "AWAITING"
 text_overrun_behavior = 3
 
-[node name="Velocity" type="Label" parent="Frame/Margin/Layout/Pitch"]
-unique_name_in_owner = true
-layout_mode = 2
+[node name="CardVelocity" type="Label" parent="Frame"]
+offset_left = 268.0
+offset_top = 52.0
+offset_right = 368.0
+offset_bottom = 100.0
 theme_override_colors/font_color = Color(1, 0.804, 0.459, 1)
-theme_override_font_sizes/font_size = 12
-text = "— MPH"
-vertical_alignment = 2
+theme_override_font_sizes/font_size = 24
+text = "-- MPH"
+horizontal_alignment = 2
 
-[node name="RuleTop" type="ColorRect" parent="Frame/Margin/Layout"]
-custom_minimum_size = Vector2(0, 1)
-layout_mode = 2
+[node name="CardTag" type="Label" parent="Frame"]
+offset_left = 16.0
+offset_top = 112.0
+offset_right = 368.0
+offset_bottom = 164.0
+theme_override_colors/font_color = Color(0.451, 0.937, 0.969, 1)
+theme_override_font_sizes/font_size = 20
+text = "MODEL READY"
+text_overrun_behavior = 3
+
+[node name="Rule" type="ColorRect" parent="Frame"]
+offset_left = 16.0
+offset_top = 168.0
+offset_right = 368.0
+offset_bottom = 172.0
 color = Color(0.2, 0.28, 0.39, 1)
 mouse_filter = 2
 
-[node name="Probabilities" type="HBoxContainer" parent="Frame/Margin/Layout"]
-layout_mode = 2
-theme_override_constants/separation = 12
-
-[node name="Stage1" type="VBoxContainer" parent="Frame/Margin/Layout/Probabilities"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(140, 0)
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 0
-
-[node name="Header" type="Label" parent="Frame/Margin/Layout/Probabilities/Stage1"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.58, 0.69, 0.77, 1)
-theme_override_font_sizes/font_size = 7
-text = "PLATE OUTCOMES"
-
-[node name="Ball" type="HBoxContainer" parent="Frame/Margin/Layout/Probabilities/Stage1"]
-layout_mode = 2
-[node name="Name" type="Label" parent="Frame/Margin/Layout/Probabilities/Stage1/Ball"]
-custom_minimum_size = Vector2(37, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.58, 0.69, 0.77, 1)
-theme_override_font_sizes/font_size = 7
-text = "BALL"
-[node name="Bar" type="ProgressBar" parent="Frame/Margin/Layout/Probabilities/Stage1/Ball"]
-custom_minimum_size = Vector2(55, 6)
-layout_mode = 2
-size_flags_horizontal = 3
-max_value = 1.0
-step = 0.001
-show_percentage = false
-theme_override_styles/background = SubResource("BarBackground")
-theme_override_styles/fill = SubResource("StageFill")
-[node name="Value" type="Label" parent="Frame/Margin/Layout/Probabilities/Stage1/Ball"]
-custom_minimum_size = Vector2(33, 0)
-layout_mode = 2
+[node name="CardErv" type="Label" parent="Frame"]
+offset_left = 16.0
+offset_top = 180.0
+offset_right = 368.0
+offset_bottom = 224.0
 theme_override_colors/font_color = Color(0.957, 0.941, 0.882, 1)
-theme_override_font_sizes/font_size = 7
-text = "—"
-horizontal_alignment = 2
+theme_override_font_sizes/font_size = 24
+text = "xRV -- / --"
 
-[node name="Called" type="HBoxContainer" parent="Frame/Margin/Layout/Probabilities/Stage1"]
-layout_mode = 2
-[node name="Name" type="Label" parent="Frame/Margin/Layout/Probabilities/Stage1/Called"]
-custom_minimum_size = Vector2(37, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.58, 0.69, 0.77, 1)
-theme_override_font_sizes/font_size = 7
-text = "CALLED"
-[node name="Bar" type="ProgressBar" parent="Frame/Margin/Layout/Probabilities/Stage1/Called"]
-custom_minimum_size = Vector2(55, 6)
-layout_mode = 2
-size_flags_horizontal = 3
-max_value = 1.0
-step = 0.001
-show_percentage = false
-theme_override_styles/background = SubResource("BarBackground")
-theme_override_styles/fill = SubResource("StageFill")
-[node name="Value" type="Label" parent="Frame/Margin/Layout/Probabilities/Stage1/Called"]
-custom_minimum_size = Vector2(33, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.957, 0.941, 0.882, 1)
-theme_override_font_sizes/font_size = 7
-text = "—"
-horizontal_alignment = 2
-
-[node name="Whiff" type="HBoxContainer" parent="Frame/Margin/Layout/Probabilities/Stage1"]
-layout_mode = 2
-[node name="Name" type="Label" parent="Frame/Margin/Layout/Probabilities/Stage1/Whiff"]
-custom_minimum_size = Vector2(37, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.58, 0.69, 0.77, 1)
-theme_override_font_sizes/font_size = 7
-text = "WHIFF"
-[node name="Bar" type="ProgressBar" parent="Frame/Margin/Layout/Probabilities/Stage1/Whiff"]
-custom_minimum_size = Vector2(55, 6)
-layout_mode = 2
-size_flags_horizontal = 3
-max_value = 1.0
-step = 0.001
-show_percentage = false
-theme_override_styles/background = SubResource("BarBackground")
-theme_override_styles/fill = SubResource("StageFill")
-[node name="Value" type="Label" parent="Frame/Margin/Layout/Probabilities/Stage1/Whiff"]
-custom_minimum_size = Vector2(33, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.957, 0.941, 0.882, 1)
-theme_override_font_sizes/font_size = 7
-text = "—"
-horizontal_alignment = 2
-
-[node name="Foul" type="HBoxContainer" parent="Frame/Margin/Layout/Probabilities/Stage1"]
-layout_mode = 2
-[node name="Name" type="Label" parent="Frame/Margin/Layout/Probabilities/Stage1/Foul"]
-custom_minimum_size = Vector2(37, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.58, 0.69, 0.77, 1)
-theme_override_font_sizes/font_size = 7
-text = "FOUL"
-[node name="Bar" type="ProgressBar" parent="Frame/Margin/Layout/Probabilities/Stage1/Foul"]
-custom_minimum_size = Vector2(55, 6)
-layout_mode = 2
-size_flags_horizontal = 3
-max_value = 1.0
-step = 0.001
-show_percentage = false
-theme_override_styles/background = SubResource("BarBackground")
-theme_override_styles/fill = SubResource("StageFill")
-[node name="Value" type="Label" parent="Frame/Margin/Layout/Probabilities/Stage1/Foul"]
-custom_minimum_size = Vector2(33, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.957, 0.941, 0.882, 1)
-theme_override_font_sizes/font_size = 7
-text = "—"
-horizontal_alignment = 2
-
-[node name="InPlay" type="HBoxContainer" parent="Frame/Margin/Layout/Probabilities/Stage1"]
-layout_mode = 2
-[node name="Name" type="Label" parent="Frame/Margin/Layout/Probabilities/Stage1/InPlay"]
-custom_minimum_size = Vector2(37, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.58, 0.69, 0.77, 1)
-theme_override_font_sizes/font_size = 7
-text = "IN PLAY"
-[node name="Bar" type="ProgressBar" parent="Frame/Margin/Layout/Probabilities/Stage1/InPlay"]
-custom_minimum_size = Vector2(55, 6)
-layout_mode = 2
-size_flags_horizontal = 3
-max_value = 1.0
-step = 0.001
-show_percentage = false
-theme_override_styles/background = SubResource("BarBackground")
-theme_override_styles/fill = SubResource("StageFill")
-[node name="Value" type="Label" parent="Frame/Margin/Layout/Probabilities/Stage1/InPlay"]
-custom_minimum_size = Vector2(33, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.957, 0.941, 0.882, 1)
-theme_override_font_sizes/font_size = 7
-text = "—"
-horizontal_alignment = 2
-
-[node name="Contact" type="VBoxContainer" parent="Frame/Margin/Layout/Probabilities"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(140, 0)
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 0
-
-[node name="Header" type="Label" parent="Frame/Margin/Layout/Probabilities/Contact"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.58, 0.69, 0.77, 1)
-theme_override_font_sizes/font_size = 7
-text = "CONTACT OUTCOMES"
-
-[node name="Out" type="HBoxContainer" parent="Frame/Margin/Layout/Probabilities/Contact"]
-layout_mode = 2
-[node name="Name" type="Label" parent="Frame/Margin/Layout/Probabilities/Contact/Out"]
-custom_minimum_size = Vector2(37, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.58, 0.69, 0.77, 1)
-theme_override_font_sizes/font_size = 7
-text = "OUT"
-[node name="Bar" type="ProgressBar" parent="Frame/Margin/Layout/Probabilities/Contact/Out"]
-custom_minimum_size = Vector2(55, 6)
-layout_mode = 2
-size_flags_horizontal = 3
-max_value = 1.0
-step = 0.001
-show_percentage = false
-theme_override_styles/background = SubResource("BarBackground")
-theme_override_styles/fill = SubResource("ContactFill")
-[node name="Value" type="Label" parent="Frame/Margin/Layout/Probabilities/Contact/Out"]
-custom_minimum_size = Vector2(33, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.957, 0.941, 0.882, 1)
-theme_override_font_sizes/font_size = 7
-text = "—"
-horizontal_alignment = 2
-
-[node name="Single" type="HBoxContainer" parent="Frame/Margin/Layout/Probabilities/Contact"]
-layout_mode = 2
-[node name="Name" type="Label" parent="Frame/Margin/Layout/Probabilities/Contact/Single"]
-custom_minimum_size = Vector2(37, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.58, 0.69, 0.77, 1)
-theme_override_font_sizes/font_size = 7
-text = "1B"
-[node name="Bar" type="ProgressBar" parent="Frame/Margin/Layout/Probabilities/Contact/Single"]
-custom_minimum_size = Vector2(55, 6)
-layout_mode = 2
-size_flags_horizontal = 3
-max_value = 1.0
-step = 0.001
-show_percentage = false
-theme_override_styles/background = SubResource("BarBackground")
-theme_override_styles/fill = SubResource("ContactFill")
-[node name="Value" type="Label" parent="Frame/Margin/Layout/Probabilities/Contact/Single"]
-custom_minimum_size = Vector2(33, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.957, 0.941, 0.882, 1)
-theme_override_font_sizes/font_size = 7
-text = "—"
-horizontal_alignment = 2
-
-[node name="Double" type="HBoxContainer" parent="Frame/Margin/Layout/Probabilities/Contact"]
-layout_mode = 2
-[node name="Name" type="Label" parent="Frame/Margin/Layout/Probabilities/Contact/Double"]
-custom_minimum_size = Vector2(37, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.58, 0.69, 0.77, 1)
-theme_override_font_sizes/font_size = 7
-text = "2B"
-[node name="Bar" type="ProgressBar" parent="Frame/Margin/Layout/Probabilities/Contact/Double"]
-custom_minimum_size = Vector2(55, 6)
-layout_mode = 2
-size_flags_horizontal = 3
-max_value = 1.0
-step = 0.001
-show_percentage = false
-theme_override_styles/background = SubResource("BarBackground")
-theme_override_styles/fill = SubResource("ContactFill")
-[node name="Value" type="Label" parent="Frame/Margin/Layout/Probabilities/Contact/Double"]
-custom_minimum_size = Vector2(33, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.957, 0.941, 0.882, 1)
-theme_override_font_sizes/font_size = 7
-text = "—"
-horizontal_alignment = 2
-
-[node name="Triple" type="HBoxContainer" parent="Frame/Margin/Layout/Probabilities/Contact"]
-layout_mode = 2
-[node name="Name" type="Label" parent="Frame/Margin/Layout/Probabilities/Contact/Triple"]
-custom_minimum_size = Vector2(37, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.58, 0.69, 0.77, 1)
-theme_override_font_sizes/font_size = 7
-text = "3B"
-[node name="Bar" type="ProgressBar" parent="Frame/Margin/Layout/Probabilities/Contact/Triple"]
-custom_minimum_size = Vector2(55, 6)
-layout_mode = 2
-size_flags_horizontal = 3
-max_value = 1.0
-step = 0.001
-show_percentage = false
-theme_override_styles/background = SubResource("BarBackground")
-theme_override_styles/fill = SubResource("ContactFill")
-[node name="Value" type="Label" parent="Frame/Margin/Layout/Probabilities/Contact/Triple"]
-custom_minimum_size = Vector2(33, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.957, 0.941, 0.882, 1)
-theme_override_font_sizes/font_size = 7
-text = "—"
-horizontal_alignment = 2
-
-[node name="Homer" type="HBoxContainer" parent="Frame/Margin/Layout/Probabilities/Contact"]
-layout_mode = 2
-[node name="Name" type="Label" parent="Frame/Margin/Layout/Probabilities/Contact/Homer"]
-custom_minimum_size = Vector2(37, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.58, 0.69, 0.77, 1)
-theme_override_font_sizes/font_size = 7
-text = "HR"
-[node name="Bar" type="ProgressBar" parent="Frame/Margin/Layout/Probabilities/Contact/Homer"]
-custom_minimum_size = Vector2(55, 6)
-layout_mode = 2
-size_flags_horizontal = 3
-max_value = 1.0
-step = 0.001
-show_percentage = false
-theme_override_styles/background = SubResource("BarBackground")
-theme_override_styles/fill = SubResource("ContactFill")
-[node name="Value" type="Label" parent="Frame/Margin/Layout/Probabilities/Contact/Homer"]
-custom_minimum_size = Vector2(33, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.957, 0.941, 0.882, 1)
-theme_override_font_sizes/font_size = 7
-text = "—"
-horizontal_alignment = 2
-
-[node name="ErvPanel" type="PanelContainer" parent="Frame/Margin/Layout"]
-layout_mode = 2
-theme_override_styles/panel = SubResource("ErvStyle")
-
-[node name="Erv" type="Label" parent="Frame/Margin/Layout/ErvPanel"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(0.58, 0.69, 0.77, 1)
-theme_override_font_sizes/font_size = 8
-text = "CALL xRV —     ACTUAL xRV —"
-horizontal_alignment = 1
-
-[node name="Read" type="HBoxContainer" parent="Frame/Margin/Layout"]
-custom_minimum_size = Vector2(0, 79)
-layout_mode = 2
-theme_override_constants/separation = 7
-
-[node name="Diagram" type="Control" parent="Frame/Margin/Layout/Read"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(142, 76)
-layout_mode = 2
-size_flags_horizontal = 3
-script = ExtResource("2_diagram")
-
-[node name="Metrics" type="VBoxContainer" parent="Frame/Margin/Layout/Read"]
-custom_minimum_size = Vector2(141, 0)
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 2
-
-[node name="Header" type="Label" parent="Frame/Margin/Layout/Read/Metrics"]
-layout_mode = 2
+[node name="CardLocation" type="Label" parent="Frame"]
+offset_left = 16.0
+offset_top = 228.0
+offset_right = 368.0
+offset_bottom = 268.0
 theme_override_colors/font_color = Color(1, 0.804, 0.459, 1)
-theme_override_font_sizes/font_size = 7
-text = "LOCATION + SHAPE"
+theme_override_font_sizes/font_size = 20
+text = "MISS --"
 
-[node name="Location" type="Label" parent="Frame/Margin/Layout/Read/Metrics"]
+[node name="CardShape" type="Label" parent="Frame"]
+offset_left = 16.0
+offset_top = 272.0
+offset_right = 368.0
+offset_bottom = 316.0
+theme_override_colors/font_color = Color(0.58, 0.69, 0.77, 1)
+theme_override_font_sizes/font_size = 20
+text = "TUN --  SEP --"
+
+[node name="CardRatio" type="Label" parent="Frame"]
+offset_left = 16.0
+offset_top = 320.0
+offset_right = 368.0
+offset_bottom = 364.0
+theme_override_colors/font_color = Color(0.58, 0.69, 0.77, 1)
+theme_override_font_sizes/font_size = 20
+text = "BREAK:TUN --"
+
+[node name="CardBest" type="Label" parent="Frame"]
+offset_left = 16.0
+offset_top = 372.0
+offset_right = 368.0
+offset_bottom = 416.0
+theme_override_colors/font_color = Color(0.451, 0.937, 0.969, 1)
+theme_override_font_sizes/font_size = 20
+text = "BEST CALL --"
+text_overrun_behavior = 3
+
+; Hidden semantic nodes preserve the reusable report API and its focused data
+; tests without forcing the former 316x348 dashboard into the gameplay frame.
+[node name="Data" type="Control" parent="."]
+visible = false
+
+[node name="Header" type="Control" parent="Data"]
+
+[node name="Rank" type="Label" parent="Data/Header"]
 unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(0.957, 0.941, 0.882, 1)
-theme_override_font_sizes/font_size = 8
+text = "CALL —/—"
+
+[node name="Tag" type="Label" parent="Data/Header"]
+unique_name_in_owner = true
+text = "MODEL READY"
+
+[node name="PitchCode" type="Label" parent="Data"]
+unique_name_in_owner = true
+text = "--"
+
+[node name="PitchName" type="Label" parent="Data"]
+unique_name_in_owner = true
+text = "AWAITING PITCH"
+
+[node name="Velocity" type="Label" parent="Data"]
+unique_name_in_owner = true
+text = "— MPH"
+
+[node name="Erv" type="Label" parent="Data"]
+unique_name_in_owner = true
+text = "CALL xRV —     ACTUAL xRV —"
+
+[node name="Location" type="Label" parent="Data"]
+unique_name_in_owner = true
 text = "MISS —"
 
-[node name="Tunnel" type="Label" parent="Frame/Margin/Layout/Read/Metrics"]
+[node name="Tunnel" type="Label" parent="Data"]
 unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(0.451, 0.937, 0.969, 1)
-theme_override_font_sizes/font_size = 8
 text = "TUNNEL Δ —"
 
-[node name="Separation" type="Label" parent="Frame/Margin/Layout/Read/Metrics"]
+[node name="Separation" type="Label" parent="Data"]
 unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(0.58, 0.69, 0.77, 1)
-theme_override_font_sizes/font_size = 8
 text = "PLATE SEP —"
 
-[node name="Ratio" type="Label" parent="Frame/Margin/Layout/Read/Metrics"]
+[node name="Ratio" type="Label" parent="Data"]
 unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(0.58, 0.69, 0.77, 1)
-theme_override_font_sizes/font_size = 8
 text = "BREAK:TUNNEL —"
 
-[node name="OptionsHeader" type="HBoxContainer" parent="Frame/Margin/Layout"]
-layout_mode = 2
-
-[node name="Label" type="Label" parent="Frame/Margin/Layout/OptionsHeader"]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.804, 0.459, 1)
-theme_override_font_sizes/font_size = 7
-text = "ARSENAL AT THIS SPOT  ·  LOWER xRV IS BETTER"
-
-[node name="Options" type="VBoxContainer" parent="Frame/Margin/Layout"]
+[node name="Stage1" type="VBoxContainer" parent="Data"]
 unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 0
 
-[node name="Option0" parent="Frame/Margin/Layout/Options" instance=ExtResource("3_option")]
+[node name="Ball" type="HBoxContainer" parent="Data/Stage1"]
+[node name="Name" type="Label" parent="Data/Stage1/Ball"]
+text = "BALL"
+[node name="Bar" type="ProgressBar" parent="Data/Stage1/Ball"]
+max_value = 1.0
+step = 0.001
+show_percentage = false
+theme_override_styles/background = SubResource("BarBackground")
+theme_override_styles/fill = SubResource("BarFill")
+[node name="Value" type="Label" parent="Data/Stage1/Ball"]
+text = "—"
 
-[node name="Option1" parent="Frame/Margin/Layout/Options" instance=ExtResource("3_option")]
+[node name="Called" type="HBoxContainer" parent="Data/Stage1"]
+[node name="Name" type="Label" parent="Data/Stage1/Called"]
+text = "CALLED"
+[node name="Bar" type="ProgressBar" parent="Data/Stage1/Called"]
+max_value = 1.0
+step = 0.001
+show_percentage = false
+[node name="Value" type="Label" parent="Data/Stage1/Called"]
+text = "—"
 
-[node name="Option2" parent="Frame/Margin/Layout/Options" instance=ExtResource("3_option")]
+[node name="Whiff" type="HBoxContainer" parent="Data/Stage1"]
+[node name="Name" type="Label" parent="Data/Stage1/Whiff"]
+text = "WHIFF"
+[node name="Bar" type="ProgressBar" parent="Data/Stage1/Whiff"]
+max_value = 1.0
+step = 0.001
+show_percentage = false
+[node name="Value" type="Label" parent="Data/Stage1/Whiff"]
+text = "—"
 
-[node name="Option3" parent="Frame/Margin/Layout/Options" instance=ExtResource("3_option")]
+[node name="Foul" type="HBoxContainer" parent="Data/Stage1"]
+[node name="Name" type="Label" parent="Data/Stage1/Foul"]
+text = "FOUL"
+[node name="Bar" type="ProgressBar" parent="Data/Stage1/Foul"]
+max_value = 1.0
+step = 0.001
+show_percentage = false
+[node name="Value" type="Label" parent="Data/Stage1/Foul"]
+text = "—"
 
-[node name="Option4" parent="Frame/Margin/Layout/Options" instance=ExtResource("3_option")]
+[node name="InPlay" type="HBoxContainer" parent="Data/Stage1"]
+[node name="Name" type="Label" parent="Data/Stage1/InPlay"]
+text = "IN PLAY"
+[node name="Bar" type="ProgressBar" parent="Data/Stage1/InPlay"]
+max_value = 1.0
+step = 0.001
+show_percentage = false
+[node name="Value" type="Label" parent="Data/Stage1/InPlay"]
+text = "—"
+
+[node name="Contact" type="VBoxContainer" parent="Data"]
+unique_name_in_owner = true
+
+[node name="Out" type="HBoxContainer" parent="Data/Contact"]
+[node name="Name" type="Label" parent="Data/Contact/Out"]
+text = "OUT"
+[node name="Bar" type="ProgressBar" parent="Data/Contact/Out"]
+max_value = 1.0
+step = 0.001
+show_percentage = false
+[node name="Value" type="Label" parent="Data/Contact/Out"]
+text = "—"
+
+[node name="Single" type="HBoxContainer" parent="Data/Contact"]
+[node name="Name" type="Label" parent="Data/Contact/Single"]
+text = "1B"
+[node name="Bar" type="ProgressBar" parent="Data/Contact/Single"]
+max_value = 1.0
+step = 0.001
+show_percentage = false
+[node name="Value" type="Label" parent="Data/Contact/Single"]
+text = "—"
+
+[node name="Double" type="HBoxContainer" parent="Data/Contact"]
+[node name="Name" type="Label" parent="Data/Contact/Double"]
+text = "2B"
+[node name="Bar" type="ProgressBar" parent="Data/Contact/Double"]
+max_value = 1.0
+step = 0.001
+show_percentage = false
+[node name="Value" type="Label" parent="Data/Contact/Double"]
+text = "—"
+
+[node name="Triple" type="HBoxContainer" parent="Data/Contact"]
+[node name="Name" type="Label" parent="Data/Contact/Triple"]
+text = "3B"
+[node name="Bar" type="ProgressBar" parent="Data/Contact/Triple"]
+max_value = 1.0
+step = 0.001
+show_percentage = false
+[node name="Value" type="Label" parent="Data/Contact/Triple"]
+text = "—"
+
+[node name="Homer" type="HBoxContainer" parent="Data/Contact"]
+[node name="Name" type="Label" parent="Data/Contact/Homer"]
+text = "HR"
+[node name="Bar" type="ProgressBar" parent="Data/Contact/Homer"]
+max_value = 1.0
+step = 0.001
+show_percentage = false
+[node name="Value" type="Label" parent="Data/Contact/Homer"]
+text = "—"
+
+[node name="Diagram" type="Control" parent="Data"]
+unique_name_in_owner = true
+script = ExtResource("2_diagram")
+
+[node name="Options" type="VBoxContainer" parent="Data"]
+unique_name_in_owner = true
+[node name="Option0" parent="Data/Options" instance=ExtResource("3_option")]
+[node name="Option1" parent="Data/Options" instance=ExtResource("3_option")]
+[node name="Option2" parent="Data/Options" instance=ExtResource("3_option")]
+[node name="Option3" parent="Data/Options" instance=ExtResource("3_option")]
+[node name="Option4" parent="Data/Options" instance=ExtResource("3_option")]

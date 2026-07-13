@@ -13,13 +13,14 @@ informational and is not required at runtime.
 | Godot path | Unreal reference path | Current evidence and runtime use |
 | --- | --- | --- |
 | `content/data/` | `Content/Data/` | All 17 files currently compare byte-for-byte, including pitchers, batters, names, teams, choreography, metadata, jersey stamp, sprite manifest, four XGB model binaries, and golden fixtures. The Godot content catalog and pitch model consume these files. |
-| `content/legacy/field/` | `Content/RawAssets/field/` | All 58 source PNGs currently compare byte-for-byte. Godot-generated `.import` sidecars exist only in the Godot tree. The stadium uses the authorized day, golden-hour, and night surface/prop textures. |
-| `content/legacy/sprites/` | `Content/RawAssets/sprites/` | The 54 production PNG/JSON files currently compare byte-for-byte after excluding Unreal-side `_preview.png` files and Godot `.import` sidecars. The 3D game still uses the rebuilt ballplayer; the landing screen now uses one authorized frame from the pitcher and batter sheets as small pixel-art accents. |
-| `assets/fonts/unreal_ui/` | `Content/Fonts/` | Pixelify Sans, DotGothic16, and VT323 are unchanged copies of the reference UI font set and restore the exact display/body/score roles. The SIL OFL 1.1 text is included beside them. |
+| `content/legacy/field/` | `Content/RawAssets/field/` | All 58 source PNGs currently compare byte-for-byte after excluding Godot `.import` sidecars. They are retained for provenance and visual comparison; the native ballpark does not load them, and the export preset excludes `content/legacy/`. |
+| `content/legacy/sprites/` | `Content/RawAssets/sprites/` | The 54 production PNG/JSON files currently compare byte-for-byte after excluding Unreal `_preview.png` files and Godot `.import` sidecars. They are archival references, not gameplay or menu sprites, and are excluded from exports. |
+| `assets/fonts/unreal_ui/` | `Content/Fonts/` | Pixelify Sans, DotGothic16, and VT323 are unchanged copies of the reference UI font set and provide the display, body, and score roles. The SIL OFL 1.1 text is included beside them. |
 
 The authorized pitcher dataset includes real pitcher names and pitch arsenals.
-The eight club identities in `teams.json` are fictional. The rebuilt production
-athlete is a generic art asset and does not attempt a real player's likeness.
+The eight club identities in `teams.json` are fictional. Native pixel athletes
+are generic project-authored designs and do not attempt a real player's
+likeness.
 
 ## Translated or reimplemented
 
@@ -37,8 +38,8 @@ Unreal package imports:
   and `gameplay/stamina_config.gd` implement the game and mode rules.
 - `core/fielding/park_geometry.gd` freezes the original Citizens Bank Park
   dimensions; `core/fielding/batted_ball_physics.gd` and
-  `gameplay/live_play_controller.gd` provide the deterministic live Godot ball
-  and fielding loop.
+  `gameplay/live_play_controller.gd` provide the deterministic live ball and
+  fielding loop.
 
 Source comments and tests identify faithful ports where behavior is intended to
 match exactly. GDScript files remain normal source code and should not be
@@ -46,48 +47,44 @@ described as byte-identical copies of Unreal C++.
 
 ## Rebuilt for Godot AI
 
-The following are new or rebuilt assets and systems for this repository:
+The following visible assets and systems are original to this repository:
 
-- `main.tscn`, the Godot node architecture, typed semantic driver, scenario
-  surface, save/menu flow, and agent-readable state.
-- The authored stadium geometry, rebuilt harbor backdrop, pixel-composite
-  shader, broadcast cameras, synthesized audio, particles, and pitch-intel
-  presentation. The UI remains a native Godot implementation but now ports the
-  Unreal Slate layout, typography, palette, and interaction states directly.
-- `assets/models/ballplayer/ballplayer.glb`, its authored Blender 5.1.2 `.blend`
-  source, animations, export metadata, and QA renderer. The complete base body,
-  face, and layered eyes derive from Blender Studio's CC0 (public-domain)
-  [Human Base Meshes bundle](https://download.blender.org/demo/bundles/bundles-3.6/).
-  They are modified, fitted, and re-weighted inside the checked-in Blender file.
-  The baseball uniform, cap, short hair, cleats, glove, bat, UV identity panels,
-  and role equipment are project-authored Blender meshes. The asset does not
-  attempt a real-player likeness.
-- `assets/textures/surface/` holds CC0 Poly Haven photogrammetry detail maps
-  (cotton jersey knit, brown leather, fine-grained wood; see its
-  `LICENSES.md`). The Blender asset embeds the applicable cloth normal and
-  roughness maps in its exported PBR materials.
-- `assets/fonts/graduate/Graduate-Regular.ttf` comes from the official Google
-  Fonts repository under SIL Open Font License 1.1; its license text is vendored
-  beside the font. Godot renders it into per-player viewport textures mapped to
-  the Blender-authored jersey identity surfaces.
-- `characters/ballplayer_actor.tscn` and its equipment selector. Helmet,
-  catcher, and umpire geometry is part of the Blender asset; runtime code only
-  selects imported meshes and updates team/roster materials. These assets do
-  not use Unreal mesh or sprite geometry.
-- Semantic haptic composition, portable Godot rumble, and the fork's bounded
-  native DualSense/DualSense Edge adaptive-trigger API.
-- `docs/art_direction/references/pixiball-pitcher-delivery-sheet-v2.png` is a
-  Codex built-in image-generation output used only as production art direction.
-  It is not a runtime texture, sprite atlas, third-party mesh, or player likeness.
+- `main.tscn`, the native `PixelScene`, semantic driver, scenario surface,
+  save/menu flow, and agent-readable state.
+- `presentation/pixel_art_style.gd` and `world/pixel_ballpark_canvas.gd`, which
+  draw the fixed-view harbor ballpark, crowds, field, props, moods, and reactions
+  as deterministic integer-aligned CanvasItem clusters.
+- `presentation/broadcast_camera.gd`, which projects simulation `Vector3` data
+  into integer pixels for intro, pitching, batting, fielding, and dugout views.
+  The spatial values remain a gameplay-data seam and are not visual geometry.
+- `characters/ballplayer_actor.tscn`, `characters/ballplayer_actor.gd`, and
+  `characters/pixel_actor_sprite.gd`, which provide the native pixel athlete,
+  ten stepped actions, roster palette and identity, semantic sockets, and
+  logical helmet, bat, glove, catcher, and umpire layers.
+- `presentation/baseball_visual.gd` and `presentation/pixel_ball_sprite.gd`,
+  which draw the projected ball, shadow, and bounded discrete trails.
+- `content/pixel/style_contract.json` and
+  `tools/validate_native_pixel_art.py`, the declarative generation contract and
+  PNG acceptance gate.
+- The native UI, synthesized audio, semantic haptic composition, portable Godot
+  rumble, and bounded DualSense/DualSense Edge adaptive-trigger integration.
+
+The PNGs under `docs/art_direction/references/` are review inputs only. The
+pitcher-delivery sheet is an original built-in image-generation output; it is
+not a runtime texture, sprite atlas, or player likeness. Documentation and
+reference images are excluded from exported packs.
 
 ## Not imported or consumed
 
 - Unreal `.uasset`, `.umap`, project configuration, build products, and editor
   plugins are not loaded by the Godot project.
-- Unreal sprite sheets are preserved under `content/legacy/sprites/`; only two
-  landing-screen mascot frames are loaded. Gameplay ballplayers remain 3D.
-- The Blender athlete does not derive geometry from an Unreal mesh or sprite
-  sheet, and there is no generated or voxel character fallback.
+- The archived Unreal field and sprite PNGs are not loaded by runtime code.
+- No external spatial asset stack, generated panorama, or post-process pixel
+  filter participates in the current image. World and character pixels are
+  authored directly on the `320x180` canvas.
+- The additional licensed font directories under `assets/fonts/` remain
+  available for development, but the current UI loads only the three authorized
+  fonts listed in the table above.
 
 ## Reproduce the current comparison
 
@@ -111,7 +108,8 @@ diff -qr -x '*.import' -x '*_preview.png' \
   games/pixiball/content/legacy/sprites
 ```
 
-Validate the consuming content/model boundary with:
+Validate the consuming data/trained-model boundary and native presentation
+boundary with:
 
 ```sh
 bin/godot.macos.editor.dev.arm64 --headless --path games/pixiball \
@@ -120,6 +118,10 @@ bin/godot.macos.editor.dev.arm64 --headless --path games/pixiball \
   --script res://core/tests/test_pitch_model.gd
 bin/godot.macos.editor.dev.arm64 --headless --path games/pixiball \
   --script res://core/tests/test_replica_integration.gd
+bin/godot.macos.editor.dev.arm64 --headless --path games/pixiball \
+  --script res://core/tests/test_scene_composition.gd
+bin/godot.macos.editor.dev.arm64 --headless --path games/pixiball \
+  --script res://characters/tests/test_ballplayer_asset.gd
 ```
 
 When adding content, update this document in the same change. Record whether a

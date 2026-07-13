@@ -1,7 +1,11 @@
 class_name PixiballPitchIntelPanel
 extends Control
 
-## Reusable post-pitch model report.
+## Reusable post-pitch model report, composed as a SALTLIGHT slate board
+## (art bible §10.1 "Slate board" + §10.7): an opaque slate plank with an ink
+## frame and hard offset shadow, a chalk Header/Numerals/Body hierarchy, the
+## finished chalk diagram (tallies, tunnel overlay, lantern-gold target) as its
+## centerpiece, and the gold BEST-call line as the recommendation readout.
 ##
 ## This scene deliberately knows nothing about the match controller or current
 ## HUD. Call `present(report)` with semantic model output, and `clear()` (or the
@@ -35,6 +39,10 @@ const CONTACT_FIELDS := {
 	"Homer": ["home_run", "homer", "p_home_run", "pHomeRun", "PHomeRun"],
 }
 
+@onready var _frame: Panel = $Frame
+@onready var _title: Label = $Frame/Title
+@onready var _rule: ColorRect = $Frame/Rule
+@onready var _data: Control = $Data
 @onready var _rank_label: Label = %Rank
 @onready var _tag_label: Label = %Tag
 @onready var _code_label: Label = %PitchCode
@@ -49,6 +57,16 @@ const CONTACT_FIELDS := {
 @onready var _stage1_box: VBoxContainer = %Stage1
 @onready var _contact_box: VBoxContainer = %Contact
 @onready var _options_box: VBoxContainer = %Options
+@onready var _card_rank: Label = $Frame/CardRank
+@onready var _card_code: Label = $Frame/CardCode
+@onready var _card_name: Label = $Frame/CardName
+@onready var _card_velocity: Label = $Frame/CardVelocity
+@onready var _card_tag: Label = $Frame/CardTag
+@onready var _card_erv: Label = $Frame/CardErv
+@onready var _card_location: Label = $Frame/CardLocation
+@onready var _card_shape: Label = $Frame/CardShape
+@onready var _card_ratio: Label = $Frame/CardRatio
+@onready var _card_best: Label = $Frame/CardBest
 
 var _stage1_rows: Dictionary = {}
 var _contact_rows: Dictionary = {}
@@ -62,12 +80,14 @@ func _ready() -> void:
 	# with score digits promoted separately below.
 	var panel_theme := Theme.new()
 	panel_theme.set_font("font", "Label", S.FONT_BODY)
+	panel_theme.set_font_size("font_size", "Label", 24)
 	theme = panel_theme
 	_stage1_rows = _collect_probability_rows(_stage1_box, STAGE1_FIELDS.keys())
 	_contact_rows = _collect_probability_rows(_contact_box, CONTACT_FIELDS.keys())
 	for index in range(5):
 		_option_rows.append(_options_box.get_node("Option%d" % index))
 	_apply_digit_faces()
+	_build_slate_board()
 	_reset_content()
 	hide()
 
@@ -85,6 +105,63 @@ func _apply_digit_faces() -> void:
 		row.get_node("Erv").add_theme_font_override("font", S.FONT_SCORE)
 
 
+## SALTLIGHT slate composition, built over the untouched scene: the same slate
+## face the diagram authors (HARBOR_WASH) so the whole board reads as one
+## chalked surface, an ink frame, and the §10.2 Header/Numerals/Body tiers.
+## Gold appears only on the recommendation readouts — the BEST-call line here
+## and the diagram's own target ticks.
+func _build_slate_board() -> void:
+	# 368x416 board inside the clipped 384x432 root leaves room for the hard
+	# 16px down-right ink shadow (§10.3) that the old edge-to-edge frame lost.
+	_frame.size = Vector2(368, 416)
+	_frame.add_theme_stylebox_override(
+		"panel", S.panel(S.HARBOR_WASH, S.INK, S.BORDER_PANEL, S.SHADOW_PANEL, 16, 16))
+
+	# Header band: chalk title, quiet steel call-rank, engraved slate rule.
+	_style_card(_title, S.FONT_DISPLAY, 24, CHALK, Rect2(16, 16, 208, 32))
+	_style_card(_card_rank, S.FONT_BODY, 16, STEEL, Rect2(216, 16, 136, 32))
+	_rule.color = S.SHADOW_BLUE
+	_rule.position = Vector2(16, 52)
+	_rule.size = Vector2(336, 4)
+
+	# Identity row: Numerals tier (VT323 40/28) for code and velocity, Header
+	# tier for the pitch name, teal Body tag for the deception/door read.
+	_style_card(_card_code, S.FONT_SCORE, 40, CHALK, Rect2(16, 60, 76, 44))
+	_style_card(_card_name, S.FONT_DISPLAY, 24, CHALK, Rect2(96, 60, 160, 44))
+	_style_card(_card_velocity, S.FONT_SCORE, 28, STEEL, Rect2(256, 60, 96, 44))
+	_style_card(_card_tag, S.FONT_BODY, 16, TEAL, Rect2(16, 104, 336, 20))
+
+	# Body telemetry rows under the diagram; the BEST-call line carries the
+	# lantern-gold recommended focus (§10.7).
+	_style_card(_card_erv, S.FONT_BODY, 16, CHALK, Rect2(16, 320, 192, 20))
+	_style_card(_card_location, S.FONT_BODY, 16, STEEL, Rect2(208, 320, 144, 20))
+	_card_location.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_style_card(_card_shape, S.FONT_BODY, 16, STEEL, Rect2(16, 344, 192, 20))
+	_style_card(_card_ratio, S.FONT_BODY, 16, TEAL, Rect2(208, 344, 144, 20))
+	_card_ratio.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_style_card(_card_best, S.FONT_BODY, 20, GOLD, Rect2(16, 368, 336, 24))
+
+	# Reveal only the finished chalk diagram from the hidden data surface and
+	# host it mid-board; every other legacy dashboard node stays a non-drawn
+	# data/test contract. Node paths, ownership, and unique names are untouched.
+	_data.show()
+	for child in _data.get_children():
+		if child is CanvasItem:
+			(child as CanvasItem).visible = child == _diagram
+	_diagram.custom_minimum_size = Vector2(336, 180)
+	_diagram.position = Vector2(16, 132)
+	_diagram.size = Vector2(336, 180)
+
+
+func _style_card(label: Label, font: Font, font_size: int, color: Color, rect: Rect2) -> void:
+	label.add_theme_font_override("font", font)
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", color)
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.position = rect.position
+	label.size = rect.size
+
+
 func present(report: Dictionary) -> void:
 	_report = report.duplicate(true)
 	_apply_identity(report)
@@ -94,6 +171,7 @@ func present(report: Dictionary) -> void:
 	_apply_options(report)
 	_apply_classification(report)
 	_diagram.present(_diagram_report(report))
+	_sync_compact_card(report)
 	show()
 
 
@@ -101,11 +179,59 @@ func clear() -> void:
 	_report.clear()
 	_reset_content()
 	_diagram.clear_data()
+	_sync_compact_card({})
 	hide()
 
 
 func has_report() -> bool:
 	return not _report.is_empty()
+
+
+## Mirror the complete semantic report into the visible slate card. The former
+## dashboard nodes (all but the hosted diagram) remain hidden as a data/test
+## surface, so callers keep the same API while gameplay receives only the
+## decisive read.
+func _sync_compact_card(report: Dictionary) -> void:
+	if report.is_empty():
+		_card_rank.text = "--/--"
+		_card_code.text = "--"
+		_card_name.text = "AWAITING"
+		_card_velocity.text = "-- MPH"
+		_card_tag.text = "MODEL READY"
+		_card_erv.text = "xRV -- / --"
+		_card_location.text = "MISS --"
+		_card_shape.text = "TUN --  SEP --"
+		_card_ratio.text = "BREAK:TUN --"
+		_card_best.text = "BEST CALL --"
+		return
+
+	_card_rank.text = _rank_label.text.trim_prefix("CALL ")
+	_card_code.text = _code_label.text
+	_card_name.text = _name_label.text.left(11)
+	_card_velocity.text = _velocity_label.text
+	_card_tag.text = _tag_label.text
+	var called: Variant = _read_number_deep(report, ["erv", "erv_called", "called_erv", "intent_erv", "Erv"])
+	var actual: Variant = _read_number_deep(report, ["erv_actual", "actual_erv", "expected_run_value", "expectedRunValue", "ErvActual"])
+	_card_erv.text = "xRV %s / %s" % [_format_signed(called), _format_signed(actual)]
+	_card_location.text = _location_label.text
+	var sequence := _find_dictionary(report, ["sequence", "seq", "Seq", "tunneling"])
+	var tunnel: Variant = _read_number_in(sequence, ["tunnel_in", "tunnel_inches", "tunnelIn", "TunnelIn"])
+	var separation: Variant = _read_number_in(sequence, ["plate_sep_in", "plate_separation_in", "plateSepIn", "PlateSepIn"])
+	_card_shape.text = "TUN %s  SEP %s" % [_compact_number(tunnel), _compact_number(separation)]
+	_card_ratio.text = _ratio_label.text.replace("BREAK:TUNNEL", "BREAK:TUN")
+	var options := _read_options(report)
+	if options.is_empty():
+		_card_best.text = "BEST CALL --"
+	else:
+		var best: Dictionary = options[0]
+		_card_best.text = "BEST %s  xRV %s" % [
+			_read_string(best, ["code", "pitch_code", "Code"], "--").to_upper(),
+			_format_signed(_read_number_in(best, ["erv", "Erv"])),
+		]
+
+
+func _compact_number(value: Variant) -> String:
+	return "--" if value == null else "%.1f" % float(value)
 
 
 func _reset_content() -> void:
@@ -353,6 +479,22 @@ func _diagram_report(report: Dictionary) -> Dictionary:
 		if prev_plate != null:
 			diagram.previous_plate = prev_plate
 	diagram.classification = _read_string(report, ["classification", "door", "pitch_classification"], "")
+	if not diagram.has("confidence"):
+		var confidence: Variant = _read_number_deep(report, ["confidence", "conf", "Confidence"])
+		if confidence == null:
+			# House confidence definition (main.gd _prediction_confidence): the
+			# strongest stage-one call, so the chalk tallies always render.
+			for field_aliases in STAGE1_FIELDS.values():
+				var probability: Variant = _read_probability(
+					report, ["probabilities", "stage1", "stage_1", "plate_outcomes"], field_aliases)
+				if probability == null:
+					continue
+				var normalized := float(probability)
+				if normalized > 1.0 and normalized <= 100.0:
+					normalized /= 100.0
+				confidence = maxf(float(confidence) if confidence != null else 0.0, normalized)
+		if confidence != null:
+			diagram.confidence = confidence
 	return diagram
 
 

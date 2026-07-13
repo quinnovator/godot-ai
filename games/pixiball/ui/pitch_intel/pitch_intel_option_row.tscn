@@ -2,10 +2,10 @@
 
 [sub_resource type="StyleBoxFlat" id="BarBackground"]
 bg_color = Color(0.063, 0.071, 0.114, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
 border_color = Color(0.102, 0.11, 0.173, 1)
 
 [sub_resource type="StyleBoxFlat" id="OptionFill"]
@@ -14,21 +14,21 @@ bg_color = Color(1, 0.804, 0.459, 1)
 [node name="Option" type="HBoxContainer"]
 
 [node name="Rank" type="Label" parent="."]
-custom_minimum_size = Vector2(20, 0)
+custom_minimum_size = Vector2(80, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.58, 0.69, 0.77, 1)
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 28
 text = "#1"
 
 [node name="Code" type="Label" parent="."]
-custom_minimum_size = Vector2(25, 0)
+custom_minimum_size = Vector2(100, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.451, 0.937, 0.969, 1)
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 32
 text = "FF"
 
 [node name="Bar" type="ProgressBar" parent="."]
-custom_minimum_size = Vector2(120, 5)
+custom_minimum_size = Vector2(480, 20)
 layout_mode = 2
 size_flags_horizontal = 3
 max_value = 1.0
@@ -38,9 +38,9 @@ theme_override_styles/background = SubResource("BarBackground")
 theme_override_styles/fill = SubResource("OptionFill")
 
 [node name="Erv" type="Label" parent="."]
-custom_minimum_size = Vector2(70, 0)
+custom_minimum_size = Vector2(280, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.957, 0.941, 0.882, 1)
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 28
 text = "A -0.100"
 horizontal_alignment = 2

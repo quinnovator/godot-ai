@@ -5,12 +5,12 @@ implementation of the user's original Unreal Engine game in `../pixiball-ue`.
 It preserves the authorized source game's baseball data, trained pitch models,
 deterministic fixtures, park dimensions, core rules, modes, and presentation
 textures while rebuilding the runtime around agent-operable Godot scenes and a
-production Blender character pipeline.
+native `1280x720` direct-CanvasItem presentation pipeline.
 
 This is not a direct conversion of Unreal packages, a byte-exact runtime port,
 or a claim of Unreal trace-digest parity. The game consumes selected source data
 and textures, translates or reimplements gameplay systems in GDScript, and uses
-rebuilt Godot/Blender presentation assets. The exact content and implementation
+rebuilt native-pixel presentation code. The exact content and implementation
 boundary is recorded in [Asset provenance](docs/ASSET_PROVENANCE.md); the
 measured simulation boundary is recorded under [Compatibility boundary](#compatibility-boundary).
 
@@ -23,8 +23,11 @@ bin/godot.macos.editor.dev.arm64 --editor --path games/pixiball
 ```
 
 Run the project, choose a mode, and play with keyboard or an SDL-standard
-controller. The project renders at a 1280 x 720 reference viewport through the
-Godot Compatibility renderer with a final pixel-composite pass.
+controller. The project renders directly into one `1280x720` root framebuffer.
+Composition retains a `320x180` design coordinate system, and `PixelScene` uses
+an exact 4x CanvasItem transform so every authored unit becomes a `4x4` native
+block. There is no `320x180` texture, intermediate viewport, upscale, or
+post-process pixel filter.
 
 ### Modes
 
@@ -86,7 +89,7 @@ the frozen Citizens Bank Park fence and wall-height geometry.
 
 `gameplay/live_play_controller.gd` predicts the first playable point, selects
 and assists a defender, follows wall caroms, and resolves user catches, pickups,
-and base throws while the broadcast camera tracks the real ball state.
+and base throws while the broadcast director projects the real ball state.
 
 For headless simulations that do not tick scene fielders,
 `core/fielding/semantic_defense.gd` resolves the same trajectory through the
@@ -94,61 +97,49 @@ original coarse fielder-intercept, catch, pickup, and throw-race model.
 `PixiballSim.resolve_semantic_live_play()` uses an isolated keyed Play stream;
 it returns the normal live-play commit packet without mutating the match.
 
-### Production characters and equipment
+### Native pixel characters and equipment
 
-The primary athlete is `assets/models/ballplayer/ballplayer.glb`, authored in
-Blender 5.1.2. Asset version 14 replaces the former generated figure with a
-complete, editable Blender character based on Blender Studio's CC0 Human Base
-Meshes anatomy. It has a slimmer professional-athlete silhouette, modeled face
-and eyes, fitted uniform, cap, short hair, cleats, glove, bat, and role gear;
-35 skinned mesh objects share one 31-bone armature and nine native clips:
-`idle`, `run`, `pitch`, `swing`, `catch`, `field_ready`, `field_throw`,
-`celebrate`, and `slide`. Ball-release, bat-contact, glove-contact,
-celebration-peak, and base-contact markers are part of the animation
-contract. The exported PBR materials retain their authored CC0 knit surface
-maps, and the world composite now
-renders at 1920x1080 with near-lossless color so the realistic character
-survives presentation.
+`characters/ballplayer_actor.tscn` remains the stable gameplay facade. Its
+`BallplayerActor` is a logic node that carries baseball-space `Vector3` data,
+team and roster identity, handedness, semantic sockets, role equipment, and
+action markers. A detached `PixiballPixelActorSprite` attaches directly to
+`PixelScene` and draws the visible athlete with integer-aligned CanvasItem
+clusters. `native_pixel_sprite` is the runtime model kind; the character image
+is generated entirely by the native pixel presenter.
 
-The mound delivery is a frame-reviewed, right-handed 45-frame sequence with
-hemisphere-corrected quaternion tracks: set, lift, hand break, stride, plant,
-late cock, release, extension, deceleration, and balanced recovery. The release
-is the authored hand-speed peak, the planted foot remains stable, and the root
-returns to its idle origin before the runtime blend. The head is an anatomical
-loft with sculpted bone structure and fully modeled features -- layered wet
-eyeballs under skin lids, brows, nose with nostrils, lips, and ears -- so the
-expression remains calm and lifelike through the delivery.
+Characters are designed at 34/20/15 design units for hero, midground, and field
+actors, producing exactly 136/80/60 native framebuffer pixels. The presenter
+favors a broad head, compact torso, readable limb lines, and two-or-more-unit
+equipment marks over anatomy that disappears at gameplay scale. Team palette,
+skin and hair variation, jersey mark, number, helmet, bat, glove, catcher gear,
+and umpire mask remain deterministic logical layers.
 
-`characters/ballplayer_actor.tscn` is the stable gameplay facade. It adds
-per-instance body variation, handedness, team palettes, sockets, and animation
-aliases while preserving the Blender materials and geometry. Batting helmets
-and catcher/umpire protection are hidden skinned meshes authored in the same
-Blender file. Two dedicated jersey UV surfaces receive high-resolution runtime
-textures for the team mark, surname, and one- or two-digit number. Palette and
-roster changes therefore remain programmatic without constructing any 3D
-character geometry, and a U-coordinate correction keeps text readable when an
-action mirrors the model.
+Ten pose-authored actions run at a stepped 10 fps: `idle`, `run`, `pitch`,
+`swing`, `catch`, `field_ready`, `field_throw`, `throw`, `celebrate`, and
+`slide`. Ball-release, bat-contact, glove-contact, celebration-peak, and
+base-contact markers preserve the gameplay timing contract. Mirroring changes
+the authored facing direction without filtering the sprite or mirroring text.
 
-See [Ballplayer asset](assets/models/ballplayer/README.md) and
-[Equipment architecture](characters/equipment/README.md) for the exact runtime
-contract.
+See [Native pixel pipeline](docs/art_direction/NATIVE_PIXEL_PIPELINE.md) and
+[Visual direction](docs/art_direction/ART_DIRECTION.md) for the generation and
+promotion rules.
 
-### High-density pixel presentation
+### Native-720 pixel presentation
 
-The presentation combines a real rigged 3D cast with an authored Godot stadium,
-the authorized day/golden/night field texture set, a rebuilt harbor backdrop,
-toon materials, broadcast cameras, particles, synthesized audio, and a
-screen-space pixel-composite shader. Legacy Unreal sprite sheets are retained as
-authorized reference assets, but the production ballplayers do not render from
-those sheets.
+`PixelScene` is a direct `Node2D` stage scaled 4x inside the native `1280x720`
+root. World, actors, ball, effects, and HUD retain `320x180` design coordinates,
+but rasterize directly into that root; `320x180` is never a framebuffer.
+`PixelBallparkCanvas` draws flat sky, harbor, stadium, field, 8x8-design-unit
+tile detail, crowd clusters, and day/golden/night palettes. Crowd, LED, bell,
+and burst reactions are deterministic and outcome-driven.
 
-The stadium seats 1,184 deterministic articulated spectators across both side
-stands and the plate section. Individuals vary in height, build, skin, hair,
-shirt, head direction, arm pose, and cap choice, then receive staggered sway,
-breathing, cheer timing, and reaction affinity. The plate crowd is divided into
-real seating blocks around an open harbor overlook rather than doubled with a
-sprite wall. Semantic play outcomes drive individual crowd, LED, and bell
-responses with a bounded decay instead of synchronizing every fan.
+The broadcast director is a projector, not a render camera. Gameplay continues
+to own finite `Vector3` baseball positions; the director maps them to integer
+`Vector2` pixels, visibility, depth order, and large/small/tiny actor LOD in
+five authored views: intro, pitching, batting, fielding, and dugout. The ball
+uses the same seam and draws a discrete one- to three-design-unit mark (4-12
+native pixels) with bounded five-sample pitch and two-sample play trails. This
+keeps simulation data intact without making it presentation geometry.
 
 ### DualSense and portable haptics
 
@@ -232,35 +223,44 @@ bin/godot.macos.editor.dev.arm64 --headless --path games/pixiball \
   --script res://core/tests/test_sim_golden_compatibility.gd
 ```
 
-## Blender 5 production pipeline
+## Native pixel production pipeline
 
-The editable `.blend` is the character source of truth and the checked-in GLB
-is its runtime export. Open
-`assets/models/ballplayer/source/ballplayer.blend`, edit geometry, weights, or
-actions directly, and export glTF 2.0 binary with materials, skins, all actions,
-Y-up conversion, applied modifiers, and extras. Then refresh Godot:
+[`content/pixel/style_contract.json`](content/pixel/style_contract.json) is the
+source of truth for generated and hand-authored additions. It freezes the
+`1280x720` root framebuffer, `320x180` design space, 4 px authoring grid, actor
+sizes, 10 fps animation cadence, palette and binary-alpha limits, fixed views,
+and direct-CanvasItem runtime rules.
 
-```sh
-bin/godot.windows.editor.dev.x86_64.console.exe --headless \
-  --path games/pixiball --import
+Validate candidate PNGs from `games/pixiball` before importing them:
+
+```powershell
+python tools/validate_native_pixel_art.py `
+  content/pixel/style_contract.json `
+  <candidate.png>
 ```
 
-Render the fixed rest, pitching, batting, catching, and running QA poses without
-modifying the production `.blend`:
+The validator rejects art with the wrong native dimensions or grid alignment,
+fractional alpha, gradient-heavy output, and unbounded palettes. Runtime art
+uses the same declarative rules through `presentation/pixel_art_style.gd`;
+resampling is not used to repair source art.
 
-```sh
-/Applications/Blender.app/Contents/MacOS/Blender \
-  --background games/pixiball/assets/models/ballplayer/source/ballplayer.blend \
-  --python games/pixiball/assets/blender/render_ballplayer_qa.py -- \
-  --output-dir /tmp/pixiball-ballplayer-qa --size 512
+Capture the authored framebuffer without `--headless` so Godot can read a
+completed GPU frame:
+
+```powershell
+bin\godot.windows.editor.dev.x86_64.console.exe `
+  --path games/pixiball `
+  --script res://tools/capture_visual_rebuild.gd -- `
+  --screen=game-batting-golden `
+  --output=res://.godot/visual-qa/game-batting-golden.png
 ```
 
-For independent VLM/modeling-agent candidates, the batch example assigns each
-job unique GLB, `.blend`, receipt, and log paths and can run four Blender workers
-in parallel. See [Parallel modeling](tools/blender/README.md). Candidates remain
-isolated until an agent explicitly validates and promotes one.
+The capture tool writes the native `1280x720` framebuffer. It supports landing,
+pitcher/team selection, final, the three moods in pitching, batting, and
+fielding views, plus the legacy `game-day`, `game-golden`, and `game-night`
+pitching aliases.
 
-For a repeatable rear-camera presentation check, launch Endless Pitch directly
+For a repeatable pitching-view presentation check, launch Endless Pitch directly
 and optionally leave the ready pose on screen before autoplay begins:
 
 ```sh
@@ -299,13 +299,23 @@ bin/godot.macos.editor.dev.arm64 --headless --path games/pixiball \
 bin/godot.macos.editor.dev.arm64 --headless --path games/pixiball \
   --script res://gameplay/tests/test_live_play_controller.gd
 
-# Imported Blender rig, equipment selection, and roster identity
+# Native pixel actor actions, equipment layers, and roster identity
 bin/godot.macos.editor.dev.arm64 --headless --path games/pixiball \
   --script res://characters/tests/test_ballplayer_asset.gd
 bin/godot.macos.editor.dev.arm64 --headless --path games/pixiball \
   --script res://characters/tests/test_ballplayer_equipment.gd
 bin/godot.macos.editor.dev.arm64 --headless --path games/pixiball \
   --script res://characters/character_smoke.gd
+
+# Native scene, integer projector, and pixel baseball presentation
+bin/godot.macos.editor.dev.arm64 --headless --path games/pixiball \
+  --script res://core/tests/test_native_720_pipeline.gd
+bin/godot.macos.editor.dev.arm64 --headless --path games/pixiball \
+  --script res://core/tests/test_scene_composition.gd
+bin/godot.macos.editor.dev.arm64 --headless --path games/pixiball \
+  --script res://presentation/tests/test_broadcast_camera.gd
+bin/godot.macos.editor.dev.arm64 --headless --path games/pixiball \
+  --script res://presentation/tests/test_baseball_visual.gd
 
 # Portable/native haptic composition and complete menu/mode wiring
 bin/godot.macos.editor.dev.arm64 --headless --path games/pixiball \
@@ -345,9 +355,10 @@ test -s "$pack"
   presentation-free semantic defense.
 - `gameplay/` — Endless and Versus simulation, bullpens, stamina, live fielding,
   and controller-facing commands.
-- `characters/` — production Blender rig facade, imported role equipment,
-  roster identity controller, and gallery.
-- `world/` / `presentation/` — stadium, camera, ball, audio, shader, and haptics.
+- `characters/` — logic actors, native pixel presenters, role-equipment
+  layers, roster identity, actions, markers, and construction smoke.
+- `world/` / `presentation/` — native ballpark canvas, integer world projector,
+  pixel ball, shared art style, audio, and haptics.
 - `ui/` — landing flow, team/pitcher selection, save data, scoreboard, strike
   zone, results, and pitch-intelligence panel.
 - `scenarios/` — deterministic agent-play fixtures.
