@@ -8,6 +8,7 @@ extends SceneTree
 ##     --output=res://.godot/visual-qa/game-batting-golden.png
 
 const MAIN_SCENE := preload("res://main.tscn")
+const PitchTrajectory := preload("res://presentation/pitch_trajectory.gd")
 const SCREENS := [
 	"landing", "pitcher", "team",
 	# Original gameplay names remain pitching-view aliases.
@@ -62,7 +63,7 @@ func _capture() -> void:
 			}, {"hits": 9, "strikeouts": 8, "walks": 2}, true, 0)
 		_:
 			if screen.begins_with("game-"):
-				_configure_gameplay_capture(game, screen)
+				_configure_gameplay_capture(game, screen, options)
 
 	# Let fonts and the native pixel presenters settle before frame readback.
 	for unused in range(120):
@@ -97,7 +98,7 @@ func _capture() -> void:
 	quit()
 
 
-func _configure_gameplay_capture(game: Node, screen: String) -> void:
+func _configure_gameplay_capture(game: Node, screen: String, options: Dictionary) -> void:
 	var spec := _gameplay_capture_spec(screen)
 	var view := String(spec.get("view", "pitching"))
 	var mood := String(spec.get("mood", "day"))
@@ -135,7 +136,36 @@ func _configure_gameplay_capture(game: Node, screen: String) -> void:
 		_:
 			game._set_gameplay_view(false)
 			game.broadcast_camera.set_mode("pitching")
+			if options.has("pitch-progress"):
+				_stage_pitch_flight(game, float(options.get("pitch-progress", 0.68)))
 	_hide_transient_banner(game, screen)
+
+
+func _stage_pitch_flight(game: Node, progress: float) -> void:
+	# Deterministic visual-QA pose for the game's core mechanic. Sampling several
+	# prior positions populates the actual BaseballVisual trail, so this receipt
+	# proves both the broadcast corridor and the visible shape of a breaking pitch.
+	var release := Vector3(0.65, 1.75, 0.25)
+	var finish: Vector3 = game.broadcast_camera.plate_location_world(0.45, 2.25)
+	var target_aim: Vector2 = game._plate_feet_to_aim(Vector2(0.45, 2.25))
+	var path := {"break_ft": [-2.4, -0.8]}
+	var clamped_progress := clampf(progress, 0.10, 0.94)
+	game.aim = target_aim
+	game.hud.set_matchup_rail_visible(false)
+	game.hud.set_pitch_selector(false)
+	game.hud.set_aim(target_aim, Color("ff6b5e"))
+	game.hud.set_help("TRACK BREAK  •  WATCH RELEASE")
+	game.ball.set_active(false)
+	game.ball.use_pitch_ball()
+	game.ball.set_ball_position(release)
+	game.ball.set_active(true)
+	game.ball.begin_pitch_motion(2550.0, 220.0, false)
+	game.ball.set_trail_slot(0)
+	var sample_count := maxi(5, ceili(clamped_progress * 30.0))
+	for index in range(1, sample_count + 1):
+		var t := clamped_progress * float(index) / float(sample_count)
+		game.ball.set_ball_position(PitchTrajectory.sample(release, finish, path, t))
+	game.hud.phase_label.text = "PITCH IN FLIGHT"
 
 
 func _gameplay_capture_spec(screen: String) -> Dictionary:

@@ -1,11 +1,11 @@
 class_name PixiballStrikeZone
 extends Control
 
-## Chalk-tick strike zone (bible §10.5): chalk corner ticks + a dashed steel
-## 3x3 interior grid over the live world, a signal-teal aim reticle, a
-## lantern-gold flash on the called cell, and a stepped chalk trail behind the
-## pitch marker. Every mark is an opaque authored cell on the native 4px
-## rhythm — no alpha fills, no arcs, no anti-aliased lines.
+## Broadcast strike-zone guide (bible §10.5): a thin chalk frame + dashed steel
+## 3x3 grid over the live world, a signal-teal aim reticle, a lantern-gold flash
+## on the called cell, and a stepped chalk trail behind the pitch marker. Every
+## mark is an opaque authored cell on the native 4px rhythm — no alpha fills,
+## no arcs, no anti-aliased lines.
 
 const S := preload("res://ui/pixiball_style.gd")
 
@@ -81,7 +81,7 @@ func _draw() -> void:
 	)
 	if show_pitch:
 		_draw_called_cell(cols, rows, center, aim_extent)
-	_draw_corner_ticks(zone_w, zone_h)
+	_draw_zone_frame(zone_w, zone_h)
 	_draw_dashed_grid(cols, rows)
 	# While aiming the reticle is topmost; once a pitch is shown the live ball
 	# marker owns the top of the stack (§4.1 lantern contract).
@@ -93,48 +93,40 @@ func _draw() -> void:
 		queue_redraw()
 
 
-## Compact chalk corner ticks. Short arms keep the plate battery readable —
-## long L-brackets used to smear through catcher/batter heads (§5.2 seat intent).
-func _draw_corner_ticks(zone_w: int, zone_h: int) -> void:
-	var arm := clampi(_snap(minf(zone_w, zone_h) / 8.0), CELL * 2, CELL * 4)
-	var arms: Array[Rect2] = [
-		Rect2(0, 0, arm, CELL), Rect2(0, 0, CELL, arm),
-		Rect2(zone_w - arm, 0, arm, CELL), Rect2(zone_w - CELL, 0, CELL, arm),
-		Rect2(0, zone_h - CELL, arm, CELL), Rect2(0, zone_h - arm, CELL, arm),
-		Rect2(zone_w - arm, zone_h - CELL, arm, CELL), Rect2(zone_w - CELL, zone_h - arm, CELL, arm),
+## A one-cell continuous rail groups as a strike-zone rectangle without
+## becoming a cage over the plate actors. The ink seat supplies contrast.
+func _draw_zone_frame(zone_w: int, zone_h: int) -> void:
+	var rail := CELL
+	var rails: Array[Rect2] = [
+		Rect2(0, 0, zone_w, rail),
+		Rect2(0, zone_h - rail, zone_w, rail),
+		Rect2(0, rail, rail, zone_h - rail * 2),
+		Rect2(zone_w - rail, rail, rail, zone_h - rail * 2),
 	]
-	for rect in arms:
-		draw_rect(rect.grow(1), S.INK)
-	for rect in arms:
+	for rect in rails:
+		draw_rect(rect.grow(2), S.INK)
+	for rect in rails:
 		draw_rect(rect, S.CHALK)
 
 
-## Quiet 3x3 guide: only the two interior crosses while aiming. The full dashed
-## grid appears once a pitch is live so the zone does not fight the battery.
+## The dashed 3x3 guide stays present while aiming as well as during flight.
+## That persistent subdivision is the fastest baseball-specific recognition
+## cue; an ink seat behind every dash prevents the battery from breaking it up.
 func _draw_dashed_grid(cols: Array[int], rows: Array[int]) -> void:
-	var inset := CELL * 3
+	var inset := CELL * 4
 	var dashes: Array[Rect2] = []
-	if show_pitch:
-		for x in [cols[1], cols[2]]:
-			var y := rows[0] + inset
-			while y + CELL * 2 <= rows[3] - inset:
-				dashes.append(Rect2(x, y, CELL, CELL * 2))
-				y += CELL * 4
-		for y in [rows[1], rows[2]]:
-			var x := cols[0] + inset
-			while x + CELL * 2 <= cols[3] - inset:
-				dashes.append(Rect2(x, y, CELL * 2, CELL))
-				x += CELL * 4
-	else:
-		# Aiming: four short mid-edge ticks only — enough to aim, not a cage.
-		var mx := _snap(float(cols[3]) * 0.5)
-		var my := _snap(float(rows[3]) * 0.5)
-		dashes.append(Rect2(mx, rows[0] + inset, CELL, CELL * 2))
-		dashes.append(Rect2(mx, rows[3] - inset - CELL * 2, CELL, CELL * 2))
-		dashes.append(Rect2(cols[0] + inset, my, CELL * 2, CELL))
-		dashes.append(Rect2(cols[3] - inset - CELL * 2, my, CELL * 2, CELL))
+	for x in [cols[1], cols[2]]:
+		var y := rows[0] + inset
+		while y + CELL * 2 <= rows[3] - inset:
+			dashes.append(Rect2(x, y, CELL, CELL * 2))
+			y += CELL * 4
+	for y in [rows[1], rows[2]]:
+		var x := cols[0] + inset
+		while x + CELL * 2 <= cols[3] - inset:
+			dashes.append(Rect2(x, y, CELL * 2, CELL))
+			x += CELL * 4
 	for dash in dashes:
-		draw_rect(Rect2(dash.position + Vector2(1, 1), dash.size), S.INK)
+		draw_rect(dash.grow(1), S.INK)
 	for dash in dashes:
 		draw_rect(dash, S.STEEL)
 
@@ -191,36 +183,31 @@ func _draw_pitch_marker(zone_w: int, zone_h: int, center: Vector2, aim_extent: V
 	draw_rect(Rect2(origin, Vector2(CELL * 2, CELL * 2)), S.CHALK)
 
 
-## Signal-teal aim reticle (§10.5): an open 5x5-cell target ring around an
-## ink moat and the accent core cell, plus four solid 1-cell cross arms. Every
-## teal mark sits inside a full 1-cell ink surround so the beacon separates by
-## value from bright day clay and the ink-contoured battery cluster alike —
-## paused-frame read comes from opaque mass, never glow or motion. The arm
-## tips extend 1 cell at 1 Hz while aiming, under the 3 Hz cap (§11.5); the
-## whole beacon stays cool so it never rivals the warm focal pool.
+## Signal-teal aim bead (§10.5): a compact open 3x3-cell ring with four detached
+## sight ticks. It stays subordinate to the baseball-specific zone rectangle;
+## the previous long cross arms made the whole guide read as a tactical HUD.
+## Every teal mark has an ink seat, so paused-frame legibility still comes from
+## opaque value separation rather than glow or motion.
 func _draw_reticle(center: Vector2, aim_extent: Vector2) -> void:
 	var point := center + Vector2(aim.x * lateral_screen_sign, aim.y) * aim_extent
 	var px := _snap(point.x)
 	var py := _snap(point.y)
 	var arm_color := S.TEAL if active else S.SLATE
 	var core_color := accent if active else S.SLATE
-	var breathe := CELL if active and int(Time.get_ticks_msec() / 500) % 2 == 0 else 0
-	var ring := Rect2(px - CELL * 2, py - CELL * 2, CELL * 5, CELL * 5)
-	var arm_len := CELL * 3 + breathe
-	var arm_gap := CELL * 3
-	var arms: Array[Rect2] = [
-		Rect2(px + arm_gap, py, arm_len, CELL),
-		Rect2(px - arm_gap - arm_len + CELL, py, arm_len, CELL),
-		Rect2(px, py + arm_gap, CELL, arm_len),
-		Rect2(px, py - arm_gap - arm_len + CELL, CELL, arm_len),
+	var ring := Rect2(px - CELL, py - CELL, CELL * 3, CELL * 3)
+	var ticks: Array[Rect2] = [
+		Rect2(px + CELL * 2, py, CELL, CELL),
+		Rect2(px - CELL * 2, py, CELL, CELL),
+		Rect2(px, py + CELL * 2, CELL, CELL),
+		Rect2(px, py - CELL * 2, CELL, CELL),
 	]
-	for arm in arms:
-		draw_rect(arm.grow(CELL), S.INK)
+	for tick in ticks:
+		draw_rect(tick.grow(1), S.INK)
 	draw_rect(ring.grow(CELL), S.INK)
-	for arm in arms:
-		draw_rect(arm, arm_color)
+	for tick in ticks:
+		draw_rect(tick, arm_color)
 	draw_rect(ring, arm_color)
-	draw_rect(Rect2(px - CELL, py - CELL, CELL * 3, CELL * 3), S.INK)
+	draw_rect(Rect2(px, py, CELL, CELL), S.INK)
 	draw_rect(Rect2(px, py, CELL, CELL), core_color)
 
 

@@ -11,6 +11,120 @@ var host: PixelBallparkCanvas
 func _init(canvas: PixelBallparkCanvas) -> void:
 	host = canvas
 
+func draw_home_plate_facade(palette: Dictionary, rect: Rect2i) -> void:
+	# Authored center-field broadcast backdrop. Masonry is the stadium shell;
+	# premium seats, portals, club glass, padding, and netting are cut into it as
+	# separate depth planes instead of repeating one texture across the frame.
+	var left := rect.position.x
+	var right := rect.end.x
+	var top := rect.position.y
+	var bottom := rect.end.y
+	Style.pixel_rect(host, Rect2(rect), palette.ink)
+
+	# Upper club glazing recessed behind the brick shell. Most of this tier sits
+	# under the scoreboard HUD, but its lower mullions remain visible in motion.
+	_draw_masonry_band(palette, Rect2i(left, top, rect.size.x, 40), 0)
+	Style.pixel_rect(host, Rect2(left + 12, top + 6, rect.size.x - 24, 20), palette.ink)
+	var glass: Color = palette.ink_mid if host.mood == "day" else palette.crowd_shadow
+	var glass_light: Color = palette.town_near if host.mood == "day" else palette.window_lit
+	for bay in [
+		Rect2i(left + 16, top + 9, 48, 14), Rect2i(left + 68, top + 9, 48, 14),
+		Rect2i(left + 120, top + 9, 80, 14), Rect2i(left + 204, top + 9, 48, 14),
+		Rect2i(left + 256, top + 9, 48, 14),
+	]:
+		Style.pixel_rect(host, Rect2(bay), glass)
+		Style.pixel_rect(host, Rect2(bay.position.x + int(bay.size.x / 2.0), bay.position.y, 1, bay.size.y), palette.stand_shell)
+		Style.pixel_rect(host, Rect2(bay.position.x + 3, bay.position.y + 3, bay.size.x - 6, 1), glass_light)
+
+	# Heavy brick belt and centered club plaque. Its irregular course lengths
+	# keep the facade architectural rather than tiled wallpaper.
+	_draw_masonry_band(palette, Rect2i(left, top + 25, rect.size.x, 15), 3)
+	Style.pixel_rect(host, Rect2(left, top + 25, rect.size.x, 2), palette.seat_board)
+	Style.pixel_rect(host, Rect2(left, top + 39, rect.size.x, 2), palette.ink)
+	var plaque := Rect2i(128, top + 29, 64, 8)
+	Style.pixel_rect(host, Rect2(plaque), palette.ink)
+	Style.pixel_rect(host, Rect2(plaque.position.x + 2, plaque.position.y + 1, plaque.size.x - 4, 1), palette.ink_mid)
+	Style.pixel_text(host, "DIAMOND CLUB", Vector2(plaque.position.x + 9, plaque.position.y + 3), palette.lamp_glow, 1)
+
+	# Three recessed seating rooms, each with its own rake and aisle. Brick wings
+	# and piers remain broad enough to carry the Citizens Bank Park silhouette.
+	_draw_premium_bay(palette, Rect2i(left + 8, top + 42, 94, bottom - top - 42), 731, [left + 35, left + 76])
+	_draw_premium_bay(palette, Rect2i(left + 113, top + 43, 94, bottom - top - 43), 797, [left + 137, left + 184])
+	_draw_premium_bay(palette, Rect2i(right - 102, top + 42, 94, bottom - top - 42), 863, [right - 76, right - 35])
+	for pier in [
+		Rect2i(left, top + 40, 8, bottom - top - 40),
+		Rect2i(left + 102, top + 40, 11, bottom - top - 40),
+		Rect2i(left + 207, top + 40, 11, bottom - top - 40),
+		Rect2i(right - 8, top + 40, 8, bottom - top - 40),
+	]:
+		_draw_masonry_band(palette, pier, pier.position.x)
+
+	# Field-level portals have stepped brick arches and dark interior depth.
+	_draw_brick_portal(palette, Vector2i(left + 53, bottom), false)
+	_draw_brick_portal(palette, Vector2i(right - 53, bottom), true)
+
+	# The home-plate screen is a final foreground plane over the center seating
+	# room. It is wide and low, matching a broadcast backstop rather than a cage.
+	_draw_broadcast_backstop(palette, Rect2i(left + 110, top + 45, 100, bottom - top - 45))
+
+func _draw_masonry_band(palette: Dictionary, rect: Rect2i, phase: int) -> void:
+	Style.pixel_rect(host, Rect2(rect), palette.roof_accent)
+	var row := 0
+	for y in range(rect.position.y + 4, rect.end.y, 5):
+		Style.pixel_rect(host, Rect2(rect.position.x, y, rect.size.x, 1), palette.wood_dark)
+		var offset := 5 + posmod(phase + row * 7, 12)
+		for x in range(rect.position.x + offset, rect.end.x, 20):
+			Style.pixel_rect(host, Rect2(x, y - 4, 1, 4), palette.wood_dark)
+		row += 1
+
+func _draw_premium_bay(palette: Dictionary, rect: Rect2i, seed: int, aisles: Array[int]) -> void:
+	Style.pixel_rect(host, Rect2(rect.grow(2)), palette.ink)
+	Style.pixel_rect(host, Rect2(rect), palette.stand_shell)
+	for row_y in range(rect.position.y + 3, rect.end.y, 5):
+		Style.pixel_rect(host, Rect2(rect.position.x, row_y, rect.size.x, 1), palette.seat_board)
+		var seat_x := rect.position.x + 2 + posmod(seed + row_y, 4)
+		while seat_x < rect.end.x - 2:
+			Style.pixel_rect(host, Rect2(seat_x, row_y - 2, 3, 2), palette.crowd_shadow)
+			seat_x += 6
+	for aisle_x in aisles:
+		Style.pixel_rect(host, Rect2(aisle_x, rect.position.y, 3, rect.size.y), palette.ink_mid)
+		for light_y in range(rect.position.y + 3, rect.end.y, 5):
+			Style.pixel_rect(host, Rect2(aisle_x + 1, light_y, 1, 1), palette.lamp_glow)
+	draw_crowd_clumps(Rect2i(rect.position + Vector2i(1, 1), rect.size - Vector2i(2, 2)), seed, aisles, 0, false)
+
+func _draw_brick_portal(palette: Dictionary, foot: Vector2i, mirror: bool) -> void:
+	var direction := -1 if mirror else 1
+	var opening_left := foot.x - 8
+	# Stepped arch: broad jambs at field level, narrowing toward the lintel.
+	Style.pixel_rect(host, Rect2(opening_left - 3, foot.y - 18, 22, 18), palette.roof_accent)
+	Style.pixel_rect(host, Rect2(opening_left, foot.y - 15, 16, 15), palette.ink)
+	Style.pixel_rect(host, Rect2(opening_left + 2, foot.y - 12, 12, 12), palette.wood_dark)
+	Style.pixel_rect(host, Rect2(opening_left + 2, foot.y - 12, 12, 1), palette.seat_board)
+	Style.pixel_rect(host, Rect2(foot.x + direction * 10, foot.y - 10, 2, 1), palette.lamp_glow)
+	Style.pixel_rect(host, Rect2(foot.x + direction * 10, foot.y - 5, 2, 1), palette.lamp_glow)
+
+func _draw_broadcast_backstop(palette: Dictionary, rect: Rect2i) -> void:
+	var left := rect.position.x
+	var right := rect.end.x
+	var top := rect.position.y
+	var bottom := rect.end.y
+	Style.pixel_rect(host, Rect2(rect), palette.ink)
+	var net := Rect2i(left + 3, top + 3, rect.size.x - 6, rect.size.y - 10)
+	Style.pixel_rect(host, Rect2(net), palette.crowd_shadow)
+	draw_crowd_clumps(Rect2i(net.position + Vector2i(1, 1), net.size - Vector2i(2, 2)), 911, [], 0, false)
+	for x in range(net.position.x + 9, net.end.x, 12):
+		Style.pixel_rect(host, Rect2(x, net.position.y, 1, net.size.y), palette.ink_mid)
+	for y in range(net.position.y + 6, net.end.y, 7):
+		Style.pixel_rect(host, Rect2(net.position.x, y, net.size.x, 1), palette.ink_mid)
+	# Only perimeter supports: the center of the strike-zone sightline stays open.
+	Style.pixel_rect(host, Rect2(left + 1, top + 1, 2, rect.size.y - 2), palette.seat_board)
+	Style.pixel_rect(host, Rect2(right - 3, top + 1, 2, rect.size.y - 2), palette.ink_mid)
+	Style.pixel_rect(host, Rect2(left + 1, top + 1, rect.size.x - 2, 2), palette.seat_board)
+	Style.pixel_rect(host, Rect2(left + 1, bottom - 8, rect.size.x - 2, 7), palette.wall_pad)
+	Style.pixel_rect(host, Rect2(left + 1, bottom - 8, rect.size.x - 2, 1), palette.seat_board)
+	for camera_well_x in [left + 9, right - 21]:
+		Style.pixel_rect(host, Rect2(camera_well_x, bottom - 6, 12, 5), palette.ink_mid)
+
 func crowd_palette(palette: Dictionary) -> Dictionary:
 	# Crowd roles on the Lantern Wharf palette (§7.5): dark clustered bodies,
 	# town_far catch-light heads, and mood-rationed clay_lit warm faces.
@@ -392,5 +506,3 @@ func draw_lightbank(palette: Dictionary, x: int, top: int, base: int) -> void:
 		var span := 16 - ring * 4
 		Style.pixel_rect(host, Rect2(x + int((16 - span) / 2.0), top - ring * 2, span, 1), palette.lamp_glow)
 	Style.pixel_rect(host, Rect2(x + 2, top + 10, 12, 1), palette.lamp_glow)
-
-

@@ -81,7 +81,11 @@ func projected_strike_zone_native() -> Rect2:
 
 
 func plate_lateral_screen_sign() -> float:
-	return -1.0 if mode == MODE_PITCHING else 1.0
+	# Input is screen-relative in both battery views: positive aim.x means the
+	# player pressed right, so the reticle and the pitch must both finish right
+	# of zone center. Camera staging already supplies the pitching-view offset;
+	# mirroring plate space here inverted both controls and late flight.
+	return 1.0
 
 
 func project_world(value: Vector3) -> Vector2:
@@ -108,10 +112,11 @@ func project_world_native(value: Vector3) -> Vector2:
 
 
 func project_pitch_world(value: Vector3) -> Vector2:
-	# Actors and field landmarks use the compact broadcast projection, while a
-	# pitched ball must finish inside the deliberately enlarged, readable zone.
-	# Blend into that plate-space mapping only over the back half of flight so
-	# release still comes directly out of the pitcher's hand.
+	# Actors and field landmarks use the high center-field broadcast projection,
+	# while a pitched ball must finish inside the deliberately enlarged zone.
+	# The plate-space blend begins before the tunnel point so horizontal/vertical
+	# break develops across the corridor instead of popping during the last few
+	# frames. Release still comes directly out of the pitcher's hand.
 	if mode not in [MODE_PITCHING, MODE_BATTING]:
 		return project_world(value)
 	var normal := project_world(value)
@@ -135,7 +140,7 @@ func project_pitch_world(value: Vector3) -> Vector2:
 		zone.get_center().x + plate_lateral_screen_sign() * lateral_ft / STRIKE_ZONE_HALF_WIDTH_FT * zone.size.x * 0.5,
 		zone.end.y - (height_ft - STRIKE_ZONE_BOTTOM_FT) / (STRIKE_ZONE_TOP_FT - STRIKE_ZONE_BOTTOM_FT) * zone.size.y
 	)
-	var plate_blend := smoothstep(0.42, 1.0, travel)
+	var plate_blend := smoothstep(0.30, 0.96, travel)
 	return normal.lerp(plate_space, plate_blend).round()
 
 
@@ -179,22 +184,22 @@ func actor_visible(value: Vector3, role := "fielder") -> bool:
 
 
 func actor_screen_offset(_value: Vector3, role := "fielder") -> Vector2:
-	# Pitching offsets are authored so the plate battery fans out around the
-	# strike-zone chalk: batter left of plate, catcher low under the zone,
-	# umpire clear right. Values are design cells (1 cell = 4 native px).
+	# Pitching offsets keep the hitter wholly outside the strike-zone frame,
+	# with catcher and umpire stacked down the center behind home plate. Values
+	# are composition cells and expand through the 2x density pass.
 	var offset := Vector2.ZERO
 	if mode == MODE_PITCHING:
 		match role:
 			"batter":
-				offset = Vector2(-11, 1)
+				offset = Vector2(-25, 1)
 			"catcher":
-				offset = Vector2(0, 7)
+				offset = Vector2(0, 9)
 			"umpire":
-				offset = Vector2(8, 1)
+				offset = Vector2(2, 14)
 			"pitcher":
-				# Plant the marquee figure a cell onto the rubber so delivery
-				# reads from the mound island, not floating over clay.
-				offset = Vector2(0, 1)
+				# Plant the body just left of the rubber so the throwing hand and
+				# released ball separate as two silhouettes in the first flight frame.
+				offset = Vector2(-2, 0)
 	elif mode == MODE_BATTING and role == "batter":
 		offset = Vector2(-22, -1)
 	return offset * DENSITY_SCALE
@@ -246,9 +251,9 @@ func _process(delta: float) -> void:
 
 
 func _project_pitching(value: Vector3) -> Vector2:
-	# Use the real plate-to-second-base depth interval. This keeps home, mound,
-	# and second collinear in the authored center-field view and prevents the
-	# old extreme lower-right to upper-left camera skew.
+	# Use the real plate-to-second-base depth interval. The near/far lane is a
+	# high center-field TV angle with a restrained first-base-side offset: long
+	# enough to read pitch flight, but still aligned through mound and plate.
 	var depth := clampf(
 		(value.z - C.SECOND_BASE.z) / (C.HOME_PLATE.z - C.SECOND_BASE.z),
 		0.0,

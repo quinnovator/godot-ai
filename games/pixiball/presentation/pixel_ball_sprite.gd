@@ -33,6 +33,8 @@ const WALL_TOP_WORLD := 10.5 * 0.3048
 const HORIZON_ROWS := {"pitching": 46, "batting": 42, "fielding": 60, "intro": 58, "dugout": 40}
 const TRAIL_SPACING := [2, 5, 8, 12]
 const TRAIL_SPACING_FAST := [1, 3, 5, 8]
+const PITCH_TRAIL_SPACING := [4, 11, 19]
+const PITCH_TRAIL_SPACING_FAST := [3, 8, 14]
 const FAST_TRAIL_CELLS_PER_FRAME := 3.0
 # Pitch-view trail keeps more history so the plate lane reads as a bent path.
 const RAY_DIRS := [Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1)]
@@ -149,10 +151,10 @@ func _draw_ball(palette: Dictionary, mood: String, mode: String, tick: int, flas
 		_cell(x, y, 1, 1, BALL_WHITE)
 
 
-## §9.2 — Up to four opaque afterimage clusters behind the flight path. Effort
-## codes ghost count; fast flight tightens spacing. Pitching mode uses 2x2
-## clusters so the plate corridor trail survives mow arcs and clay. The chain
-## walks the projected polyline so breaking balls bend it — no continuous lines.
+## §9.2 — Opaque afterimage clusters sampled from the real projected path.
+## The pitching camera owns three hand-shaped marks (spark / dash / tail), not
+## a generic enlarged dotted line. The chain bends with the pitch and never
+## becomes a continuous ribbon.
 func _draw_trail(palette: Dictionary, mode: String) -> void:
 	var points: Array = host.get_trail_world_points()
 	if points.is_empty():
@@ -172,9 +174,15 @@ func _draw_trail(palette: Dictionary, mode: String) -> void:
 	elif effort >= 0.34:
 		ghost_count = 3
 	var speed := path[0].distance_to(path[1])
-	var spacings: Array = TRAIL_SPACING_FAST if speed >= FAST_TRAIL_CELLS_PER_FRAME else TRAIL_SPACING
-	var ball_cell := Vector2i(roundi(path[0].x), roundi(path[0].y))
 	var pitch_view := mode == "pitching"
+	if pitch_view:
+		ghost_count = 3
+	var spacings: Array
+	if pitch_view:
+		spacings = PITCH_TRAIL_SPACING_FAST if speed >= FAST_TRAIL_CELLS_PER_FRAME else PITCH_TRAIL_SPACING
+	else:
+		spacings = TRAIL_SPACING_FAST if speed >= FAST_TRAIL_CELLS_PER_FRAME else TRAIL_SPACING
+	var ball_cell := Vector2i(roundi(path[0].x), roundi(path[0].y))
 	var trail_tint: Color = host.get_trail_color() if host.has_method("get_trail_color") else BALL_WHITE
 	for ghost in range(mini(ghost_count, spacings.size())):
 		var at := _point_along(path, float(spacings[ghost]))
@@ -182,13 +190,21 @@ func _draw_trail(palette: Dictionary, mode: String) -> void:
 		if cell == ball_cell:
 			continue
 		var fill := _ghost_color(palette, mode, cell.y, ghost)
-		if pitch_view and ghost == 0:
-			# Nearest ghost carries a pulse of the pitch-slot color so the lane
-			# reads as *this* pitch, not a generic chalk dash.
-			fill = fill.lerp(trail_tint, 0.45)
+		if pitch_view:
+			fill = trail_tint
 			fill.a = 1.0
-		if pitch_view and ghost <= 1:
-			_cell(cell.x, cell.y, 2, 2, fill)
+		if pitch_view:
+			match ghost:
+				0:
+					_cell(cell.x, cell.y, 2, 2, fill)
+					_cell(cell.x, cell.y, 1, 1, CHALK_PAPER)
+					_cell(cell.x + 2, cell.y + 1, 1, 1, INK)
+				1:
+					_cell(cell.x, cell.y, 2, 1, fill)
+					_cell(cell.x + 1, cell.y, 1, 1, CHALK_PAPER)
+				_:
+					_cell(cell.x, cell.y, 1, 1, fill)
+					_cell(cell.x + 1, cell.y, 1, 1, INK)
 		else:
 			_cell(cell.x, cell.y, 1, 1, fill)
 

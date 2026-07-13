@@ -79,9 +79,10 @@ reference images are excluded from exported packs.
 - Unreal `.uasset`, `.umap`, project configuration, build products, and editor
   plugins are not loaded by the Godot project.
 - The archived Unreal field and sprite PNGs are not loaded by runtime code.
-- No external spatial asset stack, generated panorama, or post-process pixel
-  filter participates in the current image. World and character pixels are
-  authored directly on the `320x180` canvas.
+- No external spatial asset stack, generated panorama, or resize/pixelation
+  filter participates in the current image. World and character structures use
+  the `320x180` composition vocabulary, material marks use the true `640x360`
+  dense grid, and one original world-only shader adds hard native-grid light.
 - The additional licensed font directories under `assets/fonts/` remain
   available for development, but the current UI loads only the three authorized
   fonts listed in the table above.

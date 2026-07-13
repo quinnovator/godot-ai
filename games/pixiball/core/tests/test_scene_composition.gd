@@ -6,6 +6,7 @@ const DESIGN_SIZE := Vector2i(640, 360)
 const GRID_PIXEL_SIZE := 4
 
 var _failures: Array[String] = []
+var _world_compositor_count := 0
 
 
 func _initialize() -> void:
@@ -27,6 +28,7 @@ func _run() -> void:
 
 	for path in [
 		"PixelScene",
+		"WorldCompositeLayer/WorldGrade",
 		"World/Stadium",
 		"Actors/Ballplayers",
 		"Presentation/Baseball",
@@ -53,6 +55,9 @@ func _run() -> void:
 	_expect(camera_director != null and camera_director.FRAMEBUFFER_SIZE == Vector2(FRAMEBUFFER_SIZE), "world projector lost its native framebuffer contract")
 	_expect(camera_director != null and camera_director.is_in_group("pixiball_pixel_projector"), "world projector group was not installed")
 
+	var composite_layer := session.get_node_or_null("WorldCompositeLayer") as CanvasLayer
+	_expect(composite_layer != null and composite_layer.layer == 10, "world compositor must sit on layer 10 below the HUD")
+
 	var stadium = session.get_node_or_null("World/Stadium")
 	var stadium_canvas: Node2D = stadium.get_canvas() if stadium != null else null
 	_expect(is_instance_valid(stadium_canvas), "stadium did not attach its native canvas")
@@ -69,6 +74,7 @@ func _run() -> void:
 		_expect(ball_sprite.global_transform.get_scale() == Vector2(4, 4), "baseball presenter does not rasterize directly on the native 4px grid")
 
 	_validate_native_tree(session)
+	_expect(_world_compositor_count == 1, "scene must contain exactly one authorized world compositor, got %d" % _world_compositor_count)
 	session.queue_free()
 	await process_frame
 	_finish()
@@ -100,7 +106,12 @@ func _validate_native_tree(node: Node) -> void:
 	_expect(not (node is Camera3D), "runtime contains Camera3D at %s" % node.get_path())
 	_expect(not (node is SubViewport), "runtime contains SubViewport at %s" % node.get_path())
 	if node is CanvasItem:
-		_expect(not ((node as CanvasItem).material is ShaderMaterial), "runtime contains ShaderMaterial at %s" % node.get_path())
+		var material := (node as CanvasItem).material
+		if material is ShaderMaterial:
+			var authorized := node.name == &"WorldGrade" and node.get_parent() is CanvasLayer and node.get_parent().name == &"WorldCompositeLayer"
+			_expect(authorized, "runtime contains unauthorized ShaderMaterial at %s" % node.get_path())
+			if authorized:
+				_world_compositor_count += 1
 	for child in node.get_children():
 		_validate_native_tree(child)
 
@@ -112,7 +123,7 @@ func _expect(condition: bool, message: String) -> void:
 
 func _finish() -> void:
 	if _failures.is_empty():
-		print("PIXIBALL_SCENE_CONTRACT_OK framebuffer=2560x1440 design_grid=640x360 density=2x cell=4px direct_canvas=true no_subviewport=true")
+		print("PIXIBALL_SCENE_CONTRACT_OK framebuffer=2560x1440 design_grid=640x360 density=2x cell=4px direct_canvas=true world_compositor=true no_subviewport=true")
 		quit(0)
 		return
 	for failure in _failures:

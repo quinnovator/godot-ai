@@ -115,100 +115,44 @@ func draw_intro(palette: Dictionary) -> void:
 
 func draw_pitching(palette: Dictionary) -> void:
 	var bands: Dictionary = Landmarks.BAND_DATUMS.pitching
-	var horizon: int = bands.horizon
-	host.atmosphere.draw_sky_band(palette, 0, 320, 0, horizon)
-	host.skyline.draw_skyline_row(palette, horizon, palette.town_far, false, [
-		["hill", -10, 56], ["crane", 44, 0], ["sheds", 96, 3], ["hill", 128, 46],
-		["masts", 180, 5], ["hill", 246, 50], ["sheds", 284, 2],
-	])
-	host.atmosphere.draw_sea_band(palette, 0, 320, horizon, bands.sea_bottom, 90)
-	# The near skyline stays lowest behind the mound so the pitcher reads
-	# against water, not roofline clutter (§7.2).
-	host.skyline.draw_skyline_row(palette, horizon + 3, palette.town_near, true, [
-		["cannery", 18, 1], ["traps", 42, 0], ["masts", 190, 4], ["sheds", 262, 3],
-	])
-	host.skyline.stamp_lighthouse(palette, 312, horizon + 2)
-	host.skyline.draw_breakwater(palette, 196, 44, horizon + 6)
-	host.atmosphere.draw_mist_veil(palette, 0, 320, horizon - 14, bands.sea_bottom)
-	host.stands.draw_fireworks(palette, 0, 320, horizon)
+	# Tight center-field television shot looking inward at home plate. This is a
+	# bespoke plate-end set, not the outfield stadium art turned around.
+	host.stands.draw_home_plate_facade(palette, Rect2i(0, 0, 320, bands.wall_top))
 
-	# Two-deck grandstand ring in three sections; the quay-wall gaps keep the
-	# harbor visible so the stands never form one unbroken wall (§6.2).
-	Style.pixel_rect(host, Rect2(72, 70, 24, 2), palette.town_near)
-	Style.pixel_rect(host, Rect2(208, 70, 24, 2), palette.town_near)
-	host.stands.draw_grandstand(palette, Rect2i(0, 56, 72, 16), 210)
-	host.stands.draw_grandstand(palette, Rect2i(96, 56, 112, 16), 220)
-	host.stands.draw_grandstand(palette, Rect2i(232, 56, 88, 16), 230)
-	host.stands.draw_bell_tower(palette, Vector2i(60, 64), 20)
-	host.atmosphere.draw_gulls(palette, [Vector2(56, 50), Vector2(64, 53), Vector2(250, 48), Vector2(258, 51)])
-	host.stands.draw_led_board(Vector2(126, 36), palette)
-
-	# Outfield wall pad strip (pass 04 adds signage).
+	# Home-plate padded rail at the foot of the club seating bowl.
 	Style.pixel_rect(host, Rect2(0, bands.wall_top, 320, bands.field_top - bands.wall_top), palette.wall_pad)
 	Style.pixel_rect(host, Rect2(0, bands.wall_top, 320, 1), palette.seat_board)
 	Style.pixel_rect(host, Rect2(0, bands.field_top - 1, 320, 1), palette.ink_mid)
 
-	# Center-field pitching room: plate, mound, and second base share one clear
-	# depth axis. First and third mirror around it, so the ground reads as a
-	# baseball diamond before decoration or actors are added.
+	# A telephoto broadcast frame contains the mound, the grass flight corridor,
+	# and the plate cutout. First, second, and third base are outside this crop;
+	# drawing them here turns the field into a diagram and destroys pitch depth.
 	var field_top: int = bands.field_top
 	var diamond: Dictionary = Landmarks.diamond("pitching")
 	var plate: Vector2 = diamond.plate
 	var mound: Vector2 = diamond.mound
-	var first: Vector2 = diamond.first
-	var second: Vector2 = diamond.second
-	var third: Vector2 = diamond.third
 	Style.pixel_rect(host, Rect2(0, field_top, 320, 180 - field_top), palette.turf_main)
-	host.playfield.draw_turf_mow_arcs(palette, plate, 0.5, Rect2i(0, field_top, 320, 180 - field_top), [
-		Vector2(36, 50), Vector2(68, 82), Vector2(100, 116), Vector2(136, 150),
-		Vector2(170, 186), Vector2(206, 222), Vector2(244, 262), Vector2(284, 302),
-	])
-	host.playfield.draw_warning_track(palette, 0, 320, field_top, 3, 1733)
-	if host.mood == "night":
-		host.playfield.draw_lamp_pool(palette, Vector2(160, 126), Vector2(52, 18))
-		host.playfield.draw_lamp_pool(palette, plate, Vector2(26, 10))
-	else:
-		host.playfield.draw_stand_shadow_stairs(palette, field_top + 3, 116 if host.mood == "golden" else 60, 8, 4)
+	# Long horizontal mow passes recede toward the plate. Uneven boundary dashes
+	# keep them organic without radial arcs or giant checker tiles.
+	var mow_light: Color = Style.shift_value(palette.turf_lit, 1) if host.mood == "night" else palette.turf_lit
+	for stripe in [Rect2(0, field_top + 13, 320, 14), Rect2(0, field_top + 45, 320, 17), Rect2(0, field_top + 82, 320, 16)]:
+		Style.pixel_rect(host, stripe, mow_light)
+	for seam_y in [field_top + 13, field_top + 27, field_top + 45, field_top + 62, field_top + 82]:
+		var dash_x := 7 + posmod(seam_y * 11, 17)
+		while dash_x < 320:
+			Style.pixel_rect(host, Rect2(dash_x, seam_y, 8, 1), palette.turf_shade)
+			dash_x += 23 + posmod(dash_x + seam_y, 13)
+	if host.mood != "night":
+		host.playfield.draw_stand_shadow_stairs(palette, field_top + 3, 92 if host.mood == "golden" else 44, 8, 4)
 
-	# Foul lines open symmetrically from home plate. A clean outer clay kite and
-	# inset grass kite create recognizable base paths; the mound remains its own
-	# visible island rather than disappearing inside an amorphous dirt mass.
-	host.playfield.chalk_seated_line(palette, plate, Vector2(34, 180), palette.turf_shade)
-	host.playfield.chalk_seated_line(palette, plate, Vector2(286, 180), palette.turf_shade)
-	var outer_diamond: Array[Vector2] = [
-		plate + Vector2(0, -2),
-		first + Vector2(8, 0),
-		second + Vector2(0, 7),
-		third + Vector2(-8, 0),
-	]
-	host.playfield.fill_organic(outer_diamond, mound, palette.clay_shade)
-	var clay_diamond: Array[Vector2] = [plate, first, second, third]
-	host.playfield.fill_organic(clay_diamond, mound, palette.clay_main)
-	var infield_grass: Array[Vector2] = [
-		plate + Vector2(0, 9),
-		first + Vector2(-9, 0),
-		second + Vector2(0, -9),
-		third + Vector2(9, 0),
-	]
-	host.playfield.fill_organic(infield_grass, mound, palette.turf_main)
-	for index in range(infield_grass.size()):
-		Style.pixel_line(host, infield_grass[index], infield_grass[(index + 1) % infield_grass.size()], palette.turf_shade)
-
-	Style.pixel_ellipse(host, plate + Vector2(0, 1), Vector2(13, 6), palette.clay_shade)
-	Style.pixel_ellipse(host, plate, Vector2(12, 5), palette.clay_main)
-	for bag: Vector2 in [first, second, third]:
-		Style.pixel_ellipse(host, bag + Vector2(0, 1), Vector2(5, 3), palette.clay_shade)
-		Style.pixel_ellipse(host, bag, Vector2(4, 2), palette.clay_main)
-	# Re-seat the two base paths most visible from center field.
-	host.playfield.chalk_seated_line(palette, plate, first, palette.clay_shade)
-	host.playfield.chalk_seated_line(palette, plate, third, palette.clay_shade)
-	host.playfield.draw_chalk_box(palette, Rect2(plate.x - 15, plate.y - 5, 7, 9))
-	host.playfield.draw_chalk_box(palette, Rect2(plate.x + 8, plate.y - 5, 7, 9))
-	host.playfield.draw_mound(palette, mound, Vector2(16, 7), Rect2(mound.x - 5, mound.y - 1, 10, 1))
-	host.playfield.draw_home_plate(palette, plate)
-	host.playfield.draw_field_bag(palette, first)
-	host.playfield.draw_field_bag(palette, second)
-	host.playfield.draw_field_bag(palette, third)
+	# Two isolated clay islands with uninterrupted grass between them—the real
+	# visual grammar of a pitch traveling from mound to plate.
+	Style.pixel_ellipse(host, plate + Vector2(0, 1), Vector2(17, 8), palette.clay_shade)
+	Style.pixel_ellipse(host, plate, Vector2(16, 7), palette.clay_main)
+	host.playfield.draw_chalk_box(palette, Rect2(plate.x - 14, plate.y - 6, 7, 10))
+	host.playfield.draw_chalk_box(palette, Rect2(plate.x + 7, plate.y - 6, 7, 10))
+	host.playfield.draw_home_plate(palette, plate, true)
+	host.playfield.draw_mound(palette, mound, Vector2(18, 8), Rect2(mound.x - 5, mound.y - 2, 10, 1))
 	host.atmosphere.draw_leaf_drift(palette)
 
 

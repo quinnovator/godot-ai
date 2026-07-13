@@ -10,9 +10,10 @@ enlarge, sample, or filter.
 The runtime keeps baseball positions as `Vector3` data because height, lateral
 movement, and field depth remain useful simulation concepts. The view director
 maps those values into five fixed integer-pixel compositions. No `Camera3D`,
-mesh, light, environment, spatial shader, skeletal rig, or composite pixel
-filter participates in the image. No `SubViewport`, offscreen low-resolution
-texture, or framebuffer post-process participates either.
+mesh, light, environment, spatial shader, or skeletal rig participates in the
+image. No `SubViewport` or offscreen low-resolution texture participates. One
+world-only dense-pixel compositor uses nearest native-grid taps for hard rim,
+stepped emissive, posterization, and atmosphere before the native HUD.
 
 ## Generative contract
 
@@ -49,8 +50,10 @@ silently repairs an asset with resampling or a pixel filter.
    `PixiballPixelActorSprite` draws role equipment and stepped poses.
 5. `BaseballVisual` retains the ball's simulation position while its pixel
    presenter draws a one- to three-design-unit ball, shadow, and discrete trail.
-6. The HUD renders into the same native root and follows the same 4 px design
-   grid with integer bounds.
+6. `WorldCompositeLayer/WorldGrade` samples only prior world pixels on the
+   native 4 px grid; it never resizes or filters the scene.
+7. The HUD renders afterward into the same native root and follows the same
+   4 px design grid with integer bounds.
 
 This split leaves gameplay deterministic and inspectable while allowing the AI
 fork to regenerate any visible layer without reconstructing a spatial asset

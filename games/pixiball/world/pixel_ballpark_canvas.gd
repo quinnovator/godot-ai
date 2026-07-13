@@ -4,6 +4,7 @@ extends Node2D
 const Style = preload("res://presentation/pixel_art_style.gd")
 const Landmarks = preload("res://world/view_landmarks.gd")
 const AtmosphereStage = preload("res://world/stages/atmosphere.gd")
+const MaterialDetailStage = preload("res://world/stages/material_detail.gd")
 const SkylineStage = preload("res://world/stages/skyline.gd")
 const PlayfieldStage = preload("res://world/stages/playfield.gd")
 const StandsStage = preload("res://world/stages/stands.gd")
@@ -76,6 +77,7 @@ var _burst_serial := 0
 var _bursts: Array[Dictionary] = []
 
 var atmosphere
+var material_detail
 var skyline
 var playfield
 var stands
@@ -86,6 +88,7 @@ func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	z_index = -100
 	atmosphere = AtmosphereStage.new(self)
+	material_detail = MaterialDetailStage.new(self)
 	skyline = SkylineStage.new(self)
 	playfield = PlayfieldStage.new(self)
 	stands = StandsStage.new(self)
@@ -252,6 +255,7 @@ func _draw() -> void:
 			views.draw_dugout(palette)
 		_:
 			views.draw_intro(palette)
+	material_detail.draw(palette)
 	_draw_bursts()
 	atmosphere.draw_vignette(palette)
 

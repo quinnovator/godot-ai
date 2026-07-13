@@ -93,8 +93,9 @@ func _enter_tree() -> void:
 
 func _configure_native_framebuffer() -> void:
 	# The game renders straight into a 1440p root. PixelScene's 4x CanvasItem
-	# transform expands one dense 640x360 design unit into one 4x4 native block;
-	# there is deliberately no low-resolution SubViewport or sampled intermediate.
+	# transform expands one dense 640x360 design unit into one 4x4 native block.
+	# A world-only screen pass adds stepped rim/emissive/atmosphere layers before
+	# the native HUD; there is still no low-resolution SubViewport or resampling.
 	var game_window := get_window()
 	game_window.content_scale_size = NATIVE_FRAMEBUFFER_SIZE
 	game_window.content_scale_mode = Window.CONTENT_SCALE_MODE_VIEWPORT
@@ -662,6 +663,7 @@ func _set_ready() -> void:
 	var batter_hand := "L" if String(_current_batter_identity.get("bats", "right")) == "left" else "R"
 	var batter_archetype := String(_current_batter_identity.get("archetype", "BALANCED HITTER")).to_upper().trim_suffix(" HITTER")
 	hud.set_identity("%s  #%02d   •   %s   •   %s BAT   •   %s" % [player_name, player_number, offense_team.name, batter_hand, batter_archetype])
+	hud.set_matchup_rail_visible(true)
 	hud.set_pitch_selector(sim.is_user_pitching(), selected_pitch)
 	hud.set_strike_zone_visible(true)
 	hud.set_pitch_marker(Vector2.ZERO, false)
@@ -906,6 +908,7 @@ func _begin_pitch() -> void:
 	pitch_release_world = Vector3.ZERO
 	pitch_release_captured = false
 	defenders["pitcher"].play_action("pitch")
+	hud.set_matchup_rail_visible(false)
 	hud.set_pitch_selector(false)
 	hud.set_pitch_marker(Vector2.ZERO, false)
 	hud.set_help("TRACK THE RELEASE" if sim.is_user_pitching() else "READ THE PITCH  •  TIME YOUR SWING")
@@ -1386,6 +1389,23 @@ func _cycle_mood() -> void:
 
 func _set_visual_mood(mood: String) -> void:
 	stadium.set_mood(mood)
+	var world_grade := get_node_or_null("WorldCompositeLayer/WorldGrade") as ColorRect
+	var material := world_grade.material as ShaderMaterial if world_grade != null else null
+	if material == null:
+		return
+	match mood:
+		"night":
+			material.set_shader_parameter("rim_strength", 0.24)
+			material.set_shader_parameter("glow_strength", 0.30)
+			material.set_shader_parameter("atmosphere_strength", 0.16)
+		"golden":
+			material.set_shader_parameter("rim_strength", 0.21)
+			material.set_shader_parameter("glow_strength", 0.21)
+			material.set_shader_parameter("atmosphere_strength", 0.12)
+		_:
+			material.set_shader_parameter("rim_strength", 0.16)
+			material.set_shader_parameter("glow_strength", 0.10)
+			material.set_shader_parameter("atmosphere_strength", 0.08)
 
 
 func _contact_detail(trajectory: Dictionary) -> String:

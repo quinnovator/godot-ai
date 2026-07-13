@@ -59,10 +59,14 @@ Every implementation decision must be justifiable by at least one pillar.
 ## 2. Technical frame (inherited, restated)
 
 - Native root framebuffer `2560x1440`. No SubViewport, no 320x180 buffer, no
-  sampled intermediate, no 3D node, no shader pixelation.
-- World/actor art authors on the 320x180 design grid; one design cell
-  (**1 cell**) = exactly 4x4 native pixels through the existing `PixelScene`
-  4x transform (`presentation/pixel_art_style.gd` `GRID_PIXEL_SIZE`).
+  resized intermediate, no 3D node, and no filtered pixelation.
+- Structural world/actor art retains a 320x180 composition vocabulary and is
+  expanded 2x onto the true 640x360 design grid. One structural cell is 8x8
+  native pixels; a 0.5-cell material mark is one true design cell and exactly
+  4x4 native pixels through `PixelScene`.
+- One world-only shader (`WorldCompositeLayer/WorldGrade`) is allowed. It uses
+  nearest 4 px taps for hard rim, stepped emissive, posterization, and sparse
+  atmosphere, then the HUD renders natively above it.
 - UI Controls and fonts use direct native coordinates and native font sizes;
   rendered text is never scaled as a texture. UI decoration snaps to a 4px
   rhythm for cohesion.
@@ -254,7 +258,7 @@ native-pixel block. "Cell" below always means one 4px design cell.
 1. Per-cell uniform random noise fields (the baseline crowd).
 2. Alpha-gradient fills, radial gradients, soft shadows, engine draw
    antialiasing.
-3. Sub-cell (non-multiple-of-4 native px) positioning of world art.
+3. Positioning outside the 4-native-pixel dense design grid.
 4. Pure `#000000` or `#ffffff` outside the `ink`/`ball_white` definitions.
 5. Black outlines around environment shapes; outline-everything cartooning.
 6. Exact-tile repetition visible at native zoom (crowd, seats, water).
@@ -262,7 +266,8 @@ native-pixel block. "Cell" below always means one 4px design cell.
    outfield wedge is the canonical example) — break with mow bands, shadow
    drift, or cluster texture.
 8. More than one warm focal pool per screen (Pillar 1).
-9. Photo/AI raster textures, 3D nodes, shader pixelation (contract).
+9. Photo/AI raster textures, 3D nodes, filtered shader pixelation, or any
+   compositor other than the single authorized world grade (contract).
 
 ---
 
@@ -288,18 +293,33 @@ anchors; camera and sim mapping contracts are unchanged.
 
 ### 6.2 `pitching`
 
-- Keep the functional anchors: strike zone/catcher block upper-left third
-  (zone center ≈ (97, 80)), pitcher on the mound center-right (feet ≈
-  (204, 128)). The baseline's brown base-path ribbon is dead; a proper clay
-  infield arc sweeps from (60, 150) to (280, 130).
-- Horizon at y=46; skyline and mast tops visible in the gaps between
-  grandstand sections (the stands must not form one unbroken wall); stands
-  and crowd 56–72; wall 72–78; field 78–180.
+- The camera is a tight center-field television angle looking inward toward
+  home plate, with the pronounced horizontal offset associated with the
+  Citizens Bank Park feed. The plate sits near (160, 92) while the pitcher and
+  mound sit camera-left near (138, 141); that diagonal is the core
+  pitch-movement stage. The batter remains fully outside the zone to
+  camera-left.
+- This crop shows only the plate cutout, uninterrupted grass flight corridor,
+  and foreground mound. First, second, and third base are outside the frame.
+  Never draw a full base-path diamond in the pitching view: it reads as a UI
+  diagram and collapses the telephoto depth.
+- The Liberty Bell, scoreboard, harbor, and outfield skyline are behind the
+  camera and never appear in this view. The upper frame is the plate-facing
+  Diamond Club: recessed club glass behind an irregular brick belt, three
+  separately raked premium seating rooms, broad masonry wings/piers, stepped
+  brick portals, wall padding, and a wide low protective net. Brick is the
+  structural shell around openings, never a full-frame repeating wallpaper.
+  Club/stands occupy y=0–82 and field y=82–180.
 - Focal: the pitcher, rim-lit `clay_lit`→`lantern_gold` against
   `turf_shade`. The strike zone is the secondary beacon in `chalk_line` with
   a `signal_teal` aim reticle — cool, so it never fights the pitcher.
-- Field contour: mow-band arcs around the mound, rake arcs in the clay,
-  stand shadow (`turf_shade`) across left foul territory anchoring depth.
+- Field contour: long horizontal mow passes, isolated mound and plate clay
+  islands, and uninterrupted grass between them. No checker tiles,
+  concentric/radial mowing, base bags, or clay base paths in this view.
+- Pitch flight: the ball leaves the visible hand above the mound and crosses
+  the open diagonal corridor before the zone. Three authored trail marks
+  (spark / dash / tail) are sampled from the real semantic trajectory; no
+  enlarged dotted chain or continuous ribbon may substitute for camera depth.
 - Batter, catcher, umpire cluster at the zone in Battery LOD at staggered
   depths.
 
@@ -379,17 +399,19 @@ LED reaction board sits center facade.
 
 ### 7.4 Field
 
-- Mow bands: alternating `turf_lit`/`turf_main` arcs, 6–9 cells wide,
-  concentric on home plate and following the camera's perspective per view.
-- Infield: `clay_main` arc with `clay_lit` rake marks (2-cell dash clusters
-  following the arc), `chalk_line` foul lines, batter's boxes, and a proper
-  5-sided plate (3×3-cell cluster).
+- Mow bands: alternating `turf_lit`/`turf_main`; the pitching view uses broad
+  horizontal passes while the other field views may use 6–9-cell perspective
+  arcs. Checker tiles and radial/ripple patterns are forbidden around the mound.
+- Infield: `clay_main` paths with `clay_lit` rake marks (2-cell dash clusters),
+  `chalk_line` foul lines, batter's boxes, and a proper 5-sided plate. The
+  pitching view may enlarge the plate to an 11×6-cell readability cluster.
 - Mound: 10-cell `clay_lit` crown with an `ink` shade crescent and a
   `chalk_line` rubber.
 - Bases: 2×2 `ball_white` diamonds with 1-cell `ink` ground-contact shade.
 - Golden mood: stepped long shadows from the stands cross the outfield;
-  night: the field lifts inside authored elliptical lamp pools with 2-cell
-  stair edges and stays at base night values outside them.
+  night: the pitching view lifts the same field-wide horizontal mow passes by
+  one value rung, never adding a circular or trapezoidal pool over the pitch
+  lane. Other views may use authored elliptical lamp pools with 2-cell stairs.
 
 ### 7.5 Crowd
 
@@ -423,11 +445,11 @@ light, fog lapping the breakwater. No rain or snow systems in scope.
 ### 7.8 Atmospheric layers
 
 Exactly one `mist_veil` rect over the far band (skyline+sea) per mood and
-one stepped `vignette_veil` corner treatment per screen — these are the only
-two translucent draws in the world renderer. All other depth comes from
-value rungs and saturation falloff. Far-layer colors may alternatively be
-pre-blended toward the veil at palette-build time; either way, no other
-runtime alpha.
+one stepped `vignette_veil` corner treatment per screen are the only authored
+translucent geometry. The world grade may add opaque hard-step rim, emissive,
+posterization, vignette, and mote results at the native dense grid. Far-layer
+colors may alternatively be pre-blended toward the veil at palette-build time;
+no smooth alpha ramp is allowed.
 
 ---
 
@@ -679,11 +701,12 @@ change (grayscale-safe).
   outs as three lamp cells lighting `stitch_red`, situation text
   right-aligned in Header 24 team trim. Baserunner diamond: a 28-px rotated
   square cluster; occupied bases fill `lantern_gold`.
-- **Strike zone** (`ui/strike_zone.gd`): `chalk_paper` 1-cell corner ticks +
-  a 3×3 dashed `steel_text` interior grid, `signal_teal` aim reticle,
-  called-strike cells flashing `lantern_gold`; the zone never exceeds 2
-  rungs above its backdrop. The pitch-trajectory preview is stepped
-  `chalk_line` segments — the baseline's opaque brown ribbons are dead.
+- **Strike zone** (`ui/strike_zone.gd`): a thin continuous `chalk_paper` rail
+  in an `ink` seat + a persistent 3×3 dashed `steel_text` interior grid,
+  `signal_teal` aim reticle, and called-strike cells flashing
+  `lantern_gold`. Plate actors stay outside or below its perimeter so the
+  guide never becomes a cage over the batter. The pitch-trajectory preview is
+  stepped `chalk_line` segments — the baseline's opaque brown ribbons are dead.
 - **Pitch selector**: five pennant tabs keyed to the existing `PITCH_SLOTS`
   hues, number + pitch code in Numerals 28; the focused pennant hoists,
   unfocused tabs dim to `steel_text`.

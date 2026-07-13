@@ -8,6 +8,7 @@ const DESIGN_SIZE := Vector2i(640, 360)
 const GRID_PIXEL_SIZE := 4
 
 var _failures: Array[String] = []
+var _world_compositor_count := 0
 
 
 func _initialize() -> void:
@@ -35,7 +36,12 @@ func _run() -> void:
 	if pixel_scene != null:
 		_check(pixel_scene.scale == Vector2(4, 4), "PixelScene does not use the exact 4x direct-render transform")
 		_check(pixel_scene.texture_filter == CanvasItem.TEXTURE_FILTER_NEAREST, "PixelScene does not force nearest source-texture sampling")
+	var composite_layer := game.get_node_or_null("WorldCompositeLayer") as CanvasLayer
+	_check(composite_layer != null, "main scene lost the world-only dense-pixel compositor")
+	if composite_layer != null:
+		_check(composite_layer.layer == 10, "world compositor must render below the native HUD")
 	_validate_direct_tree(game)
+	_check(_world_compositor_count == 1, "runtime must contain exactly one authorized world compositor, got %d" % _world_compositor_count)
 	game.queue_free()
 	await process_frame
 	_finish()
@@ -45,7 +51,12 @@ func _validate_direct_tree(node: Node) -> void:
 	_check(not (node is SubViewport), "forbidden offscreen SubViewport at %s" % node.get_path())
 	_check(not (node is SubViewportContainer), "forbidden SubViewportContainer at %s" % node.get_path())
 	if node is CanvasItem:
-		_check(not ((node as CanvasItem).material is ShaderMaterial), "forbidden postprocess ShaderMaterial at %s" % node.get_path())
+		var material := (node as CanvasItem).material
+		if material is ShaderMaterial:
+			var authorized := node.name == &"WorldGrade" and node.get_parent() is CanvasLayer and node.get_parent().name == &"WorldCompositeLayer"
+			_check(authorized, "unauthorized ShaderMaterial at %s" % node.get_path())
+			if authorized:
+				_world_compositor_count += 1
 	for child in node.get_children():
 		_validate_direct_tree(child)
 
@@ -57,7 +68,7 @@ func _check(condition: bool, message: String) -> void:
 
 func _finish() -> void:
 	if _failures.is_empty():
-		print("PIXIBALL_NATIVE_1440_PIPELINE_OK root=2560x1440 design=640x360 density=2x grid=4px subviewports=0 postprocess=0")
+		print("PIXIBALL_NATIVE_1440_PIPELINE_OK root=2560x1440 design=640x360 density=2x grid=4px subviewports=0 world_compositors=1")
 		quit(0)
 		return
 	for failure in _failures:

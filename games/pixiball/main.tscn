@@ -9,6 +9,10 @@
 [ext_resource type="Script" uid="uid://cgxd4q2fpmwts" path="res://presentation/haptics/haptic_director.gd" id="7_haptics"]
 [ext_resource type="Script" uid="uid://detm3tc1eg1p7" path="res://ui/pixiball_hud.gd" id="8_hud"]
 [ext_resource type="PackedScene" path="res://ui/pitch_intel/pitch_intel_panel.tscn" id="9_intel"]
+[ext_resource type="Shader" path="res://presentation/world_pixel_composite.gdshader" id="10_world_composite"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_world_composite"]
+shader = ExtResource("10_world_composite")
 
 [node name="Pixiball" type="Node" unique_id=98687748]
 script = ExtResource("1_main")
@@ -45,6 +49,19 @@ script = ExtResource("6_audio")
 
 [node name="HapticDirector" type="Node" parent="Systems" unique_id=1381824830]
 script = ExtResource("7_haptics")
+
+[node name="WorldCompositeLayer" type="CanvasLayer" parent="."]
+layer = 10
+
+[node name="WorldBackBuffer" type="BackBufferCopy" parent="WorldCompositeLayer"]
+copy_mode = 2
+rect = Rect2(0, 0, 2560, 1440)
+
+[node name="WorldGrade" type="ColorRect" parent="WorldCompositeLayer"]
+material = SubResource("ShaderMaterial_world_composite")
+offset_right = 2560.0
+offset_bottom = 1440.0
+mouse_filter = 2
 
 [node name="PixiballHUD" type="CanvasLayer" parent="." unique_id=1515197848]
 script = ExtResource("8_hud")

@@ -10,7 +10,9 @@ extends RefCounted
 
 const BAND_DATUMS := {
 	"intro": {"horizon": 58, "sea_bottom": 114, "stands_top": 82, "wall_top": 114, "field_top": 118},
-	"pitching": {"horizon": 46, "sea_bottom": 72, "stands_top": 56, "wall_top": 72, "field_top": 78},
+	# The center-field pitching camera faces home plate, so its upper band is a
+	# closed club/seating interior rather than an exterior horizon.
+	"pitching": {"horizon": 0, "sea_bottom": 76, "stands_top": 35, "wall_top": 76, "field_top": 82},
 	"batting": {"horizon": 42, "sea_bottom": 56, "stands_top": 42, "wall_top": 54, "field_top": 60},
 	"fielding": {"horizon": 36, "sea_bottom": 50, "stands_top": 48, "wall_top": 58, "field_top": 62},
 	"dugout": {"horizon": 56, "sea_bottom": 63, "stands_top": 63, "wall_top": 73, "field_top": 75},
@@ -26,14 +28,15 @@ const DIAMOND := {
 		"third": Vector2(122, 143),
 	},
 	"pitching": {
-		# Center-field broadcast axis with a restrained first-base-side offset.
-		# The four bags retain their baseball topology instead of collapsing into
-		# the former lower-right clay wedge.
-		"plate": Vector2(158, 96),
-		"mound": Vector2(165, 134),
-		"first": Vector2(191, 126),
-		"second": Vector2(168, 154),
-		"third": Vector2(135, 126),
+		# Citizens Bank Park-inspired center-field feed: the camera is notably
+		# offset, leaving the pitcher left of the plate sightline. Only plate and
+		# mound are rendered in this telephoto crop; the bag anchors remain useful
+		# projection contracts outside the visible stage.
+		"plate": Vector2(160, 92),
+		"mound": Vector2(138, 141),
+		"first": Vector2(171, 130),
+		"second": Vector2(127, 166),
+		"third": Vector2(115, 130),
 	},
 	"batting": {
 		"plate": Vector2(160, 154),
@@ -62,13 +65,15 @@ const DIAMOND := {
 ## Authored strike-zone rectangles (design cells) for the two tight views.
 const STRIKE_ZONES := {
 	"batting": Rect2(137, 91, 46, 56),
-	"pitching": Rect2(143, 66, 30, 36),
+	# Near-physical 17:24 proportions, lifted clear of the plate cutout. The
+	# former wider frame read as a generic targeting panel in this tight view.
+	"pitching": Rect2(151, 57, 22, 30),
 }
 
 ## Projection lanes: near→far design anchors for depth mapping.
 const PROJECTION_LANES := {
 	"intro": {"near": Vector2(208, 145), "far": Vector2(116, 92)},
-	"pitching": {"near": Vector2(168, 154), "far": Vector2(158, 96)},
+	"pitching": {"near": Vector2(127, 166), "far": Vector2(160, 92)},
 	"batting": {"near": Vector2(160, 154), "far": Vector2(160, 76)},
 	"dugout": {"origin": Vector2(160, 142)},
 	"fielding": {"origin": Vector2(160, 155)},

@@ -5,12 +5,18 @@ athletes, ball, effects, and HUD are intentional CanvasItem clusters authored
 on a `640x360` dense design grid whose unit is exactly one `4x4` framebuffer
 block. Existing `320x180` composition landmarks receive an exact 2x density
 transform before `PixelScene` applies its direct 4x CanvasItem transform. No
-design grid is an image, texture, viewport, or intermediate framebuffer, and
-the game does not depend on resampling or a post-process filter for its style.
+design grid is an image, texture, viewport, or intermediate framebuffer. One
+world-only compositor samples that native grid with nearest taps before the HUD
+to add stepped rim light, emissive fringes, posterized values, and atmosphere;
+it does not resize or blur the scene.
 
 The target is an original harbor-league world with clear action silhouettes,
-expressive color, layered environmental storytelling, and dense detail only
-where it survives the design grid. Reference PNGs in `references/` guide
+expressive color, layered environmental storytelling, and dense material detail
+at the full design grid. The renderer takes process cues from the
+[Animal Well developer rendering breakdown](https://blog.playstation.com/2022/07/20/how-animal-well-taps-into-ps5-hardware-to-elevate-2d-pixel-art-platforming/):
+layered compositing, hard value thresholds, local rim light, reflections/glow,
+and dense authored pixels, while retaining Pixiball's own baseball setting and
+models. Reference PNGs in `references/` guide
 composition and readability; they are not atlas-ready source art and must not
 be traced into runtime assets.
 
@@ -22,10 +28,12 @@ be traced into runtime assets.
   density transform.
 - Use the Compatibility renderer only as the CanvasItem backend. Do not add a
   spatial scene, `SubViewport`, offscreen low-resolution texture, dynamic
-  surface lighting, anti-aliasing, framebuffer filter, or composite shader.
+  surface lighting, anti-aliasing, or framebuffer filter. Exactly one
+  `WorldCompositeLayer/WorldGrade` shader is authorized below the native HUD.
+  Its taps remain locked to the 4 px design grid.
 - Build with flat rectangles, lines, stepped ellipses, and deliberate clusters.
-  Avoid smooth gradients, subpixel motion, fractional alpha, and single-pixel
-  noise spread across the frame.
+  Avoid smooth gradients, subpixel motion, fractional alpha, and uniform noise
+  spread across the frame. Material marks must form deterministic clusters.
 - Cap each accepted generated frame at 32 opaque colors. Character ramps use at
   most four tones, including outline and shadow.
 - Share the navy-ink, sea-teal, verdigris, coral/brick, mustard, and cream value

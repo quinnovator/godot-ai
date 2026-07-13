@@ -1045,6 +1045,7 @@ func show_final(mode: String, state: Dictionary, stats: Dictionary, new_best: bo
 func show_game() -> void:
 	title_layer.visible = false
 	game_layer.visible = true
+	set_matchup_rail_visible(true)
 
 
 func show_title() -> void:
@@ -1177,6 +1178,15 @@ func set_pitch_selector(visible: bool, selected := -1) -> void:
 		_pitch_flags[index].position.y = 0.0 if active else float(S.NATIVE_UNIT)
 		_pitch_flags[index].queue_redraw()
 		pitch_labels[index].add_theme_color_override("font_color", INK if active else _pennant_rest_color())
+
+
+func set_matchup_rail_visible(visible: bool) -> void:
+	# Broadcast scorebug stays; the two-line identity/arm rail clears during the
+	# delivery so the pitch corridor gains twelve composition rows.
+	if _identity_board != null:
+		_identity_board.visible = visible
+	if _arm_board != null:
+		_arm_board.visible = visible
 
 
 func set_field_meter(visible: bool, value := 0.0) -> void:

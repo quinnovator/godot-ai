@@ -19,6 +19,13 @@
     "window_scale_policy": "integer_only",
     "three_dimensional_assets": false,
     "postprocess_pixel_filter": false,
+    "world_compositor": {
+      "path": "WorldCompositeLayer/WorldGrade",
+      "count": 1,
+      "grid_tap_px": 4,
+      "filter": "nearest",
+      "runs_before_native_hud": true
+    },
     "dynamic_surface_lighting": false,
     "anti_aliasing": false,
     "integer_transforms": true
@@ -62,12 +69,13 @@
     "maximum_colors_per_frame": 32,
     "moods": ["day", "golden", "night"],
     "transparent_alpha_values": [0, 255],
-    "forbid_color_gradients": true
+    "forbid_color_gradients": true,
+    "runtime_composite_value_steps": 32
   },
   "generation": {
     "source_kind": "declarative_pixel_clusters",
     "required_metadata": ["role", "action", "frame", "pivot", "palette_slots"],
     "validation_command": "python tools/validate_native_pixel_art.py content/pixel/style_contract.json <png...>",
-    "notes": "Generated bitmaps are accepted only after 2560x1440 native-framebuffer, palette, alpha, and 4px-grid validation. The 320x180 coordinate vocabulary is composition space; a 2x density transform authors onto the 640x360 design grid before PixelScene maps those CanvasItems directly into the root framebuffer without an intermediate texture."
+    "notes": "Generated bitmaps are accepted only after 2560x1440 native-framebuffer, palette, alpha, and 4px-grid validation. The 320x180 coordinate vocabulary is composition space; a 2x density transform authors onto the 640x360 design grid before PixelScene maps those CanvasItems directly into the root framebuffer without an intermediate texture. One world-only nearest-grid compositor runs before the native HUD."
   }
 }

@@ -41,6 +41,36 @@ func mow_row(y: int, from_x: float, to_x: float, left: int, right: int, color: C
 	if seg_right > seg_left:
 		Style.pixel_rect(host, Rect2(seg_left, y, seg_right - seg_left, 1), color)
 
+func draw_turf_checkerboard(palette: Dictionary, region: Rect2i, tile: Vector2i, seed: int) -> void:
+	# Broad, straight stadium mowing blocks. The pitching view uses this instead
+	# of plate-centered arcs so the turf supports field perspective rather than
+	# reading as a radar/ripple pattern.
+	var width := maxi(8, tile.x)
+	var height := maxi(6, tile.y)
+	var row := 0
+	var y := region.position.y
+	while y < region.end.y:
+		var x := region.position.x - width
+		var column := -1
+		while x < region.end.x:
+			if posmod(column + row + seed, 2) == 0:
+				var clipped := Rect2i(x, y, width, mini(height, region.end.y - y)).intersection(region)
+				if clipped.has_area():
+					Style.pixel_rect(host, Rect2(clipped), palette.turf_lit)
+			x += width
+			column += 1
+		y += height
+		row += 1
+
+func draw_basepath_diamond(palette: Dictionary, bases: Array[Vector2]) -> void:
+	# Four explicit dirt lanes preserve the open grass center and make the base
+	# topology readable at a glance. The shade seat keeps each lane grounded.
+	for index in range(bases.size()):
+		var from := bases[index]
+		var to := bases[(index + 1) % bases.size()]
+		Style.pixel_line(host, from, to, palette.clay_shade, 11.0)
+		Style.pixel_line(host, from, to, palette.clay_main, 7.0)
+
 func draw_warning_track(palette: Dictionary, left: int, right: int, top: int, depth: int, seed: int) -> void:
 	# Clay strip under the wall pads (§6.4) with 1-cell drip overhangs every
 	# 6-14 cells so the grass seam never runs straight (§5.1).
@@ -120,7 +150,14 @@ func draw_mound(palette: Dictionary, center: Vector2, radius: Vector2, rubber: R
 	Style.pixel_rect(host, Rect2(rubber.position + Vector2(0, 1), rubber.size), palette.clay_shade)
 	Style.pixel_rect(host, rubber, palette.chalk_line)
 
-func draw_home_plate(palette: Dictionary, center: Vector2) -> void:
+func draw_home_plate(palette: Dictionary, center: Vector2, prominent := false) -> void:
+	if prominent:
+		Style.pixel_rect(host, Rect2(center.x - 5, center.y - 3, 11, 6), palette.ink_mid)
+		Style.pixel_rect(host, Rect2(center.x - 4, center.y - 2, 9, 2), palette.chalk_line)
+		Style.pixel_rect(host, Rect2(center.x - 3, center.y, 7, 1), palette.chalk_line)
+		Style.pixel_rect(host, Rect2(center.x - 2, center.y + 1, 5, 1), palette.chalk_line)
+		Style.pixel_rect(host, Rect2(center.x, center.y + 2, 1, 1), palette.chalk_line)
+		return
 	# Proper 5-sided plate, point toward the catcher, seated on its shadow
 	# side (§7.4, §5.2).
 	Style.pixel_rect(host, Rect2(center.x - 1, center.y + 1, 3, 1), palette.clay_shade)
@@ -131,5 +168,3 @@ func draw_field_bag(palette: Dictionary, center: Vector2) -> void:
 	# 2x2 chalk bag with a 1-cell ink ground-contact shade (§7.4).
 	Style.pixel_rect(host, Rect2(center.x - 1, center.y + 1, 1, 1), palette.ink)
 	Style.pixel_rect(host, Rect2(center.x - 1, center.y - 1, 2, 2), palette.chalk_line)
-
-

@@ -5,7 +5,9 @@ extends RefCounted
 ## 320x180 coordinate vocabulary, then a 2x density transform authors it onto
 ## a 640x360 design grid. PixelScene maps each dense design unit to an exact
 ## 4x4 block while CanvasItems rasterize directly into the 2560x1440 root. There is
-## no low-resolution viewport, texture upscale, filtering, or post-process.
+## no low-resolution viewport, texture upscale, or filtered sampling. A single
+## world-only dense-pixel compositor may grade the direct native framebuffer;
+## HUD CanvasLayers are drawn afterward and remain unprocessed.
 
 const COMPOSITION_SIZE := Vector2i(320, 180)
 const DENSITY_SCALE := 2
@@ -337,6 +339,15 @@ static func pixel_rect(canvas: CanvasItem, rect: Rect2, color: Color) -> void:
 	var snapped := Rect2(rect.position.floor(), rect.size.ceil())
 	if snapped.size.x > 0.0 and snapped.size.y > 0.0:
 		canvas.draw_rect(snapped, color, true)
+
+
+static func detail_rect(canvas: CanvasItem, rect: Rect2, color: Color) -> void:
+	# Half-composition increments are one true cell on the 640x360 design grid.
+	# This deliberately avoids pixel_rect's legacy whole-cell floor/ceil step.
+	var snapped_position := (rect.position * float(DENSITY_SCALE)).floor() / float(DENSITY_SCALE)
+	var snapped_size := (rect.size * float(DENSITY_SCALE)).ceil() / float(DENSITY_SCALE)
+	if snapped_size.x > 0.0 and snapped_size.y > 0.0:
+		canvas.draw_rect(Rect2(snapped_position, snapped_size), color, true)
 
 
 static func pixel_line(canvas: CanvasItem, from: Vector2, to: Vector2, color: Color, width := 1.0) -> void:

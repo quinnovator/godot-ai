@@ -576,6 +576,24 @@ func _draw_body(p: Dictionary, pose: Dictionary, s: int) -> void:
 			_hand(bare_hand, p.skin, s)
 			_mitt(glove_hand, (3 if not stance.mitt_boost else 4) * s)
 
+	# Dense material pass: real 640x360 cells add fabric weave, pant seams,
+	# leather catches, and a consistent upper-left rim without changing the
+	# readable battery/marquee silhouette.
+	var cloth_lit: Color = Style.shift_value(cloth, 1)
+	var pants_lit: Color = Style.shift_value(p.pants, 1)
+	var skin_lit: Color = Style.shift_value(p.skin, 1)
+	var left_edge := float(lean + twist - chest_w / 2)
+	_dense_rect(left_edge + 0.5, float(torso_top) + 0.5, 0.5, maxf(0.5, float(torso_h) - 1.0), cloth_lit)
+	_dense_rect(float(lean + twist) - 1.0, float(torso_top) + float(s) * 2.5, 1.5, 0.5, cloth_shadow)
+	_dense_rect(float(l_ankle.x) - 0.5, float(ankle_y) - float(s) * 2.5, 0.5, float(s) * 1.5, pants_lit)
+	_dense_rect(float(r_ankle.x) - 0.5, float(ankle_y) - float(s) * 2.0, 0.5, float(s), p.cloth_shadow)
+	_dense_rect(float(l_hand.x) - 0.5, float(l_hand.y) - 0.5, 0.5, 0.5, skin_lit)
+	_dense_rect(float(r_hand.x) - 0.5, float(r_hand.y) - 0.5, 0.5, 0.5, skin_lit)
+	if variant == "catcher":
+		_dense_rect(left_edge + float(s), float(torso_top) + float(s) * 1.5, maxf(0.5, float(chest_w) - float(s) * 2.0), 0.5, GEAR_BAR)
+	elif variant not in ["umpire", "batter"]:
+		_dense_rect(left_edge + float(s), float(torso_top) + 0.5, maxf(0.5, float(chest_w) - float(s) * 2.0), 0.5, p.trim)
+
 
 func _draw_slide_body(p: Dictionary, pose: Dictionary, s: int) -> void:
 	var f := int(pose.get("facing", 1))
@@ -629,6 +647,12 @@ func _draw_battery_head(cx: int, top: int, p: Dictionary, pose: Dictionary, vari
 	var glint := 0 if f > 0 else 1
 	_dense_rect(cx - 4 + glint, top + 5, 0.5, 0.5, BALL_WHITE)
 	_dense_rect(cx + 2 + glint, top + 5, 0.5, 0.5, BALL_WHITE)
+	# Dense facial modeling: cheek plane, nose bridge, lower lid, and jaw catch.
+	var face_lit: Color = Style.shift_value(p.skin, 1)
+	_dense_rect(cx - 4.5, top + 4.5, 0.5, 2.5, face_lit)
+	_dense_rect(cx - 0.5 + float(f) * 0.5, top + 6.0, 0.5, 1.0, p.skin_shadow)
+	_dense_rect(cx + 2.0, top + 6.5, 1.5, 0.5, p.skin_shadow)
+	_dense_rect(cx - 2.5, top + 8.0, 3.0, 0.5, face_lit)
 	# Mouth states: 1-2 cells only at Battery LOD.
 	match String(e.mouth):
 		"grin":
@@ -695,6 +719,11 @@ func _draw_marquee_head(cx: int, top: int, p: Dictionary, pose: Dictionary, vari
 	var glint := 0 if f > 0 else 1
 	_dense_rect(cx - 5 + glint, top + 8, 0.5, 0.5, BALL_WHITE)
 	_dense_rect(cx + 3 + glint, top + 8, 0.5, 0.5, BALL_WHITE)
+	var face_lit: Color = Style.shift_value(p.skin, 1)
+	_dense_rect(cx - 7.5, top + 6.0, 0.5, 6.0, face_lit)
+	_dense_rect(cx - 0.5 + float(f) * 0.5, top + 10.0, 0.5, 1.5, p.skin_shadow)
+	_dense_rect(cx + 3.0, top + 10.5, 1.5, 0.5, p.skin_shadow)
+	_dense_rect(cx - 3.5, top + 14.5, 5.0, 0.5, face_lit)
 	# Cheek blush / dirt smudge, 1 cell per cheek.
 	_rect(cx - 6, top + 12, 1, 1, CLAY_SMUDGE)
 	_rect(cx + 5, top + 12, 1, 1, CLAY_SMUDGE)
@@ -872,6 +901,20 @@ func _draw_diamond(p: Dictionary, pose: Dictionary) -> void:
 		var boost := 1 if stance.mitt_boost else 0
 		_rect(glove_hand.x - 1, glove_hand.y - 1 - boost, 2 + boost, 2 + boost, _leather_main)
 		_rect(glove_hand.x, glove_hand.y - boost, 1, 1, _leather_lit)
+
+	# Even the distant model uses the dense grid: cap seam, face plane, jersey
+	# edge, pant crease, and leather catch keep a 7x11 silhouette from becoming
+	# a flat stack of composition blocks.
+	var face_lit: Color = Style.shift_value(p.skin, 1)
+	var cloth_lit: Color = Style.shift_value(cloth, 1)
+	var pants_lit: Color = Style.shift_value(p.pants, 1)
+	_dense_rect(float(lean) - 1.5, float(head_top) + 0.5, 3.5, 0.5, Style.shift_value(trim, 1))
+	_dense_rect(float(lean) - 1.5, float(head_top) + 3.5, 0.5, 1.0, face_lit)
+	_dense_rect(float(lean + f), float(head_top) + 3.0, 0.5, 0.5, BALL_WHITE)
+	_dense_rect(float(lean) - float(chest_w) * 0.5 + 0.5, float(torso_top) + 0.5, 0.5, 2.5, cloth_lit)
+	_dense_rect(float(lean) - 0.5, float(torso_top) + 2.5, 1.5, 0.5, p.cloth_shadow)
+	_dense_rect(float(l_leg) + 0.5, -1.5 + float(bob), 0.5, 1.0, pants_lit)
+	_dense_rect(float(r_leg) + 0.5, -1.0 + float(bob), 0.5, 0.5, p.cloth_shadow)
 
 
 # ---------------------------------------------------------------------------
